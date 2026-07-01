@@ -8,8 +8,8 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 
 1. **Deterministic Orchestration Foundation** - Completed bootstrap: Python project, CLI, typed config, run artifacts, named command execution, Git worktree foundation, validation workflow.
 2. **RTL Repository Discovery and Structured Repository Model** - Completed deterministic repository scanner, lightweight SystemVerilog extraction, hierarchy candidate scoring, build-flow evidence discovery, JSON repository map, CLI, run artifacts, and tests.
-3. **Issue Parsing and Task Contracts** - Active next milestone: convert bounded engineering issues into explicit typed contracts with scope, invariants, acceptance criteria, validation commands, prohibited shortcuts, and evidence requirements.
-4. **Model Provider Abstraction and One Bounded Implementation Agent** - Add interchangeable model adapters and one tightly constrained implementation loop.
+3. **Issue Parsing and Task Contracts** - Completed deterministic issue-to-contract parser with explicit scope, invariants, acceptance criteria, validation commands, prohibited shortcuts, evidence requirements, warnings, CLI, and tests.
+4. **Model Provider Abstraction and One Bounded Implementation Agent** - Active next milestone: add interchangeable model adapters and one tightly constrained implementation loop.
 5. **Verification Execution and Failure Iteration** - Run configured verification, classify failures, and iterate within limits.
 6. **Independent Reviewer** - Add separate review context for diff, evidence, risks, and acceptance criteria.
 7. **Waveform and Assertion Triage** - Capture simulator outputs, waveforms, assertions, and failure summaries.
@@ -19,4 +19,4 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 
 ## Current Status
 
-Stages 1 and 2 are complete. Stage 3 is active.
+Stages 1 through 3 are complete. Stage 4 is active.

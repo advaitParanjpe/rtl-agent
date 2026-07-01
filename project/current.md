@@ -1,27 +1,29 @@
-# Issue Parsing and Explicit Task Contracts
+# Model Provider Abstraction and One Bounded Implementation Agent
 
 ## Objective
 
-Transform a user-supplied issue in Markdown or plain text into a typed task contract containing the requested behavior, scoped repository context, invariants, acceptance criteria, required validation commands, prohibited shortcuts, and evidence requirements.
+Add interchangeable model-provider adapters and one tightly constrained implementation loop that can propose edits for a typed task contract while preserving deterministic tool boundaries, validation evidence, and honest failure reporting.
 
 ## Scope
 
-- Add deterministic issue parsing invoked from the CLI.
-- Accept a Markdown or plain-text issue file and optional repository-map JSON.
-- Produce a versioned task-contract JSON artifact using typed Pydantic models.
-- Extract explicit sections, checklists, code/path references, validation commands, constraints, and acceptance criteria with deterministic parsing heuristics.
-- Preserve uncertainty as warnings or missing fields rather than inventing requirements.
-- Add focused tests using compact issue fixtures.
-- Update README usage for issue parsing.
+- Add typed model-provider interfaces and request/response models.
+- Support at least one local or stub provider suitable for deterministic tests.
+- Add one bounded implementation-agent loop that consumes a task-contract JSON and repository-map JSON.
+- Require explicit working-path validation before edits.
+- Persist prompts, model responses, decisions, and outcomes as run artifacts.
+- Keep command execution limited to configured named commands.
+- Add focused tests with stubbed model responses.
+- Update README usage for the bounded implementation flow.
 
 ## Acceptance Criteria
 
-- Task contracts are stable JSON for the same issue text and inputs.
-- Parser handles common Markdown headings, bullet lists, checkboxes, fenced commands, and path/code references.
-- Contract records requested behavior, scoped context, invariants, acceptance criteria, validation commands, prohibited shortcuts, and evidence requirements when present.
-- Missing or ambiguous sections are reported as warnings.
-- CLI returns non-zero for invalid issue paths or malformed repository-map inputs.
-- Existing discovery, command-runner, config, run-store, and worktree tests continue to pass.
+- Provider interfaces are interchangeable and fully typed.
+- Tests run without network access or real model credentials.
+- The implementation loop respects task-contract prohibited shortcuts and scoped repository context.
+- The loop can produce either a bounded proposed diff or a structured failure report.
+- Validation commands are executed only through existing configured named-command infrastructure.
+- Run artifacts contain enough evidence to audit prompts, responses, edits, and validation outcomes.
+- Existing discovery, issue parsing, command-runner, config, run-store, and worktree tests continue to pass.
 
 ## Required Validation Commands
 
@@ -31,10 +33,10 @@ Transform a user-supplied issue in Markdown or plain text into a typed task cont
 
 ## Exclusions
 
-- Do not add model-provider integration.
-- Do not add autonomous implementation-agent behavior.
-- Do not execute validation commands from parsed issues.
-- Do not implement planning, review agents, waveform analysis, mutation testing, CI bots, databases, queues, dashboards, or a web UI.
+- Do not add multiple autonomous agents.
+- Do not add reviewer agents, waveform analysis, mutation testing, CI bots, databases, queues, dashboards, or a web UI.
+- Do not execute arbitrary shell commands supplied by model output.
+- Do not require external model credentials for tests.
 
 ## Completion State
 

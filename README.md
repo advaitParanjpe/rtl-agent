@@ -20,6 +20,7 @@ This bootstrap contains deterministic infrastructure only:
 - named command execution with timeout and output logs;
 - narrow Git worktree helpers;
 - deterministic RTL repository discovery with a versioned JSON repository map;
+- deterministic issue parsing with a versioned JSON task contract;
 - tests, linting, formatting, and type checking.
 
 It does not yet contain an AI coding agent, model-provider integration, autonomous implementation, review agents, waveform analysis, mutation testing, pull requests, dashboards, queues, databases, or containers.
@@ -41,6 +42,7 @@ rtl-agent --help
 rtl-agent init
 rtl-agent inspect-config --config examples/rtl-agent.yaml
 rtl-agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json
+rtl-agent parse-issue --issue examples/issues/reset-behavior.md --repository-map .rtl-agent/simple-rtl-map.json --output .rtl-agent/reset-task-contract.json
 rtl-agent discover --config examples/rtl-agent.yaml
 rtl-agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
@@ -51,6 +53,7 @@ Module invocation also works:
 python3 -m rtl_agent --help
 python3 -m rtl_agent inspect-config --config examples/rtl-agent.yaml
 python3 -m rtl_agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json
+python3 -m rtl_agent parse-issue --issue examples/issues/reset-behavior.md --repository-map .rtl-agent/simple-rtl-map.json --output .rtl-agent/reset-task-contract.json
 python3 -m rtl_agent discover --config examples/rtl-agent.yaml
 python3 -m rtl_agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
@@ -107,6 +110,21 @@ Discovery inspects files under one repository root and never executes commands f
 For Verilog/SystemVerilog, discovery uses a lightweight parser that masks comments and strings before extracting ordinary module, interface, package, program, checker, include, import, and instantiation patterns. This is not a complete SystemVerilog parser: it does not preprocess macros, elaborate generates, resolve parameters, or semantically compile the design. Top-level modules are reported as scored candidates with reasons, not as guaranteed truth.
 
 Build and verification discovery recognizes command evidence for tools including Verilator, Icarus Verilog, Yosys, cocotb, pytest, Make, and SymbiYosys. Commercial tools may appear as recorded evidence when explicitly referenced.
+
+## Issue Parsing
+
+`parse-issue` converts a Markdown or plain-text issue into a typed task-contract JSON document:
+
+```bash
+rtl-agent parse-issue \
+  --issue examples/issues/reset-behavior.md \
+  --repository-map .rtl-agent/simple-rtl-map.json \
+  --output .rtl-agent/reset-task-contract.json
+```
+
+It extracts only explicit information from recognized headings, bullets, checkboxes, fenced shell commands, and path/code references. Supported contract fields include requested behavior, scoped repository context, invariants, acceptance criteria, validation commands, prohibited shortcuts, evidence requirements, checklist items, warnings, and optional repository-map context.
+
+Issue parsing is deterministic and does not execute validation commands. Ambiguous prose such as "maybe", "if possible", or "consider" is preserved only when it appears inside an explicit requirement section and is also reported as a warning. Unsectioned ambiguous prose is ignored with a warning. The parser does not plan an implementation or invent missing requirements.
 
 ## Run Artifacts
 

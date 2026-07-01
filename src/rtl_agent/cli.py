@@ -10,6 +10,7 @@ from rtl_agent.artifacts import RunStore
 from rtl_agent.config import load_config
 from rtl_agent.discovery import DiscoveryError, discover_repository, write_repository_map
 from rtl_agent.execution import CommandRunner
+from rtl_agent.issues import IssueParsingError, parse_issue_file, write_task_contract
 
 app = typer.Typer(
     help="Deterministic orchestration foundation for RTL engineering workflows.",
@@ -138,6 +139,28 @@ def discover(
     _print_discovery_summary(repository_map, discovery_output, run_id=run_store.run_id)
 
 
+@app.command("parse-issue")
+def parse_issue(
+    issue: Annotated[Path, typer.Option("--issue", help="Markdown or text issue file.")],
+    output: Annotated[Path, typer.Option("--output", help="Path for task-contract JSON.")],
+    repository_map: Annotated[
+        Path | None,
+        typer.Option(
+            "--repository-map", help="Optional repository-map JSON for context validation."
+        ),
+    ] = None,
+) -> None:
+    """Parse an explicit issue into a deterministic task contract."""
+    try:
+        contract = parse_issue_file(issue, repository_map)
+        write_task_contract(contract, output)
+    except IssueParsingError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_task_contract_summary(contract, output)
+
+
 def _print_discovery_summary(
     repository_map: object, output: Path, run_id: str | None = None
 ) -> None:
@@ -158,6 +181,26 @@ def _print_discovery_summary(
     if run_id:
         summary["run_id"] = run_id
     _print_json(summary)
+
+
+def _print_task_contract_summary(contract: object, output: Path) -> None:
+    from rtl_agent.task_contract import TaskContract
+
+    assert isinstance(contract, TaskContract)
+    _print_json(
+        {
+            "schema_version": contract.schema_version,
+            "issue_path": str(contract.issue_path),
+            "output": str(output),
+            "requested_behavior": len(contract.requested_behavior),
+            "acceptance_criteria": len(contract.acceptance_criteria),
+            "validation_commands": len(contract.validation_commands),
+            "warnings": len(contract.warnings),
+            "repository_map": str(contract.repository_map.path)
+            if contract.repository_map is not None
+            else None,
+        }
+    )
 
 
 def main() -> None:

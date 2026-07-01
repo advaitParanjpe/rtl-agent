@@ -53,3 +53,27 @@ Known limitations:
 - No full SystemVerilog preprocessing, elaboration, parameter resolution, generate expansion, or semantic compilation.
 - Build discovery records command evidence but does not integrate or run EDA tools.
 - No issue parsing, task contracts, AI coding agent, or model-provider abstraction yet.
+
+## 2026-07-01 - Issue Parsing and Explicit Task Contracts
+
+Completed deterministic issue parsing with a typed, versioned task-contract JSON schema, Markdown/plain-text section extraction, checklist handling, fenced validation command parsing, path/code reference extraction, optional repository-map validation, CLI support, tests, and README usage.
+
+Validation evidence:
+
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, and 30 pytest tests.
+- `.venv/bin/rtl-agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json` - passed and produced a repository map for issue-context validation.
+- `.venv/bin/rtl-agent parse-issue --issue examples/issues/reset-behavior.md --repository-map .rtl-agent/simple-rtl-map.json --output .rtl-agent/reset-task-contract.json` - passed; inspected JSON reported schema version 1, 1 requested behavior item, 2 acceptance criteria, 2 validation commands, no warnings, and matched repository-relative paths.
+- `git diff --check` - passed.
+
+Architectural decisions:
+
+- Issue parsing extracts only explicit sections, bullets, checkboxes, fenced shell commands, and path/code references.
+- Ambiguous prose is warned about rather than converted into invented requirements.
+- Parsed validation commands are recorded as argv and raw text but never executed.
+- Repository-map input is validated with the existing Pydantic repository-map schema and used only for context matching.
+
+Known limitations:
+
+- No natural-language planning or inference beyond deterministic section and pattern extraction.
+- No model-provider integration or autonomous implementation-agent behavior yet.
+- No execution of parsed validation commands.
