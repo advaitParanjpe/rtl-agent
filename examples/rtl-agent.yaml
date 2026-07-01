@@ -1,0 +1,19 @@
+schema_version: 1
+repository_path: ..
+run_artifact_dir: ../.rtl-agent/runs
+allowed_working_paths:
+  - ..
+protected_paths:
+  - ../.git
+  - ../.rtl-agent
+execution:
+  timeout_seconds: 30
+  max_output_bytes: 1048576
+commands:
+  smoke:
+    argv:
+      - python3
+      - -c
+      - "print('rtl-agent smoke ok')"
+    cwd: ..
+    timeout_seconds: 10
