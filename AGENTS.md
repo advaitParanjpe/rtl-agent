@@ -19,7 +19,7 @@ Every agent session must:
 6. Iterate on failures until the milestone is complete or a genuine blocker is proven.
 7. Update project-control documents before finishing.
 8. Leave a concise final handoff suitable for pasting into ChatGPT.
-9. Never commit, push, create remote resources, or modify files outside this repository unless explicitly instructed.
+9. Use GitHub checkpoints for coherent, validated repository states according to the repository Git policy below.
 
 There must be exactly one active implementation milestone in `project/current.md`.
 
@@ -55,8 +55,16 @@ Do not leave `project/current.md` ambiguous or containing several possible next 
 ## Repository Boundaries
 
 - Do not modify files outside this repository.
-- Do not create remotes.
-- Do not commit unless explicitly instructed.
+- Never modify Git configuration outside this repository.
+- Never create or change a remote unless explicitly instructed.
+- Never force-push or rewrite published history.
+- Never commit secrets, virtual environments, generated run artifacts, logs, caches, or temporary repositories.
+- Create commits only at coherent, validated checkpoints.
+- Use concise conventional-style commit messages.
+- Push after each checkpoint commit when a configured GitHub remote exists.
+- Do not push failing work to the default branch.
+- Every completed milestone must end with all intended files committed and pushed.
+- Record the final commit hash and pushed branch in the milestone handoff.
 - Keep generated outputs under ignored paths such as `.rtl-agent/`, `.venv/`, or test temporary directories.
 
 ## Final Handoff Template
@@ -73,6 +81,11 @@ IMPLEMENTED:
 
 VALIDATION:
 - `<command>` — PASS/FAIL
+
+GIT:
+- Branch: <branch>
+- Commits: <short hashes and messages>
+- Push: PASS/FAIL with remote name
 
 KEY FILES:
 - ...
