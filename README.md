@@ -19,9 +19,10 @@ This bootstrap contains deterministic infrastructure only:
 - durable JSON/JSONL run artifacts;
 - named command execution with timeout and output logs;
 - narrow Git worktree helpers;
+- deterministic RTL repository discovery with a versioned JSON repository map;
 - tests, linting, formatting, and type checking.
 
-It does not yet contain an AI coding agent, model-provider integration, RTL discovery, EDA-specific parsing, autonomous branch management, commits, pushes, pull requests, dashboards, queues, databases, or containers.
+It does not yet contain an AI coding agent, model-provider integration, autonomous implementation, review agents, waveform analysis, mutation testing, pull requests, dashboards, queues, databases, or containers.
 
 ## Installation
 
@@ -39,6 +40,8 @@ python -m pip install -e ".[dev]"
 rtl-agent --help
 rtl-agent init
 rtl-agent inspect-config --config examples/rtl-agent.yaml
+rtl-agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json
+rtl-agent discover --config examples/rtl-agent.yaml
 rtl-agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
 
@@ -47,7 +50,32 @@ Module invocation also works:
 ```bash
 python3 -m rtl_agent --help
 python3 -m rtl_agent inspect-config --config examples/rtl-agent.yaml
+python3 -m rtl_agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json
+python3 -m rtl_agent discover --config examples/rtl-agent.yaml
 python3 -m rtl_agent run-command --config examples/rtl-agent.yaml --command smoke
+```
+
+`inspect-repo` writes the repository map to the caller-specified path and prints only a concise summary, for example:
+
+```json
+{
+  "commands": 2,
+  "declarations": 4,
+  "files_indexed": 6,
+  "output": ".rtl-agent/simple-rtl-map.json",
+  "schema_version": 1,
+  "warnings": 0
+}
+```
+
+`discover --config ...` inspects the configured repository and writes a run artifact such as:
+
+```text
+.rtl-agent/runs/<run-id>/
+├── run.json
+├── events.jsonl
+└── discovery/
+    └── repository-map.json
 ```
 
 Run canonical checks:
@@ -68,8 +96,17 @@ git status --short
 - named validation commands;
 - run-artifact directory;
 - execution timeout and output limits.
+- discovery include/exclude patterns and scan limits.
 
 Commands are executed by name only. The runner does not invoke a shell.
+
+## Repository Discovery
+
+Discovery inspects files under one repository root and never executes commands found in that repository. It classifies common RTL, include, testbench, assertion, constraint, build, script, documentation, generated/vendor, and unknown relevant files. It currently recognizes Verilog/SystemVerilog source extensions `.v`, `.sv`, `.vh`, and `.svh`, plus common project files such as `Makefile`, `*.mk`, `*.tcl`, `*.ys`, `*.sby`, file lists, YAML/TOML/JSON config, and Python scripts.
+
+For Verilog/SystemVerilog, discovery uses a lightweight parser that masks comments and strings before extracting ordinary module, interface, package, program, checker, include, import, and instantiation patterns. This is not a complete SystemVerilog parser: it does not preprocess macros, elaborate generates, resolve parameters, or semantically compile the design. Top-level modules are reported as scored candidates with reasons, not as guaranteed truth.
+
+Build and verification discovery recognizes command evidence for tools including Verilator, Icarus Verilog, Yosys, cocotb, pytest, Make, and SymbiYosys. Commercial tools may appear as recorded evidence when explicitly referenced.
 
 ## Run Artifacts
 

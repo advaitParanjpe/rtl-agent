@@ -1,46 +1,40 @@
-# RTL Repository Discovery and Structured Repository Model
+# Issue Parsing and Explicit Task Contracts
 
 ## Objective
 
-Inspect a Verilog/SystemVerilog repository efficiently and generate a machine-readable repository map covering source files, testbenches, build commands, top-level candidates, packages/interfaces, and available verification or synthesis flows.
+Transform a user-supplied issue in Markdown or plain text into a typed task contract containing the requested behavior, scoped repository context, invariants, acceptance criteria, required validation commands, prohibited shortcuts, and evidence requirements.
 
 ## Scope
 
-- Add deterministic repository discovery invoked from the CLI.
-- Scan only configured allowed paths and respect protected paths.
-- Identify Verilog/SystemVerilog source files, likely testbenches, package/interface declarations, module declarations, and top-level candidates with lightweight parsing.
-- Detect common verification or synthesis entry points such as Makefiles, FuseSoC cores, scripts, simulator command files, and CI workflows without executing them.
-- Persist a versioned repository map artifact as stable JSON.
-- Add focused tests using temporary RTL repositories.
-
-## Deliverables
-
-- Discovery models and scanner modules under `src/rtl_agent/`.
-- CLI command for repository discovery.
-- JSON artifact schema for the repository map.
-- Example or fixture RTL repository snippets in tests only.
-- Updated README quick-start section for discovery.
+- Add deterministic issue parsing invoked from the CLI.
+- Accept a Markdown or plain-text issue file and optional repository-map JSON.
+- Produce a versioned task-contract JSON artifact using typed Pydantic models.
+- Extract explicit sections, checklists, code/path references, validation commands, constraints, and acceptance criteria with deterministic parsing heuristics.
+- Preserve uncertainty as warnings or missing fields rather than inventing requirements.
+- Add focused tests using compact issue fixtures.
+- Update README usage for issue parsing.
 
 ## Acceptance Criteria
 
-- Discovery produces stable JSON with paths relative to the inspected repository root.
-- Discovery refuses paths outside configured allowed working paths and skips protected paths.
-- Tests cover source classification, declaration extraction, top-level candidate heuristics, flow detection, and artifact writing.
-- Existing command-runner and worktree tests continue to pass.
+- Task contracts are stable JSON for the same issue text and inputs.
+- Parser handles common Markdown headings, bullet lists, checkboxes, fenced commands, and path/code references.
+- Contract records requested behavior, scoped context, invariants, acceptance criteria, validation commands, prohibited shortcuts, and evidence requirements when present.
+- Missing or ambiguous sections are reported as warnings.
+- CLI returns non-zero for invalid issue paths or malformed repository-map inputs.
+- Existing discovery, command-runner, config, run-store, and worktree tests continue to pass.
 
 ## Required Validation Commands
 
 - `python3 scripts/check.py`
-- `python3 -m rtl_agent discover --config examples/rtl-agent.yaml`
 - `git diff --check`
 - `git status --short`
 
 ## Exclusions
 
-- Do not execute EDA tools during discovery.
-- Do not add model-provider or autonomous implementation-agent behavior.
-- Do not implement full SystemVerilog parsing.
-- Do not create commits, remotes, pull requests, databases, queues, dashboards, or containers.
+- Do not add model-provider integration.
+- Do not add autonomous implementation-agent behavior.
+- Do not execute validation commands from parsed issues.
+- Do not implement planning, review agents, waveform analysis, mutation testing, CI bots, databases, queues, dashboards, or a web UI.
 
 ## Completion State
 

@@ -11,4 +11,4 @@ dist/
 build/
 *.egg-info/
 .rtl-agent/
-artifacts/
+/artifacts/

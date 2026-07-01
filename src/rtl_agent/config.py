@@ -12,6 +12,13 @@ class ExecutionConfig(BaseModel):
     max_output_bytes: int = Field(default=10_485_760, gt=0)
 
 
+class DiscoveryConfig(BaseModel):
+    include_patterns: list[str] = Field(default_factory=list)
+    exclude_patterns: list[str] = Field(default_factory=list)
+    max_file_count: int = Field(default=20_000, gt=0)
+    max_text_file_bytes: int = Field(default=1_048_576, gt=0)
+
+
 class CommandConfig(BaseModel):
     argv: list[str] = Field(min_length=1)
     cwd: Path = Path(".")
@@ -32,6 +39,7 @@ class AgentConfig(BaseModel):
     allowed_working_paths: list[Path] = Field(min_length=1)
     protected_paths: list[Path] = Field(default_factory=list)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
+    discovery: DiscoveryConfig = Field(default_factory=DiscoveryConfig)
     commands: dict[str, CommandConfig] = Field(default_factory=dict)
     config_path: Path | None = Field(default=None, exclude=True)
 

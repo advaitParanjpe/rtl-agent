@@ -1,0 +1,1 @@
+`define SIMPLE_RTL_EXAMPLE 1
