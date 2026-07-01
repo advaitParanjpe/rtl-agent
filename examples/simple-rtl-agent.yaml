@@ -1,0 +1,17 @@
+schema_version: 1
+repository_path: simple-rtl
+run_artifact_dir: ../.rtl-agent/runs
+allowed_working_paths:
+  - simple-rtl
+protected_paths: []
+execution:
+  timeout_seconds: 30
+  max_output_bytes: 1048576
+commands:
+  smoke:
+    argv:
+      - python3
+      - -c
+      - "print('simple rtl smoke ok')"
+    cwd: simple-rtl
+    timeout_seconds: 10

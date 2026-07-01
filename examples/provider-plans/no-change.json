@@ -1,0 +1,17 @@
+{
+  "responses": [
+    {
+      "message": "Exercise the bounded replace_text path without changing file content.",
+      "stop": true,
+      "tool_calls": [
+        {
+          "new": "module top;\n    import types_pkg::*;\n    `include \"defs.svh\"\n\n    child u_child (\n        .clk(clk)\n    );\nendmodule\n",
+          "old": "module top;\n    import types_pkg::*;\n    `include \"defs.svh\"\n\n    child u_child (\n        .clk(clk)\n    );\nendmodule\n",
+          "path": "rtl/top.sv",
+          "tool": "replace_text"
+        }
+      ],
+      "validation_commands": []
+    }
+  ]
+}
