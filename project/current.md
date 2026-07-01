@@ -1,29 +1,27 @@
-# Model Provider Abstraction and One Bounded Implementation Agent
+# Verification Execution and Failure Iteration
 
 ## Objective
 
-Add interchangeable model-provider adapters and one tightly constrained implementation loop that can propose edits for a typed task contract while preserving deterministic tool boundaries, validation evidence, and honest failure reporting.
+Run configured verification commands for a bounded implementation report, classify failures deterministically, and allow limited retry iterations using existing task-contract, repository-map, provider, and implementation-agent artifacts.
 
 ## Scope
 
-- Add typed model-provider interfaces and request/response models.
-- Support at least one local or stub provider suitable for deterministic tests.
-- Add one bounded implementation-agent loop that consumes a task-contract JSON and repository-map JSON.
-- Require explicit working-path validation before edits.
-- Persist prompts, model responses, decisions, and outcomes as run artifacts.
-- Keep command execution limited to configured named commands.
-- Add focused tests with stubbed model responses.
-- Update README usage for the bounded implementation flow.
+- Add deterministic verification result classification for configured named commands.
+- Classify failures into categories such as timeout, missing executable, command failure, assertion/test failure evidence, lint/syntax evidence, and unknown failure.
+- Extend the bounded implementation flow to optionally perform limited retry iterations after failed validation.
+- Persist verification attempts, classifications, retry decisions, and final outcomes as run artifacts.
+- Keep command execution restricted to configured named commands and explicit permissions.
+- Add focused tests using stub provider responses and small temporary repositories.
+- Update README usage for verification failure iteration.
 
 ## Acceptance Criteria
 
-- Provider interfaces are interchangeable and fully typed.
-- Tests run without network access or real model credentials.
-- The implementation loop respects task-contract prohibited shortcuts and scoped repository context.
-- The loop can produce either a bounded proposed diff or a structured failure report.
-- Validation commands are executed only through existing configured named-command infrastructure.
-- Run artifacts contain enough evidence to audit prompts, responses, edits, and validation outcomes.
-- Existing discovery, issue parsing, command-runner, config, run-store, and worktree tests continue to pass.
+- Verification classification is deterministic and based only on command metadata and captured stdout/stderr artifacts.
+- Retry attempts are bounded by explicit limits.
+- The system records why it retried or why it stopped.
+- Failed work produces an honest structured failure report with evidence paths.
+- Passing work produces a proposed-diff report with validation evidence.
+- Existing discovery, issue parsing, implementation-agent, command-runner, config, run-store, and worktree tests continue to pass.
 
 ## Required Validation Commands
 
@@ -33,10 +31,10 @@ Add interchangeable model-provider adapters and one tightly constrained implemen
 
 ## Exclusions
 
-- Do not add multiple autonomous agents.
 - Do not add reviewer agents, waveform analysis, mutation testing, CI bots, databases, queues, dashboards, or a web UI.
-- Do not execute arbitrary shell commands supplied by model output.
-- Do not require external model credentials for tests.
+- Do not execute arbitrary shell commands from provider output.
+- Do not add pull-request automation.
+- Do not broaden model-provider support beyond what is needed for deterministic tests.
 
 ## Completion State
 
