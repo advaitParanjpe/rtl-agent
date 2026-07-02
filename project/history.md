@@ -247,3 +247,24 @@ Known limitations:
 - The exporter indexes artifacts present under one local run directory only.
 - It records artifact metadata and hashes, not embedded artifact contents.
 - Optional report discovery outside the run directory is not included.
+
+## 2026-07-02 - Schema Examples and Compatibility Fixtures
+
+Completed compact checked-in public-schema examples for repository-map, task-contract, implementation-report, review-report, triage-report, verification-strength-report, benchmark-report, and evidence-bundle-report artifacts. Added compatibility tests that discover all checked-in schema examples, validate each through the current Pydantic model, re-serialize through `model_dump(mode="json")`, and keep assertions focused on schema compatibility rather than volatile timestamps, durations, UUIDs, absolute paths, or real hashes.
+
+Validation evidence:
+
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, and 82 pytest tests.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Fixtures are compact documentation and compatibility artifacts, not generated run directories.
+- Compatibility checks reuse existing typed models rather than handwritten duplicate schemas.
+- Fixture content uses representative relative paths and placeholder values for volatile fields.
+
+Known limitations:
+
+- Fixtures are representative examples, not exhaustive schema conformance suites.
+- No migration infrastructure, remote schema registry, code generation, CI automation, or unrelated workflow feature was added.

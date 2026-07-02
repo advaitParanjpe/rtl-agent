@@ -1,0 +1,23 @@
+{
+  "assertion_failures": [],
+  "bounded_evidence": [
+    {
+      "line": 1,
+      "source": "stdout",
+      "text": "ok"
+    }
+  ],
+  "command_exit_code": 0,
+  "command_name": "smoke",
+  "command_result_path": "runs/example/commands/smoke/result.json",
+  "command_status": "passed",
+  "parser_notes": [
+    "No assertion failure patterns found."
+  ],
+  "schema_version": 1,
+  "simulator_context": [],
+  "stderr_path": "runs/example/commands/smoke/stderr.log",
+  "stdout_path": "runs/example/commands/smoke/stdout.log",
+  "warnings": [],
+  "waveform_references": []
+}

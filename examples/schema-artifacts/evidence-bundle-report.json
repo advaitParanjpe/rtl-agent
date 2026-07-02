@@ -1,0 +1,40 @@
+{
+  "artifacts": [
+    {
+      "artifact_id": "run-json",
+      "exists": true,
+      "included_in_bundle": false,
+      "kind": "run_metadata",
+      "omitted_reason": "index only; content is not duplicated in compact evidence bundle",
+      "provenance": "local run artifact: run.json",
+      "relative_path": "run.json",
+      "schema_version": 1,
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "size_bytes": 96,
+      "source_path": "runs/example/run.json"
+    },
+    {
+      "artifact_id": "commands__smoke__stdout-log",
+      "exists": true,
+      "included_in_bundle": false,
+      "kind": "command_stdout",
+      "omitted_reason": "referenced only; artifact content remains in the local run directory",
+      "provenance": "local run artifact: commands/smoke/stdout.log",
+      "relative_path": "commands/smoke/stdout.log",
+      "schema_version": null,
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "size_bytes": 3,
+      "source_path": "runs/example/commands/smoke/stdout.log"
+    }
+  ],
+  "failure_reason": null,
+  "manifest_path": "bundles/example/manifest.json",
+  "output_dir": "bundles/example",
+  "run_dir": "runs/example",
+  "schema_version": 1,
+  "status": "passed",
+  "summary": "passed evidence bundle export with 2 artifact references",
+  "warnings": [
+    "optional artifact is missing: implementation/report.json"
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "commands": [
+    {
+      "category": "unit_test",
+      "command_text": "make smoke",
+      "confidence": 0.8,
+      "evidence": "smoke: python3 -c \"print('ok')\"",
+      "label": "smoke",
+      "line": 1,
+      "source_file": "Makefile",
+      "tool": "make"
+    }
+  ],
+  "discovered_at": "2026-07-02T00:00:00Z",
+  "files": [
+    {
+      "categories": [
+        "rtl_source"
+      ],
+      "path": "rtl/top.sv",
+      "size_bytes": 64,
+      "source": {
+        "declarations": [
+          {
+            "kind": "module",
+            "line": 1,
+            "name": "top"
+          }
+        ],
+        "imports": [],
+        "includes": [],
+        "instantiations": []
+      }
+    }
+  ],
+  "git": {
+    "branch": "main",
+    "commit_hash": "0000000",
+    "detached": false,
+    "dirty": false,
+    "is_git_repository": true
+  },
+  "guidance": [
+    {
+      "classification": "editable_rtl",
+      "path": "rtl/top.sv"
+    }
+  ],
+  "hierarchy": {
+    "design_top_candidates": [
+      {
+        "declaration_line": 1,
+        "declaration_path": "rtl/top.sv",
+        "is_testbench": false,
+        "name": "top",
+        "reasons": [
+          "uninstantiated module"
+        ],
+        "score": 10
+      }
+    ],
+    "duplicate_declarations": [],
+    "instantiated_types": [],
+    "testbench_top_candidates": [],
+    "uninstantiated_modules": [
+      "top"
+    ],
+    "unresolved_instantiations": []
+  },
+  "parser_notes": [],
+  "repository_root": "examples/simple-rtl",
+  "scan_statistics": {
+    "directories_seen": 2,
+    "files_indexed": 1,
+    "files_seen": 1,
+    "files_skipped": 0,
+    "relevant_files": 1,
+    "skipped_binary": 0,
+    "skipped_excluded": 0,
+    "skipped_oversized": 0,
+    "skipped_symlink": 0
+  },
+  "schema_version": 1,
+  "tool_version": "0.1.0",
+  "warnings": []
+}

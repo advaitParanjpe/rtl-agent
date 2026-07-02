@@ -1,0 +1,41 @@
+{
+  "assessed_acceptance_criteria": [
+    "Smoke validation passes."
+  ],
+  "changed_files": [
+    "rtl/top.sv"
+  ],
+  "covered_acceptance_criteria": [
+    "Smoke validation passes."
+  ],
+  "implementation_report_path": "examples/schema-artifacts/implementation-report.json",
+  "repository_map_path": "examples/schema-artifacts/repository-map.json",
+  "review_report_path": "examples/schema-artifacts/review-report.json",
+  "schema_version": 1,
+  "score": 75,
+  "signals": [
+    {
+      "description": "The latest smoke validation command passed.",
+      "evidence": [
+        {
+          "artifact": "examples/schema-artifacts/implementation-report.json",
+          "detail": "command=smoke; status=passed"
+        }
+      ],
+      "kind": "positive",
+      "points": 15,
+      "signal_id": "validation-passed-latest",
+      "title": "Latest validation command passed"
+    }
+  ],
+  "strength": "moderate",
+  "summary": "moderate verification strength with compact example evidence",
+  "task_contract_path": "examples/schema-artifacts/task-contract.json",
+  "triage_report_paths": [
+    "examples/schema-artifacts/triage-report.json"
+  ],
+  "validation_commands": [
+    "smoke"
+  ],
+  "weak_patterns": []
+}

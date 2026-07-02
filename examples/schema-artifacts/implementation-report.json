@@ -1,0 +1,51 @@
+{
+  "allowed_files": [
+    "rtl/top.sv"
+  ],
+  "allowed_validation_commands": [
+    "smoke"
+  ],
+  "applied_files": [
+    "rtl/top.sv"
+  ],
+  "diff_path": "runs/example/implementation/diff.patch",
+  "failure_reason": null,
+  "iterations": 1,
+  "provider": "stub",
+  "repository_map_path": "examples/schema-artifacts/repository-map.json",
+  "repository_root": "examples/simple-rtl",
+  "retry_decisions": [],
+  "schema_version": 1,
+  "status": "proposed_diff",
+  "task_contract_path": "examples/schema-artifacts/task-contract.json",
+  "tool_results": [
+    {
+      "message": "replacement applied",
+      "path": "rtl/top.sv",
+      "status": "applied",
+      "tool": "replace_text"
+    }
+  ],
+  "validation_results": [
+    {
+      "classification": {
+        "category": "passed",
+        "evidence": [
+          "exit_code=0"
+        ],
+        "stderr_excerpt": [],
+        "stdout_excerpt": [
+          "ok"
+        ],
+        "summary": "command passed"
+      },
+      "command_name": "smoke",
+      "exit_code": 0,
+      "result_path": "runs/example/commands/smoke/result.json",
+      "status": "passed",
+      "stderr_path": "runs/example/commands/smoke/stderr.log",
+      "stdout_path": "runs/example/commands/smoke/stdout.log"
+    }
+  ],
+  "warnings": []
+}
