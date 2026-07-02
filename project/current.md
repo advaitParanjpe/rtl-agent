@@ -1,27 +1,26 @@
-# Independent Reviewer
+# Waveform and Assertion Triage
 
 ## Objective
 
-Add an independent deterministic review pass over a proposed implementation report, diff artifact, task contract, repository map, and validation evidence to produce a structured review finding set covering acceptance criteria, risks, evidence gaps, and required follow-up.
+Capture and summarize simulator outputs, assertion failures, waveform artifact references, and failure context from configured verification command artifacts so later stages can reason about RTL failures without ingesting unrestricted logs.
 
 ## Scope
 
-- Add typed review request/response models and a versioned review-report JSON artifact.
-- Consume existing task-contract, repository-map, implementation-report, diff, and validation artifacts.
-- Check that validation passed before marking work acceptable.
-- Detect missing evidence, failed validation, out-of-scope file edits, prohibited-shortcut conflicts, and acceptance-criteria gaps using deterministic rules.
-- Add a CLI command for review.
-- Persist review artifacts under the existing run-artifact structure where applicable.
-- Add focused tests using compact fixtures and existing stub-provider flows.
-- Update README usage for the review pass.
+- Extend verification evidence extraction for common simulator and assertion failure patterns.
+- Record bounded stdout/stderr excerpts and artifact paths for waveform, VCD/FST/FSDB, assertion, and simulation-output files when referenced by command artifacts.
+- Add typed triage models and versioned JSON artifacts.
+- Integrate triage summaries with existing verification classification and review artifacts where practical.
+- Keep all command execution restricted to configured named commands.
+- Add focused tests using compact synthetic simulator outputs.
+- Update README usage for waveform/assertion triage.
 
 ## Acceptance Criteria
 
-- Review reports are stable JSON for the same inputs.
-- Failed validation or missing validation evidence prevents an acceptable review outcome.
-- Out-of-scope edits and prohibited-shortcut conflicts are reported as findings.
-- The review command returns non-zero for malformed inputs or unacceptable results when requested by CLI options.
-- Existing discovery, issue parsing, implementation-agent, verification iteration, command-runner, config, run-store, and worktree tests continue to pass.
+- Triage artifacts are deterministic and bounded for the same command artifacts.
+- Assertion failures and waveform references are extracted from captured command output when explicitly present.
+- The system does not ingest unrestricted logs into provider prompts or review findings.
+- Missing waveform files are reported as warnings with cited evidence.
+- Existing discovery, issue parsing, implementation-agent, verification iteration, review, command-runner, config, run-store, and worktree tests continue to pass.
 
 ## Required Validation Commands
 
@@ -31,10 +30,10 @@ Add an independent deterministic review pass over a proposed implementation repo
 
 ## Exclusions
 
-- Do not add a second implementation agent.
-- Do not add pull-request automation.
-- Do not add waveform analysis, mutation testing, CI bots, databases, queues, dashboards, or a web UI.
-- Do not require external model credentials for tests.
+- Do not add waveform rendering or UI.
+- Do not add mutation testing.
+- Do not add pull-request automation, CI bots, databases, queues, dashboards, or a web UI.
+- Do not require external EDA tools for tests.
 
 ## Completion State
 
