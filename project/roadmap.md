@@ -14,9 +14,9 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 6. **Independent Reviewer** - Completed read-only review reports with deterministic findings, optional provider finding separation, evidence citations, validation gating, scope checks, CLI, examples, and tests.
 7. **Waveform and Assertion Triage** - Completed bounded assertion, simulator-context, waveform-reference, and missing-waveform triage from command artifacts with review integration, CLI, examples, and tests.
 8. **Verification Strength and Mutation Assessment** - Completed deterministic artifact-only verification-strength scoring, weak validation pattern detection, CLI, README usage, and tests. Mutation execution remains intentionally out of scope.
-9. **Benchmark Suite** - Active next milestone: add a deterministic benchmark manifest and local runner for repeatable existing-workflow evaluations, starting with compact checked-in fixtures before larger RTL repositories.
-10. **CI and Optional Local UI Integrations** - Add reproducible CI workflows and a local evidence browser only when the CLI workflow is stable.
+9. **Benchmark Suite** - Completed deterministic local benchmark manifests, bounded named-command runner, expected-outcome reporting, run artifacts, README usage, and tests.
+10. **Evidence Bundle Export** - Active next milestone: add a deterministic local export that gathers existing run artifacts into a compact machine-readable handoff bundle.
 
 ## Current Status
 
-Stages 1 through 8 are complete. Stage 9 is active.
+Stages 1 through 9 are complete. Stage 10 is active.

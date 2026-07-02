@@ -198,3 +198,27 @@ Known limitations:
 - Acceptance and changed-file relevance use deterministic textual evidence, not semantic proof.
 - Smoke-only and simulator-failure detection are conservative heuristics.
 - No real model provider, semantic waveform analysis, CI automation, broad mutation framework, databases, queues, dashboards, or web UI.
+
+## 2026-07-02 - Benchmark Suite Manifest and Local Runner
+
+Completed a deterministic local benchmark-suite foundation. Benchmark manifests declare a run-artifact directory, bounded resources, compact local cases, existing rtl-agent config files, named-command steps, per-step timeout overrides, and expected observed statuses. The runner reuses `CommandRunner` and `RunStore`, writes command artifacts plus a versioned benchmark report, and records honest `passed`, `failed`, `timeout`, and `infrastructure_error` results without hiding earlier artifacts.
+
+Validation evidence:
+
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, and 71 pytest tests.
+- `PYTHONPATH=src .venv/bin/python -m rtl_agent run-benchmark --manifest examples/benchmarks/local-smoke.yaml --fail-on-unmet-expected` - passed with 2 compact local cases.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Benchmark execution is local and compact: no external repository downloads, copied large RTL projects, model providers, pull requests, CI, dashboards, databases, queues, or web UI.
+- The runner invokes existing configured named commands instead of duplicating orchestration logic.
+- `CommandRunner` gained an optional deterministic command-id factory for stable benchmark tests while preserving UUID command IDs by default.
+- Expected outcomes are compared against observed step statuses, but observed failure, timeout, and infrastructure-error statuses are still recorded directly.
+
+Known limitations:
+
+- The first benchmark runner supports named-command steps only.
+- Reports include measured durations, so reruns are comparable but not byte-identical across separate executions.
+- No benchmark matrix over external RTL repositories yet.

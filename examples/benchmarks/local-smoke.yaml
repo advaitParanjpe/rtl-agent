@@ -1,0 +1,26 @@
+schema_version: 1
+name: local-smoke
+run_artifact_dir: ../../.rtl-agent/runs
+resources:
+  max_cases: 2
+  max_steps_per_case: 2
+  max_step_timeout_seconds: 10
+cases:
+  - case_id: rtl-agent-smoke
+    description: Run the repository-level smoke command through existing command artifacts.
+    steps:
+      - step_id: smoke
+        kind: named_command
+        config: ../rtl-agent.yaml
+        command: smoke
+        expected_status: passed
+        timeout_seconds: 10
+  - case_id: simple-rtl-smoke
+    description: Run the compact simple-RTL smoke command.
+    steps:
+      - step_id: smoke
+        kind: named_command
+        config: ../simple-rtl-agent.yaml
+        command: smoke
+        expected_status: passed
+        timeout_seconds: 10

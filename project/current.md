@@ -1,25 +1,24 @@
-# Benchmark Suite Manifest and Local Runner
+# Evidence Bundle Export
 
 ## Objective
 
-Create a deterministic benchmark-suite foundation that can run existing rtl-agent workflow commands against compact, repository-local fixtures and persist machine-readable benchmark results.
+Create a deterministic local export command that gathers existing rtl-agent run artifacts into a compact machine-readable handoff bundle for review and archival.
 
 ## Scope
 
-- Add typed benchmark manifest and result models.
-- Add a small checked-in manifest for existing compact fixtures only.
-- Add a CLI command that runs configured benchmark steps by invoking existing rtl-agent services or configured named commands with bounded inputs.
-- Persist benchmark result artifacts under existing run-artifact paths where practical.
-- Record pass/fail status, artifact paths, durations, and concise failure summaries.
-- Add focused tests for manifest parsing, result stability, failed-step reporting, and CLI behavior.
+- Add typed evidence-bundle manifest/result models.
+- Add a CLI command that reads existing run artifacts and writes a compact export index under a caller-specified output directory.
+- Include references to available run metadata, command results, benchmark reports, implementation reports, review reports, triage reports, and verification-strength reports without re-running workflow steps.
+- Record missing optional artifacts as warnings and missing required run metadata as an honest failure.
+- Add focused tests for stable export JSON, missing-artifact warnings, failed export reporting, and CLI behavior.
 - Update README usage.
 
 ## Acceptance Criteria
 
-- Benchmark result artifacts are stable JSON for the same deterministic inputs.
-- A failing benchmark step produces a failed benchmark result without hiding earlier artifacts.
-- The runner does not fetch external repositories, call model providers, create pull requests, or require CI.
-- Existing discovery, issue parsing, implementation-agent, verification iteration, review, triage, verification-strength, command-runner, config, run-store, and worktree tests continue to pass.
+- Export artifacts are stable JSON for the same inputs.
+- The exporter never executes commands, calls model providers, mutates source files, downloads repositories, or requires CI.
+- Missing optional artifacts produce warnings; missing required run metadata produces a failed export result.
+- Existing discovery, issue parsing, implementation-agent, verification iteration, review, triage, verification-strength, benchmark, command-runner, config, run-store, and worktree tests continue to pass.
 
 ## Required Validation Commands
 
@@ -29,10 +28,9 @@ Create a deterministic benchmark-suite foundation that can run existing rtl-agen
 
 ## Exclusions
 
-- Do not add external benchmark downloads.
-- Do not add a real model provider.
 - Do not add CI automation, dashboards, databases, queues, or a web UI.
-- Do not add a broad mutation framework or semantic waveform analysis.
+- Do not add external artifact upload, remote storage, or pull-request automation.
+- Do not add real model-provider integration, semantic waveform analysis, or mutation execution.
 
 ## Completion State
 
