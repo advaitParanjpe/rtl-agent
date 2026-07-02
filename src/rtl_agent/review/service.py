@@ -17,6 +17,7 @@ from rtl_agent.review_models import (
     ReviewReport,
 )
 from rtl_agent.task_contract import TaskContract
+from rtl_agent.triage_models import TriageReport
 
 
 class ReviewError(RuntimeError):
@@ -27,6 +28,7 @@ def review_implementation(
     task_contract_path: Path,
     repository_map_path: Path,
     implementation_report_path: Path,
+    triage_report_path: Path | None = None,
     provider_findings_path: Path | None = None,
 ) -> ReviewReport:
     try:
@@ -39,6 +41,11 @@ def review_implementation(
         implementation_report = ImplementationReport.model_validate_json(
             implementation_report_path.read_text(encoding="utf-8")
         )
+        triage_report = (
+            TriageReport.model_validate_json(triage_report_path.read_text(encoding="utf-8"))
+            if triage_report_path
+            else None
+        )
     except (OSError, ValidationError, ValueError) as exc:
         raise ReviewError(f"could not load review inputs: {exc}") from exc
 
@@ -46,9 +53,11 @@ def review_implementation(
         task_contract_path=task_contract_path.resolve(),
         repository_map_path=repository_map_path.resolve(),
         implementation_report_path=implementation_report_path.resolve(),
+        triage_report_path=triage_report_path.resolve() if triage_report_path else None,
         task_contract=task_contract,
         repository_map=repository_map,
         implementation_report=implementation_report,
+        triage_report=triage_report,
     )
     provider_findings = _load_provider_findings(provider_findings_path)
     all_findings = deterministic_findings + provider_findings
@@ -66,6 +75,7 @@ def review_implementation(
         repository_map_path=repository_map_path.resolve(),
         implementation_report_path=implementation_report_path.resolve(),
         diff_path=diff_path,
+        triage_report_path=triage_report_path.resolve() if triage_report_path else None,
         deterministic_findings=deterministic_findings,
         provider_findings=provider_findings,
         checked_acceptance_criteria=[item.text for item in task_contract.acceptance_criteria],
@@ -86,9 +96,11 @@ def _deterministic_findings(
     task_contract_path: Path,
     repository_map_path: Path,
     implementation_report_path: Path,
+    triage_report_path: Path | None,
     task_contract: TaskContract,
     repository_map: RepositoryMap,
     implementation_report: ImplementationReport,
+    triage_report: TriageReport | None,
 ) -> list[ReviewFinding]:
     findings: list[ReviewFinding] = []
     findings.extend(
@@ -110,6 +122,7 @@ def _deterministic_findings(
         )
     )
     findings.extend(_acceptance_findings(task_contract_path, task_contract, implementation_report))
+    findings.extend(_triage_findings(triage_report_path, triage_report))
     return sorted(findings, key=lambda finding: finding.finding_id)
 
 
@@ -302,6 +315,37 @@ def _acceptance_findings(
             )
         ]
     return []
+
+
+def _triage_findings(
+    triage_report_path: Path | None, triage_report: TriageReport | None
+) -> list[ReviewFinding]:
+    if triage_report is None or triage_report_path is None:
+        return []
+    findings: list[ReviewFinding] = []
+    for index, warning in enumerate(triage_report.warnings, start=1):
+        findings.append(
+            _finding(
+                f"det-triage-warning-{index}",
+                ReviewFindingSeverity.WARNING,
+                "Triage warning reported",
+                warning,
+                triage_report_path,
+                warning,
+            )
+        )
+    if triage_report.assertion_failures:
+        findings.append(
+            _finding(
+                "det-triage-assertions-present",
+                ReviewFindingSeverity.INFO,
+                "Assertion failures were captured in triage",
+                f"{len(triage_report.assertion_failures)} assertion failure(s) captured",
+                triage_report_path,
+                f"assertion_failures={len(triage_report.assertion_failures)}",
+            )
+        )
+    return findings
 
 
 def _load_provider_findings(provider_findings_path: Path | None) -> list[ReviewFinding]:

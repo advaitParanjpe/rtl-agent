@@ -11,6 +11,7 @@ from rtl_agent.discovery import discover_repository, write_repository_map
 from rtl_agent.implementation import run_bounded_implementation, write_implementation_report
 from rtl_agent.issues import parse_issue_file, write_task_contract
 from rtl_agent.review import ReviewError, review_implementation, write_review_report
+from rtl_agent.triage import triage_command_result, write_triage_report
 
 
 def write(path: Path, text: str) -> None:
@@ -247,3 +248,30 @@ def test_review_persists_stable_json(tmp_path: Path) -> None:
 
     assert first.read_text(encoding="utf-8") == second.read_text(encoding="utf-8")
     assert json.loads(first.read_text(encoding="utf-8"))["schema_version"] == 1
+
+
+def test_review_includes_triage_warning_findings(tmp_path: Path) -> None:
+    task_contract_path, repository_map_path, implementation_report_path, _repo = make_review_inputs(
+        tmp_path
+    )
+    implementation = json.loads(implementation_report_path.read_text(encoding="utf-8"))
+    command_result_path = Path(implementation["validation_results"][0]["result_path"])
+    stderr_path = Path(implementation["validation_results"][0]["stderr_path"])
+    stderr_path.write_text(
+        "ASSERTION FAILED property p at time 1 ns; see missing.vcd\n", encoding="utf-8"
+    )
+    triage = triage_command_result(command_result_path)
+    triage_report_path = tmp_path / "triage.json"
+    write_triage_report(triage, triage_report_path)
+
+    report = review_implementation(
+        task_contract_path=task_contract_path,
+        repository_map_path=repository_map_path,
+        implementation_report_path=implementation_report_path,
+        triage_report_path=triage_report_path,
+    )
+
+    assert any(
+        finding.finding_id == "det-triage-warning-1" for finding in report.deterministic_findings
+    )
+    assert report.triage_report_path == triage_report_path.resolve()

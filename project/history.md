@@ -153,3 +153,25 @@ Known limitations:
 - Review checks are deterministic and artifact-based; no semantic model reviewer is included yet.
 - Prohibited-shortcut conflict detection is simple diff-token matching.
 - No pull-request automation, waveform analysis, mutation testing, CI bots, databases, queues, dashboards, or web UI yet.
+
+## 2026-07-02 - Waveform and Assertion Triage
+
+Completed deterministic waveform and assertion triage from existing command-runner artifacts. The triage pass reads command result JSON plus bounded stdout/stderr artifacts, extracts explicit assertion failures, simulator context, waveform references, missing-waveform warnings, and bounded evidence into a versioned triage-report JSON artifact, and exposes a `triage-command` CLI command. Review can optionally consume triage reports and cite triage warnings or assertion summaries.
+
+Validation evidence:
+
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, and 56 pytest tests.
+- `.venv/bin/rtl-agent triage-command --command-result .rtl-agent/triage-smoke/result.json --output .rtl-agent/triage-smoke/triage.json` - passed on a synthetic command artifact with assertion and waveform references.
+- `git diff --check` - passed.
+
+Architectural decisions:
+
+- Triage is read-only and artifact-based; it does not execute simulators or commands.
+- Waveform references are recorded by path and existence only; waveform contents are not interpreted.
+- Evidence extraction is bounded by line count, item count, and text length.
+- Review integration is optional and cites triage warnings as deterministic review findings.
+
+Known limitations:
+
+- Triage patterns are deterministic heuristics for common simulator/assertion text.
+- No waveform rendering, semantic waveform interpretation, model-based debugger, mutation testing, CI bots, databases, queues, dashboards, or web UI.
