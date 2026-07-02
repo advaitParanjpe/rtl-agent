@@ -1,21 +1,21 @@
-# CLI Documentation Consistency Pass
+# Packaging Smoke Verification
 
 ## Objective
 
-Reconcile README command examples with the current CLI surface and compact local examples so users can follow the deterministic workflow without stale commands.
+Add a bounded local packaging smoke check that verifies the installed `rtl-agent` console script and `python -m rtl_agent` module invocation expose the documented CLI surface.
 
 ## Scope
 
-- Compare README command snippets against current Typer CLI commands and options.
-- Update README examples only where they are stale, incomplete, or inconsistent with compact checked-in examples.
-- Add focused tests for CLI help availability for documented commands where practical.
-- Keep changes documentation-focused and local.
+- Add a small script or test helper that builds/installs the local package into a temporary environment or otherwise verifies installed console-script behavior without network access when dependencies are already available.
+- Check `rtl-agent --help`, `python -m rtl_agent --help`, and documented command help availability.
+- Keep the check optional or bounded enough for local validation without introducing CI automation.
+- Update README only if needed to describe the packaging smoke command.
 
 ## Acceptance Criteria
 
-- README documents the current deterministic CLI commands without stale command names or removed options.
-- Documented compact local examples remain runnable from the source tree or clearly state the required installation context.
-- Existing discovery, issue parsing, implementation-agent, verification iteration, review, triage, verification-strength, benchmark, evidence-bundle, schema-example, command-runner, config, run-store, and worktree tests continue to pass.
+- Installed console-script and module invocation help checks pass in a local environment.
+- The check remains deterministic, local, and does not require remote services, providers, CI, dashboards, or UI.
+- Existing discovery, issue parsing, implementation-agent, verification iteration, review, triage, verification-strength, benchmark, evidence-bundle, schema-example, CLI-doc, command-runner, config, run-store, and worktree tests continue to pass.
 
 ## Required Validation Commands
 
@@ -25,7 +25,7 @@ Reconcile README command examples with the current CLI surface and compact local
 
 ## Exclusions
 
-- Do not add CI automation, dashboards, databases, queues, a web UI, migration infrastructure, remote schema registries, or code generation.
+- Do not add CI automation, remote package publishing, dashboards, databases, queues, a web UI, migration infrastructure, remote schema registries, or code generation.
 - Do not add real model-provider integration, semantic waveform analysis, mutation execution, or unrelated workflow features.
 
 ## Completion State

@@ -268,3 +268,26 @@ Known limitations:
 
 - Fixtures are representative examples, not exhaustive schema conformance suites.
 - No migration infrastructure, remote schema registry, code generation, CI automation, or unrelated workflow feature was added.
+
+## 2026-07-02 - CLI Documentation Consistency Pass
+
+Completed a focused README and CLI usability consistency pass. Removed stale bootstrap wording, clarified current deterministic capabilities and limitations, switched installation guidance to standard local install, added source-tree invocation guidance for development, collapsed duplicate quick-start command blocks, kept artifact-dependent commands in their own sections, and added README command help coverage tests.
+
+Validation evidence:
+
+- `.venv/bin/python -m pip install --force-reinstall ".[dev]"` - passed and produced a working installed `rtl-agent` console script.
+- `.venv/bin/rtl-agent <documented-command> --help` - passed for every command documented in README.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, and 83 pytest tests.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Kept this milestone documentation/test focused; no orchestration features, providers, UI, CI, or schema changes were added.
+- README quick start now contains compact runnable commands, while commands requiring existing run artifacts remain in the relevant artifact sections with placeholders.
+- Compatibility test coverage checks documented command names against current Typer help.
+
+Known limitations:
+
+- README command examples are concise and do not form a full end-to-end implementation/review pipeline.
+- Packaging smoke verification is still manual in this milestone and is queued as the next focused task.

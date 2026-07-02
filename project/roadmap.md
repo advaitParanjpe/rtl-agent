@@ -17,8 +17,9 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 9. **Benchmark Suite** - Completed deterministic local benchmark manifests, bounded named-command runner, expected-outcome reporting, run artifacts, README usage, and tests.
 10. **Evidence Bundle Export** - Completed deterministic local evidence-bundle indexes with artifact provenance, hashes, schema versions, omitted-artifact references, CLI usage, and tests.
 11. **Schema Examples and Compatibility Fixtures** - Completed compact checked-in public-schema examples plus compatibility tests that validate them through current typed models.
-12. **CLI Documentation Consistency Pass** - Active next milestone: reconcile README command examples with current CLI help and compact local examples.
+12. **CLI Documentation Consistency Pass** - Completed README cleanup, installed-CLI command verification, source-tree invocation guidance, and README command help coverage tests.
+13. **Packaging Smoke Verification** - Active next milestone: add a bounded local packaging smoke check for installed console-script and module invocation.
 
 ## Current Status
 
-Stages 1 through 11 are complete. Stage 12 is active.
+Stages 1 through 12 are complete. Stage 13 is active.

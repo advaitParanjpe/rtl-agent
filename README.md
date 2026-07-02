@@ -11,7 +11,7 @@ The principle is: **Models propose. Tools decide.**
 
 ## Current State
 
-This bootstrap contains deterministic infrastructure only:
+`rtl-agent` currently contains deterministic local infrastructure:
 
 - milestone-driven project-control files;
 - typed YAML configuration;
@@ -29,7 +29,7 @@ This bootstrap contains deterministic infrastructure only:
 - compact local evidence-bundle export indexes for run artifacts;
 - tests, linting, formatting, and type checking.
 
-It does not yet contain real external model-provider integration, autonomous multi-agent behavior, review agents, waveform analysis, mutation testing, pull requests, dashboards, queues, databases, or containers.
+It does not yet contain real external model-provider integration, autonomous multi-agent behavior, review agents, semantic waveform analysis, mutation execution, pull requests, dashboards, queues, databases, containers, CI automation, or a UI.
 
 ## Installation
 
@@ -38,42 +38,30 @@ Use Python 3.12 or newer.
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install -e ".[dev]"
+python -m pip install ".[dev]"
 ```
+
+For source-tree development without reinstalling after edits, use `PYTHONPATH=src python -m rtl_agent ...`.
 
 ## Quick Start
 
 ```bash
 rtl-agent --help
-rtl-agent init
 rtl-agent inspect-config --config examples/rtl-agent.yaml
 rtl-agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json
 rtl-agent parse-issue --issue examples/issues/reset-behavior.md --repository-map .rtl-agent/simple-rtl-map.json --output .rtl-agent/reset-task-contract.json
-rtl-agent implement-task --config examples/simple-rtl-agent.yaml --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --provider-plan examples/provider-plans/no-change.json --allowed-file rtl/top.sv --max-iterations 1
-rtl-agent triage-command --command-result .rtl-agent/runs/<run-id>/commands/<command-id>/result.json --output .rtl-agent/triage-report.json
-rtl-agent review-task --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --output .rtl-agent/review-report.json
-rtl-agent assess-verification --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --review-report .rtl-agent/review-report.json --output .rtl-agent/verification-strength.json
 rtl-agent run-benchmark --manifest examples/benchmarks/local-smoke.yaml
-rtl-agent export-evidence --run-dir .rtl-agent/runs/<run-id> --output-dir .rtl-agent/bundles/<run-id>
 rtl-agent discover --config examples/rtl-agent.yaml
 rtl-agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
 
-Module invocation also works:
+Commands that consume existing run artifacts, such as `triage-command`, `review-task`, `assess-verification`, and `export-evidence`, are shown in their sections below with `<run-id>` placeholders.
+
+Module invocation also works after installation:
 
 ```bash
 python3 -m rtl_agent --help
-python3 -m rtl_agent inspect-config --config examples/rtl-agent.yaml
-python3 -m rtl_agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json
-python3 -m rtl_agent parse-issue --issue examples/issues/reset-behavior.md --repository-map .rtl-agent/simple-rtl-map.json --output .rtl-agent/reset-task-contract.json
-python3 -m rtl_agent implement-task --config examples/simple-rtl-agent.yaml --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --provider-plan examples/provider-plans/no-change.json --allowed-file rtl/top.sv --max-iterations 1
-python3 -m rtl_agent triage-command --command-result .rtl-agent/runs/<run-id>/commands/<command-id>/result.json --output .rtl-agent/triage-report.json
-python3 -m rtl_agent review-task --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --output .rtl-agent/review-report.json
-python3 -m rtl_agent assess-verification --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --review-report .rtl-agent/review-report.json --output .rtl-agent/verification-strength.json
 python3 -m rtl_agent run-benchmark --manifest examples/benchmarks/local-smoke.yaml
-python3 -m rtl_agent export-evidence --run-dir .rtl-agent/runs/<run-id> --output-dir .rtl-agent/bundles/<run-id>
-python3 -m rtl_agent discover --config examples/rtl-agent.yaml
-python3 -m rtl_agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
 
 `inspect-repo` writes the repository map to the caller-specified path and prints only a concise summary, for example:
