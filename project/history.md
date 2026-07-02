@@ -175,3 +175,26 @@ Known limitations:
 
 - Triage patterns are deterministic heuristics for common simulator/assertion text.
 - No waveform rendering, semantic waveform interpretation, model-based debugger, mutation testing, CI bots, databases, queues, dashboards, or web UI.
+
+## 2026-07-02 - Verification Strength and Mutation Assessment
+
+Completed deterministic verification-strength assessment from existing artifacts. The assessment reads task-contract, repository-map, implementation-report, optional review-report, and optional triage-report JSON; emits a versioned verification-strength report; scores bounded signals for passed command coverage, acceptance-criteria references, changed-file relevance, retry history, review outcome, repository command context, and triage availability; and flags weak patterns including no validation, failed latest validation, smoke-only validation, missing acceptance coverage, failed review, missing triage for simulator-like failures, and validation unrelated to changed files.
+
+Validation evidence:
+
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, and 63 pytest tests.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Assessment is read-only and artifact-only: it does not execute commands, mutate source files, inspect waveform contents, run mutation tests, or call model providers.
+- Strength reports reuse existing task-contract, repository-map, implementation-report, review, triage, and command-result artifacts rather than introducing a new evidence store.
+- Weak/insufficient conclusions are deterministic and evidence-cited; uncertainty is represented as weak patterns and bounded scoring rather than semantic claims.
+- Mutation assessment is limited to identifying weak validation signals; no mutation execution framework was added.
+
+Known limitations:
+
+- Acceptance and changed-file relevance use deterministic textual evidence, not semantic proof.
+- Smoke-only and simulator-failure detection are conservative heuristics.
+- No real model provider, semantic waveform analysis, CI automation, broad mutation framework, databases, queues, dashboards, or web UI.
