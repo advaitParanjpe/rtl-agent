@@ -1,0 +1,32 @@
+{
+  "checked_acceptance_criteria": [
+    "Smoke validation passes."
+  ],
+  "checked_files": [
+    "rtl/top.sv"
+  ],
+  "deterministic_findings": [
+    {
+      "description": "The implementation includes passing validation evidence.",
+      "evidence": [
+        {
+          "artifact": "examples/schema-artifacts/implementation-report.json",
+          "detail": "validation_results[0].status=passed"
+        }
+      ],
+      "finding_id": "det-validation-present",
+      "severity": "info",
+      "source": "deterministic",
+      "title": "Validation evidence present"
+    }
+  ],
+  "diff_path": "runs/example/implementation/diff.patch",
+  "implementation_report_path": "examples/schema-artifacts/implementation-report.json",
+  "outcome": "acceptable",
+  "provider_findings": [],
+  "repository_map_path": "examples/schema-artifacts/repository-map.json",
+  "schema_version": 1,
+  "summary": "acceptable with 0 error finding(s)",
+  "task_contract_path": "examples/schema-artifacts/task-contract.json",
+  "triage_report_path": null
+}

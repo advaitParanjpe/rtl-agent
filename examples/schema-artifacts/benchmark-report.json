@@ -1,0 +1,37 @@
+{
+  "case_results": [
+    {
+      "case_id": "local-smoke",
+      "expectation_met": true,
+      "status": "passed",
+      "step_results": [
+        {
+          "case_id": "local-smoke",
+          "command_name": "smoke",
+          "command_result_path": "runs/example/commands/smoke/result.json",
+          "duration_seconds": 0.01,
+          "expected_status": "passed",
+          "expectation_met": true,
+          "failure_summary": null,
+          "kind": "named_command",
+          "observed_status": "passed",
+          "stderr_path": "runs/example/commands/smoke/stderr.log",
+          "stdout_path": "runs/example/commands/smoke/stdout.log",
+          "step_id": "smoke"
+        }
+      ]
+    }
+  ],
+  "cases_failed": 0,
+  "cases_infrastructure_error": 0,
+  "cases_passed": 1,
+  "cases_timeout": 0,
+  "cases_total": 1,
+  "manifest_name": "local-smoke",
+  "manifest_path": "examples/benchmarks/local-smoke.yaml",
+  "run_dir": "runs/example",
+  "run_id": "example-run",
+  "schema_version": 1,
+  "status": "passed",
+  "summary": "passed benchmark run with 1 passed case"
+}

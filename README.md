@@ -267,6 +267,12 @@ The export writes:
 
 The bundle preserves artifact provenance, relative paths, SHA-256 hashes, byte sizes, and JSON schema versions where present. It references command logs and waveform-like files as omitted local artifacts instead of copying their contents. Missing optional artifacts are warnings; missing required `run.json` produces a failed export result. The exporter does not execute commands, mutate source files, call providers, upload artifacts, sign bundles, add cloud storage, or include large logs and waveforms.
 
+## Schema Examples
+
+Compact public-schema examples live under `examples/schema-artifacts/`. They cover representative repository-map, task-contract, implementation-report, review-report, triage-report, verification-strength-report, benchmark-report, and evidence-bundle-report artifacts.
+
+These fixtures are intended for compatibility tests and documentation. They validate through the current typed Pydantic models and are kept free of generated run directories, logs, waveforms, secrets, external repository snapshots, and volatile values such as real timestamps, UUIDs, absolute paths, durations, and hashes.
+
 ## Run Artifacts
 
 Command runs write evidence under the configured artifact directory:

@@ -16,8 +16,9 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 8. **Verification Strength and Mutation Assessment** - Completed deterministic artifact-only verification-strength scoring, weak validation pattern detection, CLI, README usage, and tests. Mutation execution remains intentionally out of scope.
 9. **Benchmark Suite** - Completed deterministic local benchmark manifests, bounded named-command runner, expected-outcome reporting, run artifacts, README usage, and tests.
 10. **Evidence Bundle Export** - Completed deterministic local evidence-bundle indexes with artifact provenance, hashes, schema versions, omitted-artifact references, CLI usage, and tests.
-11. **Schema Examples and Compatibility Fixtures** - Active next milestone: add compact checked-in example artifacts and compatibility tests for the public JSON schemas.
+11. **Schema Examples and Compatibility Fixtures** - Completed compact checked-in public-schema examples plus compatibility tests that validate them through current typed models.
+12. **CLI Documentation Consistency Pass** - Active next milestone: reconcile README command examples with current CLI help and compact local examples.
 
 ## Current Status
 
-Stages 1 through 10 are complete. Stage 11 is active.
+Stages 1 through 11 are complete. Stage 12 is active.

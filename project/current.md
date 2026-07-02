@@ -1,21 +1,21 @@
-# Schema Examples and Compatibility Fixtures
+# CLI Documentation Consistency Pass
 
 ## Objective
 
-Add compact checked-in example artifacts and compatibility tests for the public JSON schemas emitted by the deterministic rtl-agent workflow.
+Reconcile README command examples with the current CLI surface and compact local examples so users can follow the deterministic workflow without stale commands.
 
 ## Scope
 
-- Add small example JSON fixtures for representative repository-map, task-contract, implementation-report, review-report, triage-report, verification-strength-report, benchmark-report, and evidence-bundle-report artifacts.
-- Add tests that load each fixture through the current typed models.
-- Add README guidance for fixture purpose and compatibility expectations.
-- Keep fixtures compact and free of logs, waveforms, secrets, generated run directories, and external repository content.
+- Compare README command snippets against current Typer CLI commands and options.
+- Update README examples only where they are stale, incomplete, or inconsistent with compact checked-in examples.
+- Add focused tests for CLI help availability for documented commands where practical.
+- Keep changes documentation-focused and local.
 
 ## Acceptance Criteria
 
-- Every checked-in schema example validates through its corresponding typed model.
-- Fixtures are deterministic, compact, and safe to commit.
-- Existing discovery, issue parsing, implementation-agent, verification iteration, review, triage, verification-strength, benchmark, evidence-bundle, command-runner, config, run-store, and worktree tests continue to pass.
+- README documents the current deterministic CLI commands without stale command names or removed options.
+- Documented compact local examples remain runnable from the source tree or clearly state the required installation context.
+- Existing discovery, issue parsing, implementation-agent, verification iteration, review, triage, verification-strength, benchmark, evidence-bundle, schema-example, command-runner, config, run-store, and worktree tests continue to pass.
 
 ## Required Validation Commands
 
@@ -25,8 +25,8 @@ Add compact checked-in example artifacts and compatibility tests for the public 
 
 ## Exclusions
 
-- Do not add large logs, waveforms, external repository snapshots, cloud storage, signing infrastructure, CI automation, dashboards, databases, queues, or a web UI.
-- Do not add real model-provider integration, semantic waveform analysis, or mutation execution.
+- Do not add CI automation, dashboards, databases, queues, a web UI, migration infrastructure, remote schema registries, or code generation.
+- Do not add real model-provider integration, semantic waveform analysis, mutation execution, or unrelated workflow features.
 
 ## Completion State
 

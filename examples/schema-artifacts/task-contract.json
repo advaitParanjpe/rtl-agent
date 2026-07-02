@@ -1,0 +1,68 @@
+{
+  "acceptance_criteria": [
+    {
+      "line": 10,
+      "source": "heading",
+      "text": "Smoke validation passes."
+    }
+  ],
+  "checklist": [],
+  "evidence_requirements": [
+    {
+      "line": 16,
+      "source": "heading",
+      "text": "Record validation evidence."
+    }
+  ],
+  "invariants": [],
+  "issue_path": "examples/issues/smoke.md",
+  "parser_notes": [],
+  "prohibited_shortcuts": [
+    {
+      "line": 13,
+      "source": "heading",
+      "text": "Do not remove rtl/top.sv."
+    }
+  ],
+  "repository_map": {
+    "command_count": 1,
+    "file_count": 1,
+    "matched_paths": [
+      "rtl/top.sv"
+    ],
+    "path": "examples/schema-artifacts/repository-map.json",
+    "repository_root": "examples/simple-rtl",
+    "schema_version": 1,
+    "unmatched_paths": []
+  },
+  "requested_behavior": [
+    {
+      "line": 4,
+      "source": "heading",
+      "text": "Keep the top module smoke-checkable."
+    }
+  ],
+  "schema_version": 1,
+  "scoped_repository_context": [
+    {
+      "in_repository_map": true,
+      "kind": "path",
+      "line": 7,
+      "value": "rtl/top.sv"
+    }
+  ],
+  "title": "Smoke compatibility example",
+  "tool_version": "0.1.0",
+  "validation_commands": [
+    {
+      "command": [
+        "make",
+        "smoke"
+      ],
+      "line": 11,
+      "raw": "make smoke",
+      "source": "fenced_block"
+    }
+  ],
+  "warnings": []
+}
