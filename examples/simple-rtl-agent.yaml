@@ -15,3 +15,10 @@ commands:
       - "print('simple rtl smoke ok')"
     cwd: simple-rtl
     timeout_seconds: 10
+  check-define:
+    argv:
+      - python3
+      - -c
+      - "from pathlib import Path; assert '`define SIMPLE_RTL_EXAMPLE 1' in Path('rtl/defs.svh').read_text()"
+    cwd: simple-rtl
+    timeout_seconds: 10

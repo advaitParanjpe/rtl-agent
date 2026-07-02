@@ -13,14 +13,17 @@ from rtl_agent.implementation_models import (
     ProviderMessage,
     ProviderRequest,
     ProviderRole,
+    RetryDecision,
     ToolCall,
     ToolName,
     ToolResult,
     ValidationResultSummary,
+    VerificationClassification,
 )
 from rtl_agent.providers import ModelProvider
 from rtl_agent.repository_map import RepositoryMap
 from rtl_agent.task_contract import TaskContract
+from rtl_agent.verification import classify_command_result
 
 
 class ImplementationError(RuntimeError):
@@ -60,6 +63,8 @@ class ImplementationAgent:
         messages = [ProviderMessage(role=ProviderRole.USER, content=self._prompt_text())]
         tool_results: list[ToolResult] = []
         validation_results: list[ValidationResultSummary] = []
+        retry_decisions: list[RetryDecision] = []
+        failure_evidence: list[VerificationClassification] = []
         applied_files: set[str] = set()
         warnings: list[str] = []
         failure_reason: str | None = None
@@ -73,6 +78,7 @@ class ImplementationAgent:
                 allowed_validation_commands=self.allowed_validation_commands,
                 iteration=iteration,
                 messages=messages,
+                failure_evidence=failure_evidence,
             )
             self._write_json(
                 self.run_store.run_dir / "implementation" / f"provider-request-{iteration}.json",
@@ -105,11 +111,13 @@ class ImplementationAgent:
             if failure_reason:
                 break
 
+            validation_failed = False
             for command_name in response.validation_commands:
                 if command_name not in self.allowed_validation_commands:
                     failure_reason = f"validation command is not allowed: {command_name}"
                     break
                 command_result = CommandRunner(self.config, self.run_store).run_named(command_name)
+                classification = classify_command_result(command_result)
                 validation_results.append(
                     ValidationResultSummary(
                         command_name=command_name,
@@ -121,11 +129,42 @@ class ImplementationAgent:
                         / "result.json",
                         stdout_path=command_result.stdout_path,
                         stderr_path=command_result.stderr_path,
+                        classification=classification,
                     )
                 )
                 if str(command_result.status) != "passed":
-                    failure_reason = f"validation command failed: {command_name}"
+                    validation_failed = True
+                    failure_reason = (
+                        f"validation command failed: {command_name} ({classification.category})"
+                    )
+                    failure_evidence = [classification]
                     break
+            if validation_failed and iteration < self.max_iterations:
+                retry_decisions.append(
+                    RetryDecision(
+                        iteration=iteration,
+                        command_name=command_name,
+                        decision="retry",
+                        reason=failure_reason or "validation failed",
+                    )
+                )
+                messages.append(
+                    ProviderMessage(
+                        role=ProviderRole.USER,
+                        content=self._failure_prompt(command_name, failure_evidence[0]),
+                    )
+                )
+                failure_reason = None
+                continue
+            if validation_failed and failure_reason:
+                retry_decisions.append(
+                    RetryDecision(
+                        iteration=iteration,
+                        command_name=command_name,
+                        decision="stop",
+                        reason="retry limit reached",
+                    )
+                )
             if failure_reason or response.stop:
                 break
 
@@ -151,6 +190,7 @@ class ImplementationAgent:
             applied_files=sorted(applied_files),
             tool_results=tool_results,
             validation_results=validation_results,
+            retry_decisions=retry_decisions,
             diff_path=diff_path,
             failure_reason=failure_reason,
             warnings=warnings,
@@ -284,6 +324,26 @@ class ImplementationAgent:
                         "new": "<replacement text>",
                     },
                 ],
+                "failure_evidence_policy": "Only concise structured verification classifications "
+                "and bounded stdout/stderr excerpts are provided after failed validation.",
+            },
+            sort_keys=True,
+        )
+
+    @staticmethod
+    def _failure_prompt(command_name: str, classification: VerificationClassification) -> str:
+        return json.dumps(
+            {
+                "validation_failed": {
+                    "command_name": command_name,
+                    "category": classification.category,
+                    "summary": classification.summary,
+                    "evidence": classification.evidence,
+                    "stdout_excerpt": classification.stdout_excerpt,
+                    "stderr_excerpt": classification.stderr_excerpt,
+                },
+                "instruction": "Use only allowed structured tool calls to address the failure. "
+                "Do not request arbitrary shell commands.",
             },
             sort_keys=True,
         )
