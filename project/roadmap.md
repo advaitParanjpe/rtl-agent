@@ -18,8 +18,9 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 10. **Evidence Bundle Export** - Completed deterministic local evidence-bundle indexes with artifact provenance, hashes, schema versions, omitted-artifact references, CLI usage, and tests.
 11. **Schema Examples and Compatibility Fixtures** - Completed compact checked-in public-schema examples plus compatibility tests that validate them through current typed models.
 12. **CLI Documentation Consistency Pass** - Completed README cleanup, installed-CLI command verification, source-tree invocation guidance, and README command help coverage tests.
-13. **Packaging Smoke Verification** - Active next milestone: add a bounded local packaging smoke check for installed console-script and module invocation.
+13. **Packaging Smoke Verification** - Completed bounded local wheel/install smoke verification for console-script and module invocation as part of the canonical check workflow.
+14. **Compact End-to-End Example Check** - Active next milestone: add a local scripted example that exercises the deterministic workflow across compact fixtures and verifies expected artifacts.
 
 ## Current Status
 
-Stages 1 through 12 are complete. Stage 13 is active.
+Stages 1 through 13 are complete. Stage 14 is active.

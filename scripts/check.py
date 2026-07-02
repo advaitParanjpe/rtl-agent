@@ -13,6 +13,7 @@ COMMANDS = (
     [str(PYTHON), "-m", "ruff", "check", "."],
     [str(PYTHON), "-m", "mypy"],
     [str(PYTHON), "-m", "pytest"],
+    [str(PYTHON), "scripts/packaging_smoke.py"],
 )
 
 

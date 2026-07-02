@@ -1,21 +1,22 @@
-# Packaging Smoke Verification
+# Compact End-to-End Example Check
 
 ## Objective
 
-Add a bounded local packaging smoke check that verifies the installed `rtl-agent` console script and `python -m rtl_agent` module invocation expose the documented CLI surface.
+Add a local scripted example check that exercises the deterministic rtl-agent workflow across compact checked-in fixtures and verifies expected artifacts.
 
 ## Scope
 
-- Add a small script or test helper that builds/installs the local package into a temporary environment or otherwise verifies installed console-script behavior without network access when dependencies are already available.
-- Check `rtl-agent --help`, `python -m rtl_agent --help`, and documented command help availability.
-- Keep the check optional or bounded enough for local validation without introducing CI automation.
-- Update README only if needed to describe the packaging smoke command.
+- Add a bounded script that runs a compact local workflow using existing CLI/services and ignored artifact directories.
+- Cover repository inspection, issue parsing, bounded implementation with stub provider, validation, review or verification-strength where practical, benchmark or evidence export where practical.
+- Assert expected output artifact paths and key statuses without depending on timestamps, UUIDs, absolute paths, durations, or hashes.
+- Include the check in the canonical validation workflow only if it remains fast and deterministic.
+- Update README usage if a new script is added.
 
 ## Acceptance Criteria
 
-- Installed console-script and module invocation help checks pass in a local environment.
-- The check remains deterministic, local, and does not require remote services, providers, CI, dashboards, or UI.
-- Existing discovery, issue parsing, implementation-agent, verification iteration, review, triage, verification-strength, benchmark, evidence-bundle, schema-example, CLI-doc, command-runner, config, run-store, and worktree tests continue to pass.
+- The example check is local, deterministic, compact, and does not require external tools, providers, network access, CI, containers, dashboards, or UI.
+- It verifies expected artifacts and statuses from a realistic mini workflow.
+- Existing discovery, issue parsing, implementation-agent, verification iteration, review, triage, verification-strength, benchmark, evidence-bundle, schema-example, CLI-doc, packaging-smoke, command-runner, config, run-store, and worktree tests continue to pass.
 
 ## Required Validation Commands
 
@@ -25,8 +26,8 @@ Add a bounded local packaging smoke check that verifies the installed `rtl-agent
 
 ## Exclusions
 
-- Do not add CI automation, remote package publishing, dashboards, databases, queues, a web UI, migration infrastructure, remote schema registries, or code generation.
-- Do not add real model-provider integration, semantic waveform analysis, mutation execution, or unrelated workflow features.
+- Do not add real model-provider integration, semantic waveform analysis, mutation execution, CI automation, remote publishing, containers, dashboards, databases, queues, or a web UI.
+- Do not add external RTL repositories, large logs, waveforms, or generated artifacts under tracked paths.
 
 ## Completion State
 
