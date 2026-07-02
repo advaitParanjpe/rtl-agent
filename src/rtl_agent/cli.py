@@ -10,6 +10,11 @@ from rtl_agent.artifacts import RunStore
 from rtl_agent.config import load_config
 from rtl_agent.discovery import DiscoveryError, discover_repository, write_repository_map
 from rtl_agent.execution import CommandRunner
+from rtl_agent.implementation import (
+    ImplementationError,
+    run_bounded_implementation,
+    write_implementation_report,
+)
 from rtl_agent.issues import IssueParsingError, parse_issue_file, write_task_contract
 
 app = typer.Typer(
@@ -161,6 +166,57 @@ def parse_issue(
     _print_task_contract_summary(contract, output)
 
 
+@app.command("implement-task")
+def implement_task(
+    config: Annotated[Path, typer.Option("--config", "-c", help="Path to rtl-agent YAML config.")],
+    task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
+    repository_map: Annotated[Path, typer.Option("--repository-map", help="Repository-map JSON.")],
+    provider_plan: Annotated[
+        Path,
+        typer.Option("--provider-plan", help="Stub provider JSON plan with structured tool calls."),
+    ],
+    allowed_file: Annotated[
+        list[str],
+        typer.Option("--allowed-file", help="Repository-relative file the agent may edit."),
+    ],
+    validation_command: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--validation-command",
+            help="Configured command name the agent may run for validation.",
+        ),
+    ] = None,
+    max_iterations: Annotated[
+        int,
+        typer.Option("--max-iterations", min=1, help="Maximum implementation iterations."),
+    ] = 1,
+) -> None:
+    """Run one bounded implementation agent with a deterministic stub provider."""
+    try:
+        loaded = load_config(config)
+        run_store = RunStore(loaded.run_root)
+        run_store.create()
+        report = run_bounded_implementation(
+            config=loaded,
+            run_store=run_store,
+            provider_plan=provider_plan,
+            task_contract_path=task_contract,
+            repository_map_path=repository_map,
+            allowed_files=allowed_file,
+            allowed_validation_commands=validation_command or [],
+            max_iterations=max_iterations,
+        )
+        output = run_store.run_dir / "implementation" / "report.json"
+        write_implementation_report(report, output)
+    except (ImplementationError, ValueError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_implementation_summary(report, output, run_store.run_id)
+    if report.status == "failed":
+        raise typer.Exit(1)
+
+
 def _print_discovery_summary(
     repository_map: object, output: Path, run_id: str | None = None
 ) -> None:
@@ -199,6 +255,30 @@ def _print_task_contract_summary(contract: object, output: Path) -> None:
             "repository_map": str(contract.repository_map.path)
             if contract.repository_map is not None
             else None,
+        }
+    )
+
+
+def _print_implementation_summary(report: object, output: Path, run_id: str) -> None:
+    from rtl_agent.implementation_models import ImplementationReport
+
+    assert isinstance(report, ImplementationReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "run_id": run_id,
+            "status": report.status,
+            "output": str(output),
+            "provider": report.provider,
+            "iterations": report.iterations,
+            "applied_files": report.applied_files,
+            "validation_results": [
+                {"command_name": item.command_name, "status": item.status}
+                for item in report.validation_results
+            ],
+            "diff_path": str(report.diff_path) if report.diff_path else None,
+            "failure_reason": report.failure_reason,
+            "warnings": report.warnings,
         }
     )
 

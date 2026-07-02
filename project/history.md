@@ -77,3 +77,29 @@ Known limitations:
 - No natural-language planning or inference beyond deterministic section and pattern extraction.
 - No model-provider integration or autonomous implementation-agent behavior yet.
 - No execution of parsed validation commands.
+
+## 2026-07-01 - Model Provider Abstraction and One Bounded Implementation Agent
+
+Completed a tightly bounded implementation loop with typed provider request/response models, a deterministic local stub provider, explicit file and command permissions, repository-local structured `read_file` and `replace_text` tool calls, limited iterations, run-artifact audit trail, named-command-only validation, proposed-diff/failure reporting, CLI support, tests, and README usage.
+
+Validation evidence:
+
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, and 35 pytest tests.
+- `.venv/bin/rtl-agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json` - passed.
+- `.venv/bin/rtl-agent parse-issue --issue examples/issues/reset-behavior.md --repository-map .rtl-agent/simple-rtl-map.json --output .rtl-agent/reset-task-contract.json` - passed.
+- `.venv/bin/rtl-agent implement-task --config examples/simple-rtl-agent.yaml --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --provider-plan examples/provider-plans/no-change.json --allowed-file rtl/top.sv --max-iterations 1` - passed and wrote implementation report, provider request/response artifacts, and diff artifact under `.rtl-agent/runs/<run-id>/implementation/`.
+- `git diff --check` - passed.
+
+Architectural decisions:
+
+- The only provider shipped in this milestone is a local JSON stub provider for deterministic tests and examples.
+- Model output is restricted to structured tool calls; arbitrary shell commands from provider output are not executed.
+- Editable files must be explicitly allowed, repository-relative, present in the repository map, and in task-contract scope.
+- Validation is limited to configured named commands explicitly allowed on the CLI.
+- The implementation loop returns either a proposed-diff report or an honest structured failure report.
+
+Known limitations:
+
+- No real external model-provider integration yet.
+- No multi-agent framework, reviewer agent, pull-request automation, waveform analysis, mutation testing, CI bots, databases, queues, dashboards, or web UI.
+- No semantic verification beyond configured named-command execution.

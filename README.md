@@ -21,9 +21,10 @@ This bootstrap contains deterministic infrastructure only:
 - narrow Git worktree helpers;
 - deterministic RTL repository discovery with a versioned JSON repository map;
 - deterministic issue parsing with a versioned JSON task contract;
+- one bounded implementation-agent loop with a deterministic stub provider;
 - tests, linting, formatting, and type checking.
 
-It does not yet contain an AI coding agent, model-provider integration, autonomous implementation, review agents, waveform analysis, mutation testing, pull requests, dashboards, queues, databases, or containers.
+It does not yet contain real external model-provider integration, autonomous multi-agent behavior, review agents, waveform analysis, mutation testing, pull requests, dashboards, queues, databases, or containers.
 
 ## Installation
 
@@ -43,6 +44,7 @@ rtl-agent init
 rtl-agent inspect-config --config examples/rtl-agent.yaml
 rtl-agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json
 rtl-agent parse-issue --issue examples/issues/reset-behavior.md --repository-map .rtl-agent/simple-rtl-map.json --output .rtl-agent/reset-task-contract.json
+rtl-agent implement-task --config examples/simple-rtl-agent.yaml --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --provider-plan examples/provider-plans/no-change.json --allowed-file rtl/top.sv --max-iterations 1
 rtl-agent discover --config examples/rtl-agent.yaml
 rtl-agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
@@ -54,6 +56,7 @@ python3 -m rtl_agent --help
 python3 -m rtl_agent inspect-config --config examples/rtl-agent.yaml
 python3 -m rtl_agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json
 python3 -m rtl_agent parse-issue --issue examples/issues/reset-behavior.md --repository-map .rtl-agent/simple-rtl-map.json --output .rtl-agent/reset-task-contract.json
+python3 -m rtl_agent implement-task --config examples/simple-rtl-agent.yaml --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --provider-plan examples/provider-plans/no-change.json --allowed-file rtl/top.sv --max-iterations 1
 python3 -m rtl_agent discover --config examples/rtl-agent.yaml
 python3 -m rtl_agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
@@ -125,6 +128,39 @@ rtl-agent parse-issue \
 It extracts only explicit information from recognized headings, bullets, checkboxes, fenced shell commands, and path/code references. Supported contract fields include requested behavior, scoped repository context, invariants, acceptance criteria, validation commands, prohibited shortcuts, evidence requirements, checklist items, warnings, and optional repository-map context.
 
 Issue parsing is deterministic and does not execute validation commands. Ambiguous prose such as "maybe", "if possible", or "consider" is preserved only when it appears inside an explicit requirement section and is also reported as a warning. Unsectioned ambiguous prose is ignored with a warning. The parser does not plan an implementation or invent missing requirements.
+
+## Bounded Implementation Agent
+
+`implement-task` runs one tightly bounded implementation loop using a deterministic stub provider plan:
+
+```bash
+rtl-agent implement-task \
+  --config examples/simple-rtl-agent.yaml \
+  --task-contract .rtl-agent/reset-task-contract.json \
+  --repository-map .rtl-agent/simple-rtl-map.json \
+  --provider-plan examples/provider-plans/no-change.json \
+  --allowed-file rtl/top.sv \
+  --validation-command smoke \
+  --max-iterations 1
+```
+
+The implementation agent accepts only structured stub-provider tool calls. Supported tools are `read_file` and `replace_text`. Each editable file must be explicitly listed with `--allowed-file`, must be repository-relative, must be present in the repository map, and must be in the task contract's scoped repository context. Validation can run only configured named commands explicitly listed with `--validation-command`; commands from model output are names, not shell text.
+
+Runs write audit artifacts under:
+
+```text
+.rtl-agent/runs/<run-id>/
+├── run.json
+├── events.jsonl
+├── commands/
+└── implementation/
+    ├── provider-request-1.json
+    ├── provider-response-1.json
+    ├── diff.patch
+    └── report.json
+```
+
+The current provider is intentionally a local stub for deterministic tests and examples. There is no broad provider support, reviewer agent, pull-request automation, or multi-agent framework yet.
 
 ## Run Artifacts
 
