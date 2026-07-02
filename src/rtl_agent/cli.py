@@ -14,6 +14,13 @@ from rtl_agent.benchmark import (
 )
 from rtl_agent.config import load_config
 from rtl_agent.discovery import DiscoveryError, discover_repository, write_repository_map
+from rtl_agent.evidence_bundle import (
+    EvidenceBundleError,
+    export_evidence_bundle,
+)
+from rtl_agent.evidence_bundle import (
+    report_summary_payload as evidence_bundle_summary_payload,
+)
 from rtl_agent.execution import CommandRunner
 from rtl_agent.implementation import (
     ImplementationError,
@@ -356,6 +363,33 @@ def run_benchmark(
 
     _print_json(report_summary_payload(report))
     if fail_on_unmet_expected and report.status != "passed":
+        raise typer.Exit(1)
+
+
+@app.command("export-evidence")
+def export_evidence(
+    run_dir: Annotated[
+        Path,
+        typer.Option("--run-dir", help="Existing rtl-agent run artifact directory."),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option("--output-dir", help="Directory for compact evidence bundle index."),
+    ],
+    fail_on_failed_export: Annotated[
+        bool,
+        typer.Option("--fail-on-failed-export/--no-fail-on-failed-export"),
+    ] = False,
+) -> None:
+    """Export a compact local evidence-bundle index from existing run artifacts."""
+    try:
+        report = export_evidence_bundle(run_dir=run_dir, output_dir=output_dir)
+    except EvidenceBundleError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_json(evidence_bundle_summary_payload(report))
+    if fail_on_failed_export and report.status == "failed":
         raise typer.Exit(1)
 
 
