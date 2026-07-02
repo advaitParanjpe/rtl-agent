@@ -53,6 +53,7 @@ class ReviewReport(BaseModel):
     repository_map_path: Path
     implementation_report_path: Path
     diff_path: Path | None = None
+    triage_report_path: Path | None = None
     deterministic_findings: list[ReviewFinding] = Field(default_factory=list)
     provider_findings: list[ReviewFinding] = Field(default_factory=list)
     checked_acceptance_criteria: list[str] = Field(default_factory=list)

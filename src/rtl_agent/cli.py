@@ -17,6 +17,7 @@ from rtl_agent.implementation import (
 )
 from rtl_agent.issues import IssueParsingError, parse_issue_file, write_task_contract
 from rtl_agent.review import ReviewError, review_implementation, write_review_report
+from rtl_agent.triage import TriageError, triage_command_result, write_triage_report
 
 app = typer.Typer(
     help="Deterministic orchestration foundation for RTL engineering workflows.",
@@ -234,6 +235,10 @@ def review_task(
             help="Optional provider-backed semantic findings JSON; findings must cite evidence.",
         ),
     ] = None,
+    triage_report: Annotated[
+        Path | None,
+        typer.Option("--triage-report", help="Optional waveform/assertion triage report JSON."),
+    ] = None,
     fail_on_unacceptable: Annotated[
         bool,
         typer.Option("--fail-on-unacceptable/--no-fail-on-unacceptable"),
@@ -245,6 +250,7 @@ def review_task(
             task_contract_path=task_contract,
             repository_map_path=repository_map,
             implementation_report_path=implementation_report,
+            triage_report_path=triage_report,
             provider_findings_path=provider_findings,
         )
         write_review_report(report, output)
@@ -255,6 +261,25 @@ def review_task(
     _print_review_summary(report, output)
     if fail_on_unacceptable and report.outcome == "unacceptable":
         raise typer.Exit(1)
+
+
+@app.command("triage-command")
+def triage_command(
+    command_result: Annotated[
+        Path,
+        typer.Option("--command-result", help="Command result JSON from run artifacts."),
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Path for triage-report JSON.")],
+) -> None:
+    """Extract bounded assertion, simulator, and waveform triage from command artifacts."""
+    try:
+        report = triage_command_result(command_result)
+        write_triage_report(report, output)
+    except TriageError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_triage_summary(report, output)
 
 
 def _print_discovery_summary(
@@ -344,6 +369,24 @@ def _print_review_summary(report: object, output: Path) -> None:
                 finding.severity == ReviewFindingSeverity.ERROR for finding in findings
             ),
             "summary": report.summary,
+        }
+    )
+
+
+def _print_triage_summary(report: object, output: Path) -> None:
+    from rtl_agent.triage_models import TriageReport
+
+    assert isinstance(report, TriageReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "command_name": report.command_name,
+            "command_status": report.command_status,
+            "output": str(output),
+            "assertion_failures": len(report.assertion_failures),
+            "waveform_references": len(report.waveform_references),
+            "simulator_context": len(report.simulator_context),
+            "warnings": len(report.warnings),
         }
     )
 

@@ -23,6 +23,7 @@ This bootstrap contains deterministic infrastructure only:
 - deterministic issue parsing with a versioned JSON task contract;
 - one bounded implementation-agent loop with a deterministic stub provider;
 - read-only deterministic review reports for implementation artifacts;
+- bounded waveform and assertion triage from command artifacts;
 - tests, linting, formatting, and type checking.
 
 It does not yet contain real external model-provider integration, autonomous multi-agent behavior, review agents, waveform analysis, mutation testing, pull requests, dashboards, queues, databases, or containers.
@@ -46,6 +47,7 @@ rtl-agent inspect-config --config examples/rtl-agent.yaml
 rtl-agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json
 rtl-agent parse-issue --issue examples/issues/reset-behavior.md --repository-map .rtl-agent/simple-rtl-map.json --output .rtl-agent/reset-task-contract.json
 rtl-agent implement-task --config examples/simple-rtl-agent.yaml --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --provider-plan examples/provider-plans/no-change.json --allowed-file rtl/top.sv --max-iterations 1
+rtl-agent triage-command --command-result .rtl-agent/runs/<run-id>/commands/<command-id>/result.json --output .rtl-agent/triage-report.json
 rtl-agent review-task --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --output .rtl-agent/review-report.json
 rtl-agent discover --config examples/rtl-agent.yaml
 rtl-agent run-command --config examples/rtl-agent.yaml --command smoke
@@ -59,6 +61,7 @@ python3 -m rtl_agent inspect-config --config examples/rtl-agent.yaml
 python3 -m rtl_agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json
 python3 -m rtl_agent parse-issue --issue examples/issues/reset-behavior.md --repository-map .rtl-agent/simple-rtl-map.json --output .rtl-agent/reset-task-contract.json
 python3 -m rtl_agent implement-task --config examples/simple-rtl-agent.yaml --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --provider-plan examples/provider-plans/no-change.json --allowed-file rtl/top.sv --max-iterations 1
+python3 -m rtl_agent triage-command --command-result .rtl-agent/runs/<run-id>/commands/<command-id>/result.json --output .rtl-agent/triage-report.json
 python3 -m rtl_agent review-task --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --output .rtl-agent/review-report.json
 python3 -m rtl_agent discover --config examples/rtl-agent.yaml
 python3 -m rtl_agent run-command --config examples/rtl-agent.yaml --command smoke
@@ -181,6 +184,20 @@ rtl-agent review-task \
 ```
 
 The review pass is read-only. It does not edit files, execute commands, retry implementation, or override failed validation. Deterministic findings are separated from optional provider-backed semantic findings. Every finding must cite concrete evidence such as an input artifact path and detail. Failed or missing validation evidence makes the review unacceptable.
+
+## Waveform and Assertion Triage
+
+`triage-command` reads an existing command result artifact and writes a bounded triage JSON report:
+
+```bash
+rtl-agent triage-command \
+  --command-result .rtl-agent/runs/<run-id>/commands/<command-id>/result.json \
+  --output .rtl-agent/triage-report.json
+```
+
+Triage extracts explicit assertion failures, simulator context lines, and waveform file references such as `.vcd`, `.fst`, `.fsdb`, `.wlf`, and `.ghw` from captured stdout/stderr artifacts. It records bounded excerpts and artifact paths only. It does not execute simulators, inspect waveform contents, render waveforms, perform semantic debugging, or pass unrestricted logs to providers.
+
+`review-task` can also consume a triage report with `--triage-report` so missing waveform references or captured assertion failures are cited in review findings.
 
 ## Run Artifacts
 
