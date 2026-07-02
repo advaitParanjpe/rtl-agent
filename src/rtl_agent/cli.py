@@ -7,6 +7,11 @@ from typing import Annotated
 import typer
 
 from rtl_agent.artifacts import RunStore
+from rtl_agent.benchmark import (
+    BenchmarkError,
+    report_summary_payload,
+    run_benchmark_manifest,
+)
 from rtl_agent.config import load_config
 from rtl_agent.discovery import DiscoveryError, discover_repository, write_repository_map
 from rtl_agent.execution import CommandRunner
@@ -328,6 +333,29 @@ def assess_verification(
 
     _print_verification_strength_summary(report, output)
     if fail_on_insufficient and report.strength == "insufficient":
+        raise typer.Exit(1)
+
+
+@app.command("run-benchmark")
+def run_benchmark(
+    manifest: Annotated[
+        Path,
+        typer.Option("--manifest", help="Benchmark manifest YAML."),
+    ],
+    fail_on_unmet_expected: Annotated[
+        bool,
+        typer.Option("--fail-on-unmet-expected/--no-fail-on-unmet-expected"),
+    ] = False,
+) -> None:
+    """Run a local deterministic benchmark manifest using existing command artifacts."""
+    try:
+        report = run_benchmark_manifest(manifest)
+    except BenchmarkError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_json(report_summary_payload(report))
+    if fail_on_unmet_expected and report.status != "passed":
         raise typer.Exit(1)
 
 

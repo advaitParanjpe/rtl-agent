@@ -25,6 +25,7 @@ This bootstrap contains deterministic infrastructure only:
 - read-only deterministic review reports for implementation artifacts;
 - bounded waveform and assertion triage from command artifacts;
 - deterministic verification-strength assessment from existing artifacts;
+- deterministic local benchmark manifests and run reports;
 - tests, linting, formatting, and type checking.
 
 It does not yet contain real external model-provider integration, autonomous multi-agent behavior, review agents, waveform analysis, mutation testing, pull requests, dashboards, queues, databases, or containers.
@@ -51,6 +52,7 @@ rtl-agent implement-task --config examples/simple-rtl-agent.yaml --task-contract
 rtl-agent triage-command --command-result .rtl-agent/runs/<run-id>/commands/<command-id>/result.json --output .rtl-agent/triage-report.json
 rtl-agent review-task --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --output .rtl-agent/review-report.json
 rtl-agent assess-verification --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --review-report .rtl-agent/review-report.json --output .rtl-agent/verification-strength.json
+rtl-agent run-benchmark --manifest examples/benchmarks/local-smoke.yaml
 rtl-agent discover --config examples/rtl-agent.yaml
 rtl-agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
@@ -66,6 +68,7 @@ python3 -m rtl_agent implement-task --config examples/simple-rtl-agent.yaml --ta
 python3 -m rtl_agent triage-command --command-result .rtl-agent/runs/<run-id>/commands/<command-id>/result.json --output .rtl-agent/triage-report.json
 python3 -m rtl_agent review-task --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --output .rtl-agent/review-report.json
 python3 -m rtl_agent assess-verification --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --review-report .rtl-agent/review-report.json --output .rtl-agent/verification-strength.json
+python3 -m rtl_agent run-benchmark --manifest examples/benchmarks/local-smoke.yaml
 python3 -m rtl_agent discover --config examples/rtl-agent.yaml
 python3 -m rtl_agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
@@ -218,6 +221,27 @@ rtl-agent assess-verification \
 ```
 
 The assessment is deterministic, bounded, and artifact-only. It scores evidence from passed command coverage, acceptance-criteria references, changed-file relevance, retry history, review outcome, and triage availability for simulator-like failures. It flags weak patterns such as no validation, failed latest validation, smoke-only validation, missing acceptance coverage, failed review, missing triage for simulator failures, and validation evidence unrelated to changed files. It does not mutate files, execute commands, inspect waveform contents, run mutation tests, or call a model provider.
+
+## Benchmark Suite
+
+`run-benchmark` reads a local benchmark manifest and runs compact cases through existing named-command execution and run artifacts:
+
+```bash
+rtl-agent run-benchmark \
+  --manifest examples/benchmarks/local-smoke.yaml \
+  --fail-on-unmet-expected
+```
+
+Manifests declare bounded resources, local config files, named commands, per-step timeout overrides, and expected observed statuses: `passed`, `failed`, `timeout`, or `infrastructure_error`. The runner writes a versioned benchmark report under the manifest's configured run-artifact directory:
+
+```text
+.rtl-agent/runs/<run-id>/
+├── commands/
+└── benchmarks/
+    └── report.json
+```
+
+The runner reuses `CommandRunner` and `RunStore`; it does not fetch external repositories, call model providers, create pull requests, require CI, or copy large RTL projects.
 
 ## Run Artifacts
 
