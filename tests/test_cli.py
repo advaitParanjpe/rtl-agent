@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -51,3 +52,30 @@ commands:
     assert result.exit_code == 0
     assert '"status": "passed"' in result.stdout
     assert list((tmp_path / ".rtl-agent" / "runs").glob("*/commands/*/stdout.log"))
+
+
+def test_readme_documented_commands_have_help() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+    documented = {
+        match.group(1)
+        for match in re.finditer(r"^rtl-agent ([a-z][a-z-]+)\b", readme, re.MULTILINE)
+    }
+    expected = {
+        "assess-verification",
+        "discover",
+        "export-evidence",
+        "implement-task",
+        "inspect-config",
+        "inspect-repo",
+        "parse-issue",
+        "review-task",
+        "run-benchmark",
+        "run-command",
+        "triage-command",
+    }
+    runner = CliRunner()
+
+    assert documented == expected
+    for command in sorted(documented):
+        result = runner.invoke(app, [command, "--help"])
+        assert result.exit_code == 0, command
