@@ -18,6 +18,11 @@ from rtl_agent.implementation import (
 from rtl_agent.issues import IssueParsingError, parse_issue_file, write_task_contract
 from rtl_agent.review import ReviewError, review_implementation, write_review_report
 from rtl_agent.triage import TriageError, triage_command_result, write_triage_report
+from rtl_agent.verification_strength_service import (
+    VerificationStrengthError,
+    assess_verification_strength,
+    write_verification_strength_report,
+)
 
 app = typer.Typer(
     help="Deterministic orchestration foundation for RTL engineering workflows.",
@@ -282,6 +287,50 @@ def triage_command(
     _print_triage_summary(report, output)
 
 
+@app.command("assess-verification")
+def assess_verification(
+    task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
+    repository_map: Annotated[Path, typer.Option("--repository-map", help="Repository-map JSON.")],
+    implementation_report: Annotated[
+        Path,
+        typer.Option("--implementation-report", help="Implementation report JSON."),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="Path for verification-strength report JSON."),
+    ],
+    review_report: Annotated[
+        Path | None,
+        typer.Option("--review-report", help="Optional review-report JSON."),
+    ] = None,
+    triage_report: Annotated[
+        list[Path] | None,
+        typer.Option("--triage-report", help="Optional triage-report JSON; may be repeated."),
+    ] = None,
+    fail_on_insufficient: Annotated[
+        bool,
+        typer.Option("--fail-on-insufficient/--no-fail-on-insufficient"),
+    ] = False,
+) -> None:
+    """Assess verification strength from existing artifacts without executing commands."""
+    try:
+        report = assess_verification_strength(
+            task_contract_path=task_contract,
+            repository_map_path=repository_map,
+            implementation_report_path=implementation_report,
+            review_report_path=review_report,
+            triage_report_paths=triage_report or [],
+        )
+        write_verification_strength_report(report, output)
+    except VerificationStrengthError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_verification_strength_summary(report, output)
+    if fail_on_insufficient and report.strength == "insufficient":
+        raise typer.Exit(1)
+
+
 def _print_discovery_summary(
     repository_map: object, output: Path, run_id: str | None = None
 ) -> None:
@@ -387,6 +436,24 @@ def _print_triage_summary(report: object, output: Path) -> None:
             "waveform_references": len(report.waveform_references),
             "simulator_context": len(report.simulator_context),
             "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_verification_strength_summary(report: object, output: Path) -> None:
+    from rtl_agent.verification_strength_models import VerificationStrengthReport
+
+    assert isinstance(report, VerificationStrengthReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "strength": report.strength,
+            "score": report.score,
+            "output": str(output),
+            "signals": len(report.signals),
+            "weak_patterns": len(report.weak_patterns),
+            "validation_commands": report.validation_commands,
+            "summary": report.summary,
         }
     )
 

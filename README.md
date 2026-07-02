@@ -24,6 +24,7 @@ This bootstrap contains deterministic infrastructure only:
 - one bounded implementation-agent loop with a deterministic stub provider;
 - read-only deterministic review reports for implementation artifacts;
 - bounded waveform and assertion triage from command artifacts;
+- deterministic verification-strength assessment from existing artifacts;
 - tests, linting, formatting, and type checking.
 
 It does not yet contain real external model-provider integration, autonomous multi-agent behavior, review agents, waveform analysis, mutation testing, pull requests, dashboards, queues, databases, or containers.
@@ -49,6 +50,7 @@ rtl-agent parse-issue --issue examples/issues/reset-behavior.md --repository-map
 rtl-agent implement-task --config examples/simple-rtl-agent.yaml --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --provider-plan examples/provider-plans/no-change.json --allowed-file rtl/top.sv --max-iterations 1
 rtl-agent triage-command --command-result .rtl-agent/runs/<run-id>/commands/<command-id>/result.json --output .rtl-agent/triage-report.json
 rtl-agent review-task --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --output .rtl-agent/review-report.json
+rtl-agent assess-verification --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --review-report .rtl-agent/review-report.json --output .rtl-agent/verification-strength.json
 rtl-agent discover --config examples/rtl-agent.yaml
 rtl-agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
@@ -63,6 +65,7 @@ python3 -m rtl_agent parse-issue --issue examples/issues/reset-behavior.md --rep
 python3 -m rtl_agent implement-task --config examples/simple-rtl-agent.yaml --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --provider-plan examples/provider-plans/no-change.json --allowed-file rtl/top.sv --max-iterations 1
 python3 -m rtl_agent triage-command --command-result .rtl-agent/runs/<run-id>/commands/<command-id>/result.json --output .rtl-agent/triage-report.json
 python3 -m rtl_agent review-task --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --output .rtl-agent/review-report.json
+python3 -m rtl_agent assess-verification --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --review-report .rtl-agent/review-report.json --output .rtl-agent/verification-strength.json
 python3 -m rtl_agent discover --config examples/rtl-agent.yaml
 python3 -m rtl_agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
@@ -198,6 +201,23 @@ rtl-agent triage-command \
 Triage extracts explicit assertion failures, simulator context lines, and waveform file references such as `.vcd`, `.fst`, `.fsdb`, `.wlf`, and `.ghw` from captured stdout/stderr artifacts. It records bounded excerpts and artifact paths only. It does not execute simulators, inspect waveform contents, render waveforms, perform semantic debugging, or pass unrestricted logs to providers.
 
 `review-task` can also consume a triage report with `--triage-report` so missing waveform references or captured assertion failures are cited in review findings.
+
+## Verification Strength Assessment
+
+`assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:
+
+```bash
+rtl-agent assess-verification \
+  --task-contract .rtl-agent/reset-task-contract.json \
+  --repository-map .rtl-agent/simple-rtl-map.json \
+  --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json \
+  --review-report .rtl-agent/review-report.json \
+  --triage-report .rtl-agent/triage-report.json \
+  --output .rtl-agent/verification-strength.json \
+  --fail-on-insufficient
+```
+
+The assessment is deterministic, bounded, and artifact-only. It scores evidence from passed command coverage, acceptance-criteria references, changed-file relevance, retry history, review outcome, and triage availability for simulator-like failures. It flags weak patterns such as no validation, failed latest validation, smoke-only validation, missing acceptance coverage, failed review, missing triage for simulator failures, and validation evidence unrelated to changed files. It does not mutate files, execute commands, inspect waveform contents, run mutation tests, or call a model provider.
 
 ## Run Artifacts
 

@@ -1,26 +1,25 @@
-# Verification Strength and Mutation Assessment
+# Benchmark Suite Manifest and Local Runner
 
 ## Objective
 
-Estimate whether configured validation evidence is strong enough for a task contract and identify weak validation signals using deterministic, bounded analysis of task contracts, repository maps, implementation reports, review reports, and triage artifacts.
+Create a deterministic benchmark-suite foundation that can run existing rtl-agent workflow commands against compact, repository-local fixtures and persist machine-readable benchmark results.
 
 ## Scope
 
-- Add typed verification-strength models and a versioned JSON artifact.
-- Score validation evidence using deterministic signals such as passed command coverage, acceptance-criteria references, changed-file relevance, failure/retry history, and review findings.
-- Detect weak validation patterns such as no validation, only smoke commands, missing acceptance coverage, failed review, missing triage for simulator failures, or validation unrelated to changed files.
-- Add a CLI command for strength assessment.
-- Persist assessment artifacts under existing run-artifact paths where practical.
-- Add focused tests using compact synthetic artifacts.
+- Add typed benchmark manifest and result models.
+- Add a small checked-in manifest for existing compact fixtures only.
+- Add a CLI command that runs configured benchmark steps by invoking existing rtl-agent services or configured named commands with bounded inputs.
+- Persist benchmark result artifacts under existing run-artifact paths where practical.
+- Record pass/fail status, artifact paths, durations, and concise failure summaries.
+- Add focused tests for manifest parsing, result stability, failed-step reporting, and CLI behavior.
 - Update README usage.
 
 ## Acceptance Criteria
 
-- Assessment artifacts are stable JSON for the same inputs.
-- Failed validation or unacceptable review produces weak/insufficient strength.
-- Passing validation with relevant evidence produces stronger assessment than smoke-only validation.
-- The system never mutates source files or executes arbitrary commands during assessment.
-- Existing discovery, issue parsing, implementation-agent, verification iteration, review, triage, command-runner, config, run-store, and worktree tests continue to pass.
+- Benchmark result artifacts are stable JSON for the same deterministic inputs.
+- A failing benchmark step produces a failed benchmark result without hiding earlier artifacts.
+- The runner does not fetch external repositories, call model providers, create pull requests, or require CI.
+- Existing discovery, issue parsing, implementation-agent, verification iteration, review, triage, verification-strength, command-runner, config, run-store, and worktree tests continue to pass.
 
 ## Required Validation Commands
 
@@ -30,9 +29,10 @@ Estimate whether configured validation evidence is strong enough for a task cont
 
 ## Exclusions
 
-- Do not add mutation testing execution in this milestone.
-- Do not execute EDA tools beyond existing configured command infrastructure.
-- Do not add model-based assessment, pull-request automation, CI bots, databases, queues, dashboards, or a web UI.
+- Do not add external benchmark downloads.
+- Do not add a real model provider.
+- Do not add CI automation, dashboards, databases, queues, or a web UI.
+- Do not add a broad mutation framework or semantic waveform analysis.
 
 ## Completion State
 
