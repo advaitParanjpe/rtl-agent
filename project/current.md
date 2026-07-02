@@ -1,27 +1,27 @@
-# Verification Execution and Failure Iteration
+# Independent Reviewer
 
 ## Objective
 
-Run configured verification commands for a bounded implementation report, classify failures deterministically, and allow limited retry iterations using existing task-contract, repository-map, provider, and implementation-agent artifacts.
+Add an independent deterministic review pass over a proposed implementation report, diff artifact, task contract, repository map, and validation evidence to produce a structured review finding set covering acceptance criteria, risks, evidence gaps, and required follow-up.
 
 ## Scope
 
-- Add deterministic verification result classification for configured named commands.
-- Classify failures into categories such as timeout, missing executable, command failure, assertion/test failure evidence, lint/syntax evidence, and unknown failure.
-- Extend the bounded implementation flow to optionally perform limited retry iterations after failed validation.
-- Persist verification attempts, classifications, retry decisions, and final outcomes as run artifacts.
-- Keep command execution restricted to configured named commands and explicit permissions.
-- Add focused tests using stub provider responses and small temporary repositories.
-- Update README usage for verification failure iteration.
+- Add typed review request/response models and a versioned review-report JSON artifact.
+- Consume existing task-contract, repository-map, implementation-report, diff, and validation artifacts.
+- Check that validation passed before marking work acceptable.
+- Detect missing evidence, failed validation, out-of-scope file edits, prohibited-shortcut conflicts, and acceptance-criteria gaps using deterministic rules.
+- Add a CLI command for review.
+- Persist review artifacts under the existing run-artifact structure where applicable.
+- Add focused tests using compact fixtures and existing stub-provider flows.
+- Update README usage for the review pass.
 
 ## Acceptance Criteria
 
-- Verification classification is deterministic and based only on command metadata and captured stdout/stderr artifacts.
-- Retry attempts are bounded by explicit limits.
-- The system records why it retried or why it stopped.
-- Failed work produces an honest structured failure report with evidence paths.
-- Passing work produces a proposed-diff report with validation evidence.
-- Existing discovery, issue parsing, implementation-agent, command-runner, config, run-store, and worktree tests continue to pass.
+- Review reports are stable JSON for the same inputs.
+- Failed validation or missing validation evidence prevents an acceptable review outcome.
+- Out-of-scope edits and prohibited-shortcut conflicts are reported as findings.
+- The review command returns non-zero for malformed inputs or unacceptable results when requested by CLI options.
+- Existing discovery, issue parsing, implementation-agent, verification iteration, command-runner, config, run-store, and worktree tests continue to pass.
 
 ## Required Validation Commands
 
@@ -31,10 +31,10 @@ Run configured verification commands for a bounded implementation report, classi
 
 ## Exclusions
 
-- Do not add reviewer agents, waveform analysis, mutation testing, CI bots, databases, queues, dashboards, or a web UI.
-- Do not execute arbitrary shell commands from provider output.
+- Do not add a second implementation agent.
 - Do not add pull-request automation.
-- Do not broaden model-provider support beyond what is needed for deterministic tests.
+- Do not add waveform analysis, mutation testing, CI bots, databases, queues, dashboards, or a web UI.
+- Do not require external model credentials for tests.
 
 ## Completion State
 

@@ -103,3 +103,27 @@ Known limitations:
 - No real external model-provider integration yet.
 - No multi-agent framework, reviewer agent, pull-request automation, waveform analysis, mutation testing, CI bots, databases, queues, dashboards, or web UI.
 - No semantic verification beyond configured named-command execution.
+
+## 2026-07-02 - Verification Execution and Failure Iteration
+
+Completed deterministic verification classification and bounded retry iteration inside the existing implementation-agent flow. Validation command results are classified from command metadata and bounded stdout/stderr excerpts, failed validation is never reported as success, concise structured failure evidence is passed to the next provider iteration, retry/stop decisions are recorded, and reports include validation classifications and retry decisions.
+
+Validation evidence:
+
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, and 41 pytest tests.
+- `.venv/bin/rtl-agent inspect-repo --repo examples/simple-rtl --output .rtl-agent/simple-rtl-map.json` - passed.
+- `.venv/bin/rtl-agent parse-issue --issue examples/issues/define-value.md --repository-map .rtl-agent/simple-rtl-map.json --output .rtl-agent/define-task-contract.json` - passed.
+- `.venv/bin/rtl-agent implement-task --config examples/simple-rtl-agent.yaml --task-contract .rtl-agent/define-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --provider-plan examples/provider-plans/retry-after-failure.json --allowed-file rtl/defs.svh --validation-command check-define --max-iterations 2` - passed; report recorded first validation as `assertion_or_test_failure`, retried once, then passed.
+- `git diff --check` - passed.
+
+Architectural decisions:
+
+- Verification classification reuses existing command-runner artifacts and stores only concise bounded excerpts in provider-facing failure evidence.
+- Retry is strictly bounded by `max_iterations` and records `retry` or `stop` decisions.
+- Failed validation keeps the report failed when the retry limit is reached.
+- Command execution remains restricted to configured named commands explicitly allowed on the CLI.
+
+Known limitations:
+
+- Classification is heuristic and deterministic; it does not perform semantic log analysis.
+- No reviewer agent, pull-request automation, waveform analysis, mutation testing, CI bots, databases, queues, dashboards, or web UI yet.
