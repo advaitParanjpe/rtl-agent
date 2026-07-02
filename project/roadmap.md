@@ -15,8 +15,9 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 7. **Waveform and Assertion Triage** - Completed bounded assertion, simulator-context, waveform-reference, and missing-waveform triage from command artifacts with review integration, CLI, examples, and tests.
 8. **Verification Strength and Mutation Assessment** - Completed deterministic artifact-only verification-strength scoring, weak validation pattern detection, CLI, README usage, and tests. Mutation execution remains intentionally out of scope.
 9. **Benchmark Suite** - Completed deterministic local benchmark manifests, bounded named-command runner, expected-outcome reporting, run artifacts, README usage, and tests.
-10. **Evidence Bundle Export** - Active next milestone: add a deterministic local export that gathers existing run artifacts into a compact machine-readable handoff bundle.
+10. **Evidence Bundle Export** - Completed deterministic local evidence-bundle indexes with artifact provenance, hashes, schema versions, omitted-artifact references, CLI usage, and tests.
+11. **Schema Examples and Compatibility Fixtures** - Active next milestone: add compact checked-in example artifacts and compatibility tests for the public JSON schemas.
 
 ## Current Status
 
-Stages 1 through 9 are complete. Stage 10 is active.
+Stages 1 through 10 are complete. Stage 11 is active.

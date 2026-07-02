@@ -222,3 +222,28 @@ Known limitations:
 - The first benchmark runner supports named-command steps only.
 - Reports include measured durations, so reruns are comparable but not byte-identical across separate executions.
 - No benchmark matrix over external RTL repositories yet.
+
+## 2026-07-02 - Evidence Bundle Export
+
+Completed deterministic local evidence-bundle export from existing run artifacts. The exporter writes a compact `manifest.json` and `bundle.json` under a caller-specified output directory, preserves provenance through run-relative artifact references, records SHA-256 hashes, byte sizes, JSON schema versions when present, and explicit omitted-content reasons for logs and other artifacts. Missing optional artifacts are warnings; missing required `run.json` produces a failed export result.
+
+Validation evidence:
+
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, and 78 pytest tests.
+- `PYTHONPATH=src .venv/bin/python -m rtl_agent run-benchmark --manifest examples/benchmarks/local-smoke.yaml --fail-on-unmet-expected` - passed and produced local run artifacts.
+- `PYTHONPATH=src .venv/bin/python -m rtl_agent export-evidence --run-dir .rtl-agent/runs/20260702T120133Z-f762820a --output-dir .rtl-agent/bundles/20260702T120133Z-f762820a --fail-on-failed-export` - passed with 9 artifact references and 2 optional-artifact warnings.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Export is index-only and artifact-based: it does not execute commands, mutate source files, copy large logs, inspect waveforms, call providers, upload artifacts, sign bundles, or add cloud storage.
+- Artifact classification reuses existing run layout and report schemas; unknown JSON and non-JSON artifacts are still hashed and referenced.
+- Command logs and waveform-like files are explicitly marked referenced-only with omitted-content reasons.
+- The export result is deterministic for the same run artifact inputs.
+
+Known limitations:
+
+- The exporter indexes artifacts present under one local run directory only.
+- It records artifact metadata and hashes, not embedded artifact contents.
+- Optional report discovery outside the run directory is not included.

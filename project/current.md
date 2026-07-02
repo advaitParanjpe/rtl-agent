@@ -1,24 +1,21 @@
-# Evidence Bundle Export
+# Schema Examples and Compatibility Fixtures
 
 ## Objective
 
-Create a deterministic local export command that gathers existing rtl-agent run artifacts into a compact machine-readable handoff bundle for review and archival.
+Add compact checked-in example artifacts and compatibility tests for the public JSON schemas emitted by the deterministic rtl-agent workflow.
 
 ## Scope
 
-- Add typed evidence-bundle manifest/result models.
-- Add a CLI command that reads existing run artifacts and writes a compact export index under a caller-specified output directory.
-- Include references to available run metadata, command results, benchmark reports, implementation reports, review reports, triage reports, and verification-strength reports without re-running workflow steps.
-- Record missing optional artifacts as warnings and missing required run metadata as an honest failure.
-- Add focused tests for stable export JSON, missing-artifact warnings, failed export reporting, and CLI behavior.
-- Update README usage.
+- Add small example JSON fixtures for representative repository-map, task-contract, implementation-report, review-report, triage-report, verification-strength-report, benchmark-report, and evidence-bundle-report artifacts.
+- Add tests that load each fixture through the current typed models.
+- Add README guidance for fixture purpose and compatibility expectations.
+- Keep fixtures compact and free of logs, waveforms, secrets, generated run directories, and external repository content.
 
 ## Acceptance Criteria
 
-- Export artifacts are stable JSON for the same inputs.
-- The exporter never executes commands, calls model providers, mutates source files, downloads repositories, or requires CI.
-- Missing optional artifacts produce warnings; missing required run metadata produces a failed export result.
-- Existing discovery, issue parsing, implementation-agent, verification iteration, review, triage, verification-strength, benchmark, command-runner, config, run-store, and worktree tests continue to pass.
+- Every checked-in schema example validates through its corresponding typed model.
+- Fixtures are deterministic, compact, and safe to commit.
+- Existing discovery, issue parsing, implementation-agent, verification iteration, review, triage, verification-strength, benchmark, evidence-bundle, command-runner, config, run-store, and worktree tests continue to pass.
 
 ## Required Validation Commands
 
@@ -28,8 +25,7 @@ Create a deterministic local export command that gathers existing rtl-agent run 
 
 ## Exclusions
 
-- Do not add CI automation, dashboards, databases, queues, or a web UI.
-- Do not add external artifact upload, remote storage, or pull-request automation.
+- Do not add large logs, waveforms, external repository snapshots, cloud storage, signing infrastructure, CI automation, dashboards, databases, queues, or a web UI.
 - Do not add real model-provider integration, semantic waveform analysis, or mutation execution.
 
 ## Completion State

@@ -26,6 +26,7 @@ This bootstrap contains deterministic infrastructure only:
 - bounded waveform and assertion triage from command artifacts;
 - deterministic verification-strength assessment from existing artifacts;
 - deterministic local benchmark manifests and run reports;
+- compact local evidence-bundle export indexes for run artifacts;
 - tests, linting, formatting, and type checking.
 
 It does not yet contain real external model-provider integration, autonomous multi-agent behavior, review agents, waveform analysis, mutation testing, pull requests, dashboards, queues, databases, or containers.
@@ -53,6 +54,7 @@ rtl-agent triage-command --command-result .rtl-agent/runs/<run-id>/commands/<com
 rtl-agent review-task --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --output .rtl-agent/review-report.json
 rtl-agent assess-verification --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --review-report .rtl-agent/review-report.json --output .rtl-agent/verification-strength.json
 rtl-agent run-benchmark --manifest examples/benchmarks/local-smoke.yaml
+rtl-agent export-evidence --run-dir .rtl-agent/runs/<run-id> --output-dir .rtl-agent/bundles/<run-id>
 rtl-agent discover --config examples/rtl-agent.yaml
 rtl-agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
@@ -69,6 +71,7 @@ python3 -m rtl_agent triage-command --command-result .rtl-agent/runs/<run-id>/co
 python3 -m rtl_agent review-task --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --output .rtl-agent/review-report.json
 python3 -m rtl_agent assess-verification --task-contract .rtl-agent/reset-task-contract.json --repository-map .rtl-agent/simple-rtl-map.json --implementation-report .rtl-agent/runs/<run-id>/implementation/report.json --review-report .rtl-agent/review-report.json --output .rtl-agent/verification-strength.json
 python3 -m rtl_agent run-benchmark --manifest examples/benchmarks/local-smoke.yaml
+python3 -m rtl_agent export-evidence --run-dir .rtl-agent/runs/<run-id> --output-dir .rtl-agent/bundles/<run-id>
 python3 -m rtl_agent discover --config examples/rtl-agent.yaml
 python3 -m rtl_agent run-command --config examples/rtl-agent.yaml --command smoke
 ```
@@ -242,6 +245,27 @@ Manifests declare bounded resources, local config files, named commands, per-ste
 ```
 
 The runner reuses `CommandRunner` and `RunStore`; it does not fetch external repositories, call model providers, create pull requests, require CI, or copy large RTL projects.
+
+## Evidence Bundle Export
+
+`export-evidence` reads an existing run directory and writes a compact local index:
+
+```bash
+rtl-agent export-evidence \
+  --run-dir .rtl-agent/runs/<run-id> \
+  --output-dir .rtl-agent/bundles/<run-id> \
+  --fail-on-failed-export
+```
+
+The export writes:
+
+```text
+.rtl-agent/bundles/<run-id>/
+├── manifest.json
+└── bundle.json
+```
+
+The bundle preserves artifact provenance, relative paths, SHA-256 hashes, byte sizes, and JSON schema versions where present. It references command logs and waveform-like files as omitted local artifacts instead of copying their contents. Missing optional artifacts are warnings; missing required `run.json` produces a failed export result. The exporter does not execute commands, mutate source files, call providers, upload artifacts, sign bundles, add cloud storage, or include large logs and waveforms.
 
 ## Run Artifacts
 
