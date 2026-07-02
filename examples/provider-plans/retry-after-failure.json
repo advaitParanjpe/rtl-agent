@@ -1,0 +1,34 @@
+{
+  "responses": [
+    {
+      "message": "Apply an intentionally wrong first edit so validation evidence can drive retry.",
+      "stop": true,
+      "tool_calls": [
+        {
+          "new": "`define SIMPLE_RTL_EXAMPLE 0\n",
+          "old": "`define SIMPLE_RTL_EXAMPLE 1\n",
+          "path": "rtl/defs.svh",
+          "tool": "replace_text"
+        }
+      ],
+      "validation_commands": [
+        "check-define"
+      ]
+    },
+    {
+      "message": "Restore the expected value after structured failure evidence.",
+      "stop": true,
+      "tool_calls": [
+        {
+          "new": "`define SIMPLE_RTL_EXAMPLE 1\n",
+          "old": "`define SIMPLE_RTL_EXAMPLE 0\n",
+          "path": "rtl/defs.svh",
+          "tool": "replace_text"
+        }
+      ],
+      "validation_commands": [
+        "check-define"
+      ]
+    }
+  ]
+}

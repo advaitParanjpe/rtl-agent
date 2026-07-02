@@ -10,8 +10,8 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 2. **RTL Repository Discovery and Structured Repository Model** - Completed deterministic repository scanner, lightweight SystemVerilog extraction, hierarchy candidate scoring, build-flow evidence discovery, JSON repository map, CLI, run artifacts, and tests.
 3. **Issue Parsing and Task Contracts** - Completed deterministic issue-to-contract parser with explicit scope, invariants, acceptance criteria, validation commands, prohibited shortcuts, evidence requirements, warnings, CLI, and tests.
 4. **Model Provider Abstraction and One Bounded Implementation Agent** - Completed typed provider interface, deterministic stub provider, bounded implementation loop, explicit permissions, structured tool calls, named-command validation, run artifacts, reports, CLI, and tests.
-5. **Verification Execution and Failure Iteration** - Active next milestone: run configured verification, classify failures, and iterate within limits.
-6. **Independent Reviewer** - Add separate review context for diff, evidence, risks, and acceptance criteria.
+5. **Verification Execution and Failure Iteration** - Completed deterministic validation classification, bounded retry iteration, concise failure evidence, retry/stop decisions, report fields, CLI summary, examples, and tests.
+6. **Independent Reviewer** - Active next milestone: add separate review context for diff, evidence, risks, and acceptance criteria.
 7. **Waveform and Assertion Triage** - Capture simulator outputs, waveforms, assertions, and failure summaries.
 8. **Verification Strength and Mutation Assessment** - Estimate whether tests prove the intended behavior and detect weak validation.
 9. **Benchmark Suite** - Evaluate across AXI router, TinyNPU, Sparrow-V, and later Sparrow-Cluster.
@@ -19,4 +19,4 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 
 ## Current Status
 
-Stages 1 through 4 are complete. Stage 5 is active.
+Stages 1 through 5 are complete. Stage 6 is active.

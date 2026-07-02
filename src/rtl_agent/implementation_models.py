@@ -23,6 +23,31 @@ class ImplementationStatus(StrEnum):
     FAILED = "failed"
 
 
+class VerificationFailureCategory(StrEnum):
+    PASSED = "passed"
+    TIMEOUT = "timeout"
+    MISSING_EXECUTABLE = "missing_executable"
+    ASSERTION_TEST_FAILURE = "assertion_or_test_failure"
+    LINT_SYNTAX_FAILURE = "lint_or_syntax_failure"
+    COMMAND_FAILURE = "command_failure"
+    UNKNOWN_FAILURE = "unknown_failure"
+
+
+class RetryDecision(BaseModel):
+    iteration: int
+    command_name: str
+    decision: str
+    reason: str
+
+
+class VerificationClassification(BaseModel):
+    category: VerificationFailureCategory
+    summary: str
+    evidence: list[str] = Field(default_factory=list)
+    stdout_excerpt: list[str] = Field(default_factory=list)
+    stderr_excerpt: list[str] = Field(default_factory=list)
+
+
 class ProviderMessage(BaseModel):
     role: ProviderRole
     content: str
@@ -34,6 +59,7 @@ class ProviderRequest(BaseModel):
     allowed_validation_commands: list[str]
     iteration: int
     messages: list[ProviderMessage]
+    failure_evidence: list[VerificationClassification] = Field(default_factory=list)
 
 
 class ToolCall(BaseModel):
@@ -64,6 +90,7 @@ class ValidationResultSummary(BaseModel):
     result_path: Path
     stdout_path: Path
     stderr_path: Path
+    classification: VerificationClassification
 
 
 class ImplementationReport(BaseModel):
@@ -81,6 +108,7 @@ class ImplementationReport(BaseModel):
     applied_files: list[str] = Field(default_factory=list)
     tool_results: list[ToolResult] = Field(default_factory=list)
     validation_results: list[ValidationResultSummary] = Field(default_factory=list)
+    retry_decisions: list[RetryDecision] = Field(default_factory=list)
     diff_path: Path | None = None
     failure_reason: str | None = None
     warnings: list[str] = Field(default_factory=list)

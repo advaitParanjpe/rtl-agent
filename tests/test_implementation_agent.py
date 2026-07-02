@@ -210,3 +210,105 @@ def test_bounded_implementation_rejects_tool_call_for_unallowed_file(tmp_path: P
 
     assert report.status == "failed"
     assert report.failure_reason == "file is not explicitly allowed: rtl/other.sv"
+
+
+def test_bounded_implementation_retries_after_failed_validation(tmp_path: Path) -> None:
+    config, repository_map_path, task_contract_path, repo = make_repo_inputs(tmp_path)
+    plan = write_plan(
+        tmp_path / "plan.json",
+        {
+            "responses": [
+                {
+                    "message": "Apply first attempt.",
+                    "tool_calls": [
+                        {
+                            "tool": "replace_text",
+                            "path": "rtl/top.sv",
+                            "old": "old_signal",
+                            "new": "bad_signal",
+                        }
+                    ],
+                    "validation_commands": ["check"],
+                    "stop": True,
+                },
+                {
+                    "message": "Fix failed validation.",
+                    "tool_calls": [
+                        {
+                            "tool": "replace_text",
+                            "path": "rtl/top.sv",
+                            "old": "bad_signal",
+                            "new": "new_signal",
+                        }
+                    ],
+                    "validation_commands": ["check"],
+                    "stop": True,
+                },
+            ]
+        },
+    )
+    store = RunStore(config.run_root, run_id="run-1")
+    store.create()
+
+    report = run_bounded_implementation(
+        config=config,
+        run_store=store,
+        provider_plan=plan,
+        task_contract_path=task_contract_path,
+        repository_map_path=repository_map_path,
+        allowed_files=["rtl/top.sv"],
+        allowed_validation_commands=["check"],
+        max_iterations=2,
+    )
+
+    assert report.status == "proposed_diff"
+    assert [item.status for item in report.validation_results] == ["failed", "passed"]
+    assert report.validation_results[0].classification.category == "assertion_or_test_failure"
+    assert report.retry_decisions[0].decision == "retry"
+    assert "new_signal" in (repo / "rtl" / "top.sv").read_text(encoding="utf-8")
+    request_2 = json.loads(
+        (store.run_dir / "implementation" / "provider-request-2.json").read_text(encoding="utf-8")
+    )
+    assert request_2["failure_evidence"][0]["category"] == "assertion_or_test_failure"
+    assert "Traceback" not in json.dumps(request_2["failure_evidence"])
+
+
+def test_bounded_implementation_stays_failed_when_retry_limit_reached(tmp_path: Path) -> None:
+    config, repository_map_path, task_contract_path, _repo = make_repo_inputs(tmp_path)
+    plan = write_plan(
+        tmp_path / "plan.json",
+        {
+            "responses": [
+                {
+                    "message": "Apply bad edit.",
+                    "tool_calls": [
+                        {
+                            "tool": "replace_text",
+                            "path": "rtl/top.sv",
+                            "old": "old_signal",
+                            "new": "bad_signal",
+                        }
+                    ],
+                    "validation_commands": ["check"],
+                    "stop": True,
+                }
+            ]
+        },
+    )
+    store = RunStore(config.run_root, run_id="run-1")
+    store.create()
+
+    report = run_bounded_implementation(
+        config=config,
+        run_store=store,
+        provider_plan=plan,
+        task_contract_path=task_contract_path,
+        repository_map_path=repository_map_path,
+        allowed_files=["rtl/top.sv"],
+        allowed_validation_commands=["check"],
+        max_iterations=1,
+    )
+
+    assert report.status == "failed"
+    assert report.failure_reason == "validation command failed: check (assertion_or_test_failure)"
+    assert report.retry_decisions[0].decision == "stop"

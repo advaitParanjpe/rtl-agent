@@ -273,9 +273,14 @@ def _print_implementation_summary(report: object, output: Path, run_id: str) -> 
             "iterations": report.iterations,
             "applied_files": report.applied_files,
             "validation_results": [
-                {"command_name": item.command_name, "status": item.status}
+                {
+                    "command_name": item.command_name,
+                    "status": item.status,
+                    "classification": item.classification.category,
+                }
                 for item in report.validation_results
             ],
+            "retry_decisions": [item.model_dump(mode="json") for item in report.retry_decisions],
             "diff_path": str(report.diff_path) if report.diff_path else None,
             "failure_reason": report.failure_reason,
             "warnings": report.warnings,

@@ -146,6 +146,8 @@ rtl-agent implement-task \
 
 The implementation agent accepts only structured stub-provider tool calls. Supported tools are `read_file` and `replace_text`. Each editable file must be explicitly listed with `--allowed-file`, must be repository-relative, must be present in the repository map, and must be in the task contract's scoped repository context. Validation can run only configured named commands explicitly listed with `--validation-command`; commands from model output are names, not shell text.
 
+Validation failures are classified deterministically from command metadata plus bounded stdout/stderr excerpts. Categories include timeout, missing executable, assertion/test failure evidence, lint/syntax evidence, generic command failure, and unknown failure. When validation fails and `--max-iterations` leaves room, the next provider request receives only concise structured failure evidence, not unrestricted logs. If retries are exhausted, the report remains failed.
+
 Runs write audit artifacts under:
 
 ```text
