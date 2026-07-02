@@ -291,3 +291,25 @@ Known limitations:
 
 - README command examples are concise and do not form a full end-to-end implementation/review pipeline.
 - Packaging smoke verification is still manual in this milestone and is queued as the next focused task.
+
+## 2026-07-02 - Packaging Smoke Verification
+
+Completed a bounded local packaging smoke check. The canonical `scripts/check.py` workflow now builds a local wheel without dependency resolution, installs it into a temporary virtual environment without index access, exposes current dev-environment runtime dependencies through a `.pth` file, and verifies `rtl-agent --help`, `python -m rtl_agent --help`, and every README-documented `rtl-agent <command> --help`.
+
+Validation evidence:
+
+- `.venv/bin/python scripts/packaging_smoke.py` - passed.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 83 pytest tests, and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Packaging smoke verification is local and deterministic: no publishing, remote package index lookup, CI workflow, container, provider, UI, or unrelated packaging refactor was added.
+- The script installs the built wheel into a temporary venv and verifies installed console-script plus module invocation, rather than relying on `PYTHONPATH=src`.
+- `hatchling` is included in the dev extra so local no-build-isolation wheel builds are explicit.
+
+Known limitations:
+
+- The temporary packaging smoke environment reuses current dev-environment runtime dependencies through a `.pth` file instead of creating a fully dependency-isolated offline wheelhouse.
+- The smoke check verifies CLI help availability, not every command's runtime behavior.

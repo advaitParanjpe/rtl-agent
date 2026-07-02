@@ -95,6 +95,8 @@ git diff --check
 git status --short
 ```
 
+`scripts/check.py` includes a local packaging smoke check. It builds the current package into a wheel, installs that wheel into a temporary virtual environment without index access or dependency resolution, and verifies both `rtl-agent --help` and `python -m rtl_agent --help` plus documented command help.
+
 ## Configuration
 
 `examples/rtl-agent.yaml` defines:
