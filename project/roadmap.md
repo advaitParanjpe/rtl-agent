@@ -19,8 +19,9 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 11. **Schema Examples and Compatibility Fixtures** - Completed compact checked-in public-schema examples plus compatibility tests that validate them through current typed models.
 12. **CLI Documentation Consistency Pass** - Completed README cleanup, installed-CLI command verification, source-tree invocation guidance, and README command help coverage tests.
 13. **Packaging Smoke Verification** - Completed bounded local wheel/install smoke verification for console-script and module invocation as part of the canonical check workflow.
-14. **Compact End-to-End Example Check** - Active next milestone: add a local scripted example that exercises the deterministic workflow across compact fixtures and verifies expected artifacts.
+14. **Compact End-to-End Example Check** - Completed compact local scripted example check across checked-in fixtures, deterministic implementation retry, review, verification-strength, benchmark, evidence export, and schema-backed artifact assertions.
+15. **Failure Report Example Check** - Active next milestone: add a compact local example check for the honest terminal-failure path and its emitted artifacts.
 
 ## Current Status
 
-Stages 1 through 13 are complete. Stage 14 is active.
+Stages 1 through 14 are complete. Stage 15 is active.

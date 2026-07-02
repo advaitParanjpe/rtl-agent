@@ -313,3 +313,25 @@ Known limitations:
 
 - The temporary packaging smoke environment reuses current dev-environment runtime dependencies through a `.pth` file instead of creating a fully dependency-isolated offline wheelhouse.
 - The smoke check verifies CLI help availability, not every command's runtime behavior.
+
+## 2026-07-02 - Compact End-to-End Example Check
+
+Completed a compact local end-to-end example check. The canonical `scripts/check.py` workflow now runs `scripts/e2e_example_check.py`, which copies checked-in examples into a temporary workspace, exercises the real CLI workflow stages, and validates emitted artifacts through the existing Pydantic models. The check covers repository inspection, issue parsing, deterministic stub-provider implementation with one failed validation and retry, command-result triage, deterministic review, verification-strength assessment, local benchmark execution, and evidence-bundle export.
+
+Validation evidence:
+
+- `.venv/bin/python scripts/e2e_example_check.py` - passed.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 83 pytest tests, compact end-to-end example check, and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The example check uses checked-in fixtures but copies them to a temporary workspace because the implementation stage intentionally mutates its configured repository.
+- The check invokes the real CLI via `python -m rtl_agent` and validates generated JSON through existing artifact models rather than adding a parallel demo path or duplicate schemas.
+- Assertions avoid volatile timestamps, UUIDs, durations, hashes, and absolute path equality; they focus on schema versions, statuses, stable file names, retry decisions, and artifact existence.
+
+Known limitations:
+
+- The scripted example is a compact deterministic smoke of the workflow, not an exhaustive integration test of every command option.
+- It uses the existing local stub provider only; no real provider, external repository, CI, container, UI, or broad orchestration feature was added.
