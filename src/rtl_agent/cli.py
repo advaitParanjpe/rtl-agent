@@ -16,6 +16,7 @@ from rtl_agent.implementation import (
     write_implementation_report,
 )
 from rtl_agent.issues import IssueParsingError, parse_issue_file, write_task_contract
+from rtl_agent.review import ReviewError, review_implementation, write_review_report
 
 app = typer.Typer(
     help="Deterministic orchestration foundation for RTL engineering workflows.",
@@ -217,6 +218,45 @@ def implement_task(
         raise typer.Exit(1)
 
 
+@app.command("review-task")
+def review_task(
+    task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
+    repository_map: Annotated[Path, typer.Option("--repository-map", help="Repository-map JSON.")],
+    implementation_report: Annotated[
+        Path,
+        typer.Option("--implementation-report", help="Implementation report JSON."),
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Path for review-report JSON.")],
+    provider_findings: Annotated[
+        Path | None,
+        typer.Option(
+            "--provider-findings",
+            help="Optional provider-backed semantic findings JSON; findings must cite evidence.",
+        ),
+    ] = None,
+    fail_on_unacceptable: Annotated[
+        bool,
+        typer.Option("--fail-on-unacceptable/--no-fail-on-unacceptable"),
+    ] = False,
+) -> None:
+    """Review implementation artifacts without editing files or executing commands."""
+    try:
+        report = review_implementation(
+            task_contract_path=task_contract,
+            repository_map_path=repository_map,
+            implementation_report_path=implementation_report,
+            provider_findings_path=provider_findings,
+        )
+        write_review_report(report, output)
+    except ReviewError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_review_summary(report, output)
+    if fail_on_unacceptable and report.outcome == "unacceptable":
+        raise typer.Exit(1)
+
+
 def _print_discovery_summary(
     repository_map: object, output: Path, run_id: str | None = None
 ) -> None:
@@ -284,6 +324,26 @@ def _print_implementation_summary(report: object, output: Path, run_id: str) -> 
             "diff_path": str(report.diff_path) if report.diff_path else None,
             "failure_reason": report.failure_reason,
             "warnings": report.warnings,
+        }
+    )
+
+
+def _print_review_summary(report: object, output: Path) -> None:
+    from rtl_agent.review_models import ReviewFindingSeverity, ReviewReport
+
+    assert isinstance(report, ReviewReport)
+    findings = report.deterministic_findings + report.provider_findings
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "outcome": report.outcome,
+            "output": str(output),
+            "deterministic_findings": len(report.deterministic_findings),
+            "provider_findings": len(report.provider_findings),
+            "error_findings": sum(
+                finding.severity == ReviewFindingSeverity.ERROR for finding in findings
+            ),
+            "summary": report.summary,
         }
     )
 
