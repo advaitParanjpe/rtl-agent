@@ -263,6 +263,25 @@ rtl-agent link-assertion-waveform \
 
 The command selects one assertion finding by stable id (`--assertion-id assertion-<index>`) or `--assertion-index`, resolves its associated VCD waveform reference, converts the assertion's simulator time into VCD tick units using the waveform's `$timescale`, and then invokes the existing waveform-window extractor. It emits a versioned linkage report recording the selected assertion, source triage report, selected waveform, timestamp-conversion details, generated waveform-slice path and hash, warnings, and unresolved ambiguities. It fails honestly when no assertion is selected, the assertion has no usable timestamp, no compatible textual VCD is associated, the timescale conversion is ambiguous, or the waveform is missing or malformed, and it never silently chooses between multiple candidate waveforms (use `--waveform-path` to disambiguate). It never infers root cause.
 
+## Relevant-Signal Reduction
+
+`reduce-signals` narrows a waveform slice to a bounded, evidence-ranked subset of signals most relevant to a failure, and writes a reduced slice alongside a scored report:
+
+```bash
+rtl-agent extract-waveform-window \
+  --vcd examples/waveforms/failure.vcd \
+  --failure-time 40 --before 15 --after 5 \
+  --output .rtl-agent/waveform-slice.json
+
+rtl-agent reduce-signals \
+  --waveform-slice .rtl-agent/waveform-slice.json \
+  --assertion-signal top.dut.valid \
+  --reduced-slice-output .rtl-agent/reduced-slice.json \
+  --output .rtl-agent/relevant-signals.json
+```
+
+Ranking is deterministic and uses only explicit textual and transition evidence already in the slice: whether the signal is named by the assertion (`--assertion-signal`/`--assertion-summary`, or an `--assertion-link` report), whether it has transitions in the window or exactly at the failure time, whether it carries unknown (`x`) or high-impedance (`z`) values, and whether it shares the assertion signal's parent scope. Each retained signal cites its matched criteria and a deterministic score; the reduced set is a strict subset of the input slice, bounded by `--max-signals`. It never traces signal dependencies, interprets waveform semantics, localizes RTL source, or claims root cause.
+
 ## Verification Strength Assessment
 
 `assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:

@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Waveform Evidence Bundle Integration
+Automatic Relevant-Signal Reduction
 
 ## Completed Work
 

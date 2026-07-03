@@ -515,3 +515,26 @@ Known limitations:
 
 - Detection is content-based on stable top-level keys; deeply restructured future report schemas would need the key-sets updated.
 - The linkage report's own generated waveform slice is classified as a waveform-slice artifact, which is correct but means one linkage run contributes two waveform-related artifacts to a bundle.
+
+## 2026-07-03 - Automatic Relevant-Signal Reduction
+
+Added deterministic relevant-signal reduction over an existing waveform slice. New typed, versioned report schema (`src/rtl_agent/relevant_signal_models.py`), a reduction service (`src/rtl_agent/signal_reduction/service.py`), and a `reduce-signals` CLI command consume a waveform-slice report (and optionally an assertion-link report and/or explicit assertion signal/summary flags) and rank each slice signal by explicit, evidence-cited criteria: assertion-named (100), transition at the failure timestamp (40), any in-window transition (20), unknown/high-impedance `x`/`z` presence (25), and shared parent-scope hierarchy proximity to the assertion signal (15). Retained signals are a strict, score-sorted, `--max-signals`-bounded subset, each citing its matched criteria; excluded signals are summarized by reason. The service also writes a reduced waveform-slice artifact (reusing the existing `WaveformSliceReport` schema and `write_waveform_slice`), filtered to the retained signals with recomputed selected-signal and in-window value-change statistics.
+
+Validation evidence:
+
+- `PYTHONPATH=src .venv/bin/rtl-agent extract-waveform-window --vcd examples/waveforms/failure.vcd --failure-time 40 --before 15 --after 5 --output .rtl-agent/waveform-slice.json` then `... reduce-signals --waveform-slice .rtl-agent/waveform-slice.json --assertion-signal top.dut.valid --reduced-slice-output .rtl-agent/reduced-slice.json --output .rtl-agent/relevant-signals.json` - passed; `top.dut.valid` ranked highest (assertion-named + transition + x/z).
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 136 pytest tests, agent portability check, compact end-to-end/failure/tool-failure/no-change example checks, and packaging smoke verification (which now also verifies `reduce-signals --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Reduction consumes the existing slice artifact only; it never re-parses VCD or re-extracts windows. The reduced output reuses the unchanged `WaveformSliceReport` schema so downstream tools (evidence bundle) already recognize it.
+- Criterion weights are fixed module constants and every retained signal carries per-criterion point/detail reasons, keeping ranking deterministic and auditable rather than a black-box score.
+- Assertion context is optional and layered: explicit `--assertion-signal`/`--assertion-summary` flags take precedence over an `--assertion-link` report; with no context, ranking relies solely on transition and `x`/`z` evidence.
+- Hierarchy proximity requires sharing the assertion signal's immediate parent scope (not merely the root), so shallow root-only overlap does not inflate relevance.
+
+Known limitations:
+
+- Relevance is heuristic and evidence-based, not causal; it deliberately performs no dependency tracing, semantic interpretation, RTL source localization, model-based analysis, stimulus minimization, or patch generation.
+- Assertion-name matching is exact full-name, exact leaf-name, or whole-token summary match; it does not fuzzy-match renamed or partially-quoted signal references.

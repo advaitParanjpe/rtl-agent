@@ -34,6 +34,11 @@ from rtl_agent.implementation import (
 )
 from rtl_agent.issues import IssueParsingError, parse_issue_file, write_task_contract
 from rtl_agent.review import ReviewError, review_implementation, write_review_report
+from rtl_agent.signal_reduction import (
+    SignalReductionError,
+    reduce_relevant_signals,
+    write_reduction_report,
+)
 from rtl_agent.triage import TriageError, triage_command_result, write_triage_report
 from rtl_agent.verification_strength_service import (
     VerificationStrengthError,
@@ -429,6 +434,52 @@ def link_assertion_waveform_command(
     _print_assertion_link_summary(report, output)
 
 
+@app.command("reduce-signals")
+def reduce_signals_command(
+    waveform_slice: Annotated[
+        Path,
+        typer.Option("--waveform-slice", help="Existing waveform-slice JSON to reduce."),
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Path for the reduction-report JSON.")],
+    reduced_slice_output: Annotated[
+        Path,
+        typer.Option("--reduced-slice-output", help="Path for the reduced waveform-slice JSON."),
+    ],
+    assertion_link: Annotated[
+        Path | None,
+        typer.Option("--assertion-link", help="Optional assertion-link report for context."),
+    ] = None,
+    assertion_signal: Annotated[
+        str | None,
+        typer.Option("--assertion-signal", help="Assertion signal name or leaf for ranking."),
+    ] = None,
+    assertion_summary: Annotated[
+        str | None,
+        typer.Option("--assertion-summary", help="Assertion summary text for token matching."),
+    ] = None,
+    max_signals: Annotated[
+        int,
+        typer.Option("--max-signals", min=1, help="Maximum retained signals."),
+    ] = 32,
+) -> None:
+    """Reduce a waveform slice to a bounded, evidence-ranked relevant signal set."""
+    try:
+        report = reduce_relevant_signals(
+            waveform_slice,
+            reduced_slice_output,
+            assertion_link_path=assertion_link,
+            assertion_signal=assertion_signal,
+            assertion_summary=assertion_summary,
+            max_signals=max_signals,
+        )
+        write_reduction_report(report, output)
+    except SignalReductionError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_reduction_summary(report, output)
+
+
 @app.command("assess-verification")
 def assess_verification(
     task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
@@ -668,6 +719,24 @@ def _print_waveform_slice_summary(report: object, output: Path) -> None:
             "observed_end": report.window.observed_end,
             "selected_signals": len(report.selected_signals),
             "value_changes": len(report.value_changes),
+            "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_reduction_summary(report: object, output: Path) -> None:
+    from rtl_agent.relevant_signal_models import RelevantSignalReductionReport
+
+    assert isinstance(report, RelevantSignalReductionReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "reduced_slice_path": str(report.reduced_slice_path),
+            "failure_time": report.failure_time,
+            "total_candidate_signals": report.total_candidate_signals,
+            "retained_signals": len(report.retained_signals),
+            "top_signals": [signal.name for signal in report.retained_signals[:5]],
             "warnings": len(report.warnings),
         }
     )
