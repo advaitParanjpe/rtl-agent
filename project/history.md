@@ -335,3 +335,25 @@ Known limitations:
 
 - The scripted example is a compact deterministic smoke of the workflow, not an exhaustive integration test of every command option.
 - It uses the existing local stub provider only; no real provider, external repository, CI, container, UI, or broad orchestration feature was added.
+
+## 2026-07-03 - Failure Report Example Check
+
+Completed a compact local failure-path example check. The canonical `scripts/check.py` workflow now runs `scripts/failure_example_check.py`, which copies checked-in examples into a temporary workspace, exercises the real CLI workflow with a one-iteration bounded implementation run, expects the terminal failed implementation exit, and validates emitted artifacts through the existing Pydantic models. The check covers failed implementation status and reason, command-result evidence, retry stop history, triage, unacceptable review disposition, insufficient verification-strength result, and evidence-bundle export of the failed run artifacts.
+
+Validation evidence:
+
+- `python3 scripts/failure_example_check.py` - passed.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 83 pytest tests, compact end-to-end example check, compact failure example check, and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The failure example reuses the existing compact fixtures, stub-provider plan, configured `check-define` command, CLI stages, run artifacts, and schemas rather than adding a parallel demo path.
+- The implementation stage is bounded to one iteration so the first real validation failure becomes the terminal report; assertions avoid timestamps, UUIDs, absolute paths, durations, and hashes.
+- Review, verification-strength, triage, and evidence-bundle artifacts are written under the temporary run directory where practical so evidence export can classify them.
+
+Known limitations:
+
+- The check covers a deterministic validation-failure terminal path, not every possible provider, permission, or structured-tool failure mode.
+- It remains a compact local workflow smoke; no real provider, external repository, CI, container, dashboard, database, queue, UI, semantic waveform analysis, or broad orchestration feature was added.

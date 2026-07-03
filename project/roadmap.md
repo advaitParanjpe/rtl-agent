@@ -20,8 +20,9 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 12. **CLI Documentation Consistency Pass** - Completed README cleanup, installed-CLI command verification, source-tree invocation guidance, and README command help coverage tests.
 13. **Packaging Smoke Verification** - Completed bounded local wheel/install smoke verification for console-script and module invocation as part of the canonical check workflow.
 14. **Compact End-to-End Example Check** - Completed compact local scripted example check across checked-in fixtures, deterministic implementation retry, review, verification-strength, benchmark, evidence export, and schema-backed artifact assertions.
-15. **Failure Report Example Check** - Active next milestone: add a compact local example check for the honest terminal-failure path and its emitted artifacts.
+15. **Failure Report Example Check** - Completed compact local scripted example check for the honest terminal-failure path, failed report artifact, command evidence, review disposition, verification-strength result, and evidence-bundle export.
+16. **Tool Failure Report Example Check** - Active next milestone: add a compact local example check for deterministic structured-tool failure reporting.
 
 ## Current Status
 
-Stages 1 through 14 are complete. Stage 15 is active.
+Stages 1 through 15 are complete. Stage 16 is active.

@@ -97,7 +97,7 @@ git status --short
 
 `scripts/check.py` includes a local packaging smoke check. It builds the current package into a wheel, installs that wheel into a temporary virtual environment without index access or dependency resolution, and verifies both `rtl-agent --help` and `python -m rtl_agent --help` plus documented command help.
 
-It also runs `scripts/e2e_example_check.py`, a compact local example check that copies the checked-in fixtures to a temporary workspace, exercises inspect, parse, bounded implementation with retry, triage, review, verification-strength, benchmark, and evidence export stages, and verifies stable artifact statuses through the existing schemas.
+It also runs `scripts/e2e_example_check.py`, a compact local example check that copies the checked-in fixtures to a temporary workspace, exercises inspect, parse, bounded implementation with retry, triage, review, verification-strength, benchmark, and evidence export stages, and verifies stable artifact statuses through the existing schemas. `scripts/failure_example_check.py` covers the matching bounded terminal-failure path and validates the failed report, command evidence, review, verification-strength, and exported evidence artifacts.
 
 ## Configuration
 

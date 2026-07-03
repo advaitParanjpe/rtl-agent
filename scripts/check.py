@@ -14,6 +14,7 @@ COMMANDS = (
     [str(PYTHON), "-m", "mypy"],
     [str(PYTHON), "-m", "pytest"],
     [str(PYTHON), "scripts/e2e_example_check.py"],
+    [str(PYTHON), "scripts/failure_example_check.py"],
     [str(PYTHON), "scripts/packaging_smoke.py"],
 )
 
