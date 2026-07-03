@@ -1,26 +1,26 @@
-# Passing-vs-Failing Waveform Comparison
+# Signal-to-RTL Source Mapping
 
 ## Objective
 
-Deterministically compare a failing waveform slice against a passing (reference) waveform slice over their shared signals and time window, and emit a typed, versioned comparison artifact that reports per-signal value-timeline divergences. Report only observable differences; never interpret causal meaning or claim root cause.
+Deterministically map hierarchical waveform signal names to their declaring RTL source locations using the existing repository map's declaration evidence, and emit a typed, versioned mapping report. Report only declaration-evidence matches; never elaborate semantics, infer connectivity, or claim causal meaning.
 
 ## Scope
 
-- Add a typed, versioned waveform-comparison report schema.
-- Add a deterministic service that consumes two existing waveform-slice reports (a failing slice and a passing/reference slice) and, for each signal present in both, compares the ordered value timeline (initial value at window start plus in-window transitions).
-- For each compared signal, report: whether timelines are identical, the first divergence time, the differing values at that point, and counts of differing transition points.
-- Report signals present in only one slice (added/removed relative to the reference) and any window or timescale mismatch as explicit warnings.
-- Add a CLI command such as `compare-waveforms`.
-- Reuse the existing waveform-slice models and, where practical, the relevant-signal-reduction output as the signal set to compare; do not re-parse VCD or re-extract windows.
+- Add a typed, versioned signal-to-source mapping report schema.
+- Add a deterministic service that consumes an existing repository-map artifact plus a set of hierarchical signal names (supplied directly, or read from a reduced waveform-slice or a waveform-comparison report) and, for each signal, resolves candidate RTL source locations from `FileRecord.source.declarations` (declaration name, kind, file path, line).
+- Match by the signal's leaf name against declaration names, and use the signal's scope components (module hierarchy) to disambiguate where the repository map provides module/declaration evidence.
+- For each signal report: resolved status (resolved / unresolved / ambiguous), the candidate declaration location(s) with kind and line, and the basis for the match.
+- Add a CLI command such as `map-signals`.
+- Reuse the existing repository-map, reduced-slice, and comparison models; do not re-scan the repository or re-parse RTL.
 - Emit bounded, stably ordered output with deterministic serialization.
-- Fail or warn honestly: no shared signals, empty slices, or incompatible windows yield clear warnings; never invent divergences.
-- Add compact fixtures and tests covering identical timelines, first-divergence detection, added/removed signals, window/timescale mismatch, empty results, and deterministic output.
+- Fail or warn honestly: signals with no matching declaration are unresolved; signals matching multiple declarations are ambiguous and never silently collapsed to one.
+- Add compact fixtures and tests covering a resolved signal, an unresolved signal, an ambiguous (multi-declaration) signal, scope-based disambiguation, empty input, and deterministic output.
 - Add one concise runnable README example.
 
 ## Acceptance Criteria
 
-- Comparison is deterministic, bounded, and reports only observable value/timeline differences with explicit evidence (times and values).
-- Signals compared are those present in both slices; added/removed signals are reported separately, not silently dropped.
+- Mapping is deterministic, bounded, and cites explicit declaration evidence (path, line, kind) for each resolved signal.
+- Unresolved and ambiguous signals are reported explicitly, not dropped or guessed.
 - Output ordering and serialization are stable across repeated runs.
 - No existing artifact schema, CLI behavior, provider behavior, or product workflow changes.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
@@ -33,8 +33,8 @@ Deterministically compare a failing waveform slice against a passing (reference)
 
 ## Exclusions
 
-- Do not make causal claims, trace signal dependencies, interpret waveform semantics, localize RTL source, perform model-based analysis, or minimize stimulus.
-- Do not re-parse VCD or duplicate waveform-window extraction; consume the existing slice artifacts.
+- Do not perform semantic elaboration, parameter resolution, generate expansion, connectivity/dependency tracing, model-based analysis, stimulus minimization, patch generation, or causal claims.
+- Do not re-scan the repository or re-parse RTL; consume the existing repository-map artifact.
 - Do not add real model-provider integration, external repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 

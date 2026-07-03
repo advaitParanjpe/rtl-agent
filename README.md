@@ -282,6 +282,19 @@ rtl-agent reduce-signals \
 
 Ranking is deterministic and uses only explicit textual and transition evidence already in the slice: whether the signal is named by the assertion (`--assertion-signal`/`--assertion-summary`, or an `--assertion-link` report), whether it has transitions in the window or exactly at the failure time, whether it carries unknown (`x`) or high-impedance (`z`) values, and whether it shares the assertion signal's parent scope. Each retained signal cites its matched criteria and a deterministic score; the reduced set is a strict subset of the input slice, bounded by `--max-signals`. It never traces signal dependencies, interprets waveform semantics, localizes RTL source, or claims root cause.
 
+## Passing-vs-Failing Waveform Comparison
+
+`compare-waveforms` compares a failing waveform slice against a passing (reference) slice over their shared signals and common time window, and writes a typed comparison report:
+
+```bash
+rtl-agent compare-waveforms \
+  --failing-slice .rtl-agent/failing-slice.json \
+  --passing-slice .rtl-agent/passing-slice.json \
+  --output .rtl-agent/waveform-comparison.json
+```
+
+For each signal present in both slices it reconstructs the value timeline (initial value plus in-window transitions) and reports whether the timelines are identical, the first divergence time and the value on each side there, per-side transition counts, `x`/`z` differences, and the divergence duration and intervals. It also reports signals added or removed relative to the reference, the global earliest divergence, and a deterministic ranking of the most divergent signals. The time basis is explicit: identical timescales compare in shared ticks, differing-but-parseable timescales are normalized to femtoseconds (recorded in `time_basis`), and ambiguous or incompatible timescales are compared as raw ticks with a warning. Incompatible timescales, window mismatches, ambiguous duplicate names, and missing overlap are reported as warnings; incompatible traces are never silently aligned. It never claims causal meaning or localizes RTL source.
+
 ## Verification Strength Assessment
 
 `assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:

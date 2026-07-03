@@ -62,6 +62,7 @@ def test_readme_documented_commands_have_help() -> None:
     }
     expected = {
         "assess-verification",
+        "compare-waveforms",
         "discover",
         "export-evidence",
         "extract-waveform-window",

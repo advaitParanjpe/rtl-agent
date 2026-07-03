@@ -538,3 +538,27 @@ Known limitations:
 
 - Relevance is heuristic and evidence-based, not causal; it deliberately performs no dependency tracing, semantic interpretation, RTL source localization, model-based analysis, stimulus minimization, or patch generation.
 - Assertion-name matching is exact full-name, exact leaf-name, or whole-token summary match; it does not fuzzy-match renamed or partially-quoted signal references.
+
+## 2026-07-03 - Passing-vs-Failing Waveform Comparison
+
+Added deterministic comparison of a failing waveform slice against a passing (reference) slice. New typed, versioned comparison report schema (`src/rtl_agent/waveform_comparison_models.py`), a comparison service (`src/rtl_agent/waveform_comparison/service.py`), and a `compare-waveforms` CLI command reuse the existing `WaveformSliceReport` model (no VCD re-parsing). For each signal present in both slices, the service reconstructs the value timeline (initial value plus in-window transitions) and reports whether timelines are identical, the first divergence time with each side's value there, per-side transition counts, `x`/`z` differences, and divergence duration and intervals. It reports added/removed signals relative to the reference, the global earliest divergence and its signals, and a deterministic ranking of the most divergent signals. The time basis is explicit: identical timescales compare in shared ticks; differing-but-parseable timescales normalize to femtoseconds (recorded in `time_basis` with per-side tick sizes); ambiguous/incompatible timescales compare as raw ticks with a warning. Window mismatches restrict comparison to the overlapping range with a warning; ambiguous duplicate names, missing overlap, empty slices, and no shared signals all warn.
+
+Validation evidence:
+
+- Live pipeline: two `extract-waveform-window` runs on the fixture VCD and a stable-`state`/high-`valid` variant, then `compare-waveforms` - `top.dut.state` and `top.dut.valid` diverged (x/z differences), `top.clk`/`top.data` identical, global earliest divergence at tick 25.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 152 pytest tests, agent portability check, compact end-to-end/failure/tool-failure/no-change example checks, and packaging smoke verification (which now also verifies `compare-waveforms --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Comparison consumes the existing slice artifacts only; it never re-parses VCD or re-extracts windows. Signals are matched by hierarchical name (VCD identifiers can legitimately differ between two separate dumps).
+- Value timelines are compared as step functions sampled at the union of both sides' transition times within the overlapping window, so differing tick grids and transition sets are handled without alignment heuristics.
+- Timestamp normalization is explicit and recorded in `time_basis`; incompatible or ambiguous timescales are never silently aligned (they downgrade to raw-tick comparison with a warning).
+- Divergence ranking is a deterministic integer score (duration-weighted, plus interval count and an x/z bonus); ordering is stable by score, first divergence time, then name.
+
+Known limitations:
+
+- Comparison is observational only: it reports value/timeline differences and never claims causal meaning, traces dependencies, localizes RTL source, minimizes stimulus, or generates patches.
+- Undetermined initial values (not determinable at the window start) are treated as a distinct token, so an undetermined-vs-concrete boundary is reported as a divergence.
+- Textual same-timescale or simple-magnitude (1/10/100 × fs…s) timescales normalize; exotic timescales fall back to raw-tick comparison with a warning.

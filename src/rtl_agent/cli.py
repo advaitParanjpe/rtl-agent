@@ -50,6 +50,11 @@ from rtl_agent.waveform import (
     extract_waveform_window,
     write_waveform_slice,
 )
+from rtl_agent.waveform_comparison import (
+    WaveformComparisonError,
+    compare_waveforms,
+    write_comparison_report,
+)
 
 app = typer.Typer(
     help="Deterministic orchestration foundation for RTL engineering workflows.",
@@ -480,6 +485,33 @@ def reduce_signals_command(
     _print_reduction_summary(report, output)
 
 
+@app.command("compare-waveforms")
+def compare_waveforms_command(
+    failing_slice: Annotated[
+        Path,
+        typer.Option("--failing-slice", help="Failing waveform-slice JSON."),
+    ],
+    passing_slice: Annotated[
+        Path,
+        typer.Option("--passing-slice", help="Passing/reference waveform-slice JSON."),
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Path for the comparison-report JSON.")],
+    max_signals: Annotated[
+        int,
+        typer.Option("--max-signals", min=1, help="Maximum diverging signals reported."),
+    ] = 256,
+) -> None:
+    """Compare a failing waveform slice against a passing reference slice."""
+    try:
+        report = compare_waveforms(failing_slice, passing_slice, max_signals=max_signals)
+        write_comparison_report(report, output)
+    except WaveformComparisonError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_comparison_summary(report, output)
+
+
 @app.command("assess-verification")
 def assess_verification(
     task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
@@ -719,6 +751,29 @@ def _print_waveform_slice_summary(report: object, output: Path) -> None:
             "observed_end": report.window.observed_end,
             "selected_signals": len(report.selected_signals),
             "value_changes": len(report.value_changes),
+            "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_comparison_summary(report: object, output: Path) -> None:
+    from rtl_agent.waveform_comparison_models import WaveformComparisonReport
+
+    assert isinstance(report, WaveformComparisonReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "time_basis": report.time_basis.kind,
+            "normalized": report.time_basis.normalized,
+            "common_start": report.time_basis.common_start,
+            "common_end": report.time_basis.common_end,
+            "shared_signals": report.shared_signal_count,
+            "added_signals": len(report.added_signals),
+            "removed_signals": len(report.removed_signals),
+            "diverging_signals": len(report.diverging_signals),
+            "identical_signals": len(report.identical_signals),
+            "global_earliest_divergence_time": report.global_earliest_divergence_time,
             "warnings": len(report.warnings),
         }
     )
