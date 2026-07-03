@@ -1,26 +1,28 @@
-# Signal-to-RTL Source Mapping
+# Static RTL Driver and Dependency Tracing
 
 ## Objective
 
-Deterministically map hierarchical waveform signal names to their declaring RTL source locations using the existing repository map's declaration evidence, and emit a typed, versioned mapping report. Report only declaration-evidence matches; never elaborate semantics, infer connectivity, or claim causal meaning.
+For signals already mapped to declaring RTL files, deterministically extract static, textual driver and dependency evidence — the assignment and port-connection statements that reference each signal by name, plus the right-hand-side signal names they reference — and emit a typed, versioned artifact with source locations. Evidence is textual only; never elaborate, simulate, or claim semantic dataflow or causal meaning.
 
 ## Scope
 
-- Add a typed, versioned signal-to-source mapping report schema.
-- Add a deterministic service that consumes an existing repository-map artifact plus a set of hierarchical signal names (supplied directly, or read from a reduced waveform-slice or a waveform-comparison report) and, for each signal, resolves candidate RTL source locations from `FileRecord.source.declarations` (declaration name, kind, file path, line).
-- Match by the signal's leaf name against declaration names, and use the signal's scope components (module hierarchy) to disambiguate where the repository map provides module/declaration evidence.
-- For each signal report: resolved status (resolved / unresolved / ambiguous), the candidate declaration location(s) with kind and line, and the basis for the match.
-- Add a CLI command such as `map-signals`.
-- Reuse the existing repository-map, reduced-slice, and comparison models; do not re-scan the repository or re-parse RTL.
+- Add a typed, versioned driver/dependency evidence report schema.
+- Add a deterministic service that consumes an existing signal-source-map report (and the repository map for file paths and `repository_root`) and, for each resolved/probable mapped signal, performs a bounded textual scan of the declaring RTL file(s) for statements referencing the signal's leaf name:
+  - assignment drivers (`assign` and procedural `<=`/`=`) where the signal appears as the left-hand side;
+  - port connections (`.port(signal)` style) that reference the signal;
+  - and the right-hand-side identifiers referenced by those statements (candidate dependencies).
+- Record, per matched statement: file path, line number, statement kind (continuous assign / procedural assign / port connection / other reference), the bounded statement text, and the referenced identifier names.
+- Add a CLI command such as `trace-drivers`.
+- Reuse the existing repository-map and signal-source-map models; read RTL files only for bounded textual scanning (no re-derivation of the repository map).
 - Emit bounded, stably ordered output with deterministic serialization.
-- Fail or warn honestly: signals with no matching declaration are unresolved; signals matching multiple declarations are ambiguous and never silently collapsed to one.
-- Add compact fixtures and tests covering a resolved signal, an unresolved signal, an ambiguous (multi-declaration) signal, scope-based disambiguation, empty input, and deterministic output.
+- Fail or warn honestly: unresolved/unmapped signals, missing files, and signals with no textual references are reported explicitly; matches are labeled as textual evidence, not proven drivers.
+- Add compact fixtures and tests covering a continuous-assign driver, a procedural driver, a port connection, a signal with no drivers, a missing file, and deterministic output.
 - Add one concise runnable README example.
 
 ## Acceptance Criteria
 
-- Mapping is deterministic, bounded, and cites explicit declaration evidence (path, line, kind) for each resolved signal.
-- Unresolved and ambiguous signals are reported explicitly, not dropped or guessed.
+- Extraction is deterministic, bounded, and cites explicit source locations and statement text for every match.
+- Referenced right-hand-side identifiers are recorded as textual candidates, not asserted dependencies.
 - Output ordering and serialization are stable across repeated runs.
 - No existing artifact schema, CLI behavior, provider behavior, or product workflow changes.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
@@ -33,8 +35,9 @@ Deterministically map hierarchical waveform signal names to their declaring RTL 
 
 ## Exclusions
 
-- Do not perform semantic elaboration, parameter resolution, generate expansion, connectivity/dependency tracing, model-based analysis, stimulus minimization, patch generation, or causal claims.
-- Do not re-scan the repository or re-parse RTL; consume the existing repository-map artifact.
+- Do not elaborate, preprocess, expand macros/generates, resolve parameters, simulate, build a semantic dataflow graph, or make causal claims.
+- Do not resolve instance-to-module-type connectivity beyond textual port-connection matches.
+- Do not add source rewriting, patch generation, FST/FSDB support, model-based analysis, or stimulus minimization.
 - Do not add real model-provider integration, external repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 

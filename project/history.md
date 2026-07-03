@@ -562,3 +562,27 @@ Known limitations:
 - Comparison is observational only: it reports value/timeline differences and never claims causal meaning, traces dependencies, localizes RTL source, minimizes stimulus, or generates patches.
 - Undetermined initial values (not determinable at the window start) are treated as a distinct token, so an undetermined-vs-concrete boundary is reported as a divergence.
 - Textual same-timescale or simple-magnitude (1/10/100 × fs…s) timescales normalize; exotic timescales fall back to raw-tick comparison with a warning.
+
+## 2026-07-03 - Signal-to-RTL Source Mapping
+
+Added deterministic mapping of hierarchical waveform signal names to candidate RTL declarations. New typed, versioned mapping report schema (`src/rtl_agent/signal_source_map_models.py`), a mapping service (`src/rtl_agent/signal_source_map/service.py`), and a `map-signals` CLI command consume an existing repository-map artifact plus signal names (given directly, or read from a waveform-slice or comparison report) and match each signal's hierarchical path components and leaf against repository-map declaration names (`module`/`interface`/`package`/`program`/`checker`, with file path and line). Each signal is classified `exact` (unambiguous scope-component match), `probable` (weaker leaf or case-insensitive match), `ambiguous` (a matched name with multiple declarations — all preserved), or `unresolved`, and every candidate carries a tiered score and an explicit match reason.
+
+Validation evidence:
+
+- Live run: `inspect-repo` on `examples/simple-rtl` then `map-signals --signal top.u_child.clk --signal top --signal top.foo.bar` - resolved `top.*` scope signals to `module top` at `rtl/top.sv:1` (exact) and a bare `top` leaf as probable.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 164 pytest tests, agent portability check, compact end-to-end/failure/tool-failure/no-change example checks, and packaging smoke verification (which now also verifies `map-signals --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Mapping consumes the existing repository-map and waveform artifacts only; it never re-scans the repository or re-parses RTL. Declaration evidence is limited to top-level declarations (modules/interfaces/packages/programs/checkers), so mapping resolves hierarchical scope components rather than internal net/reg names.
+- Scoring is tiered and deterministic: scope-component exact-name matches outrank leaf and case-insensitive matches, and outer (design-root) scope components are preferred via a depth bonus, giving stable scope-based disambiguation.
+- Ambiguity is never collapsed: when a matched name has multiple declarations, every candidate location is preserved and the signal is reported `ambiguous`.
+- The report explains every match with a per-candidate reason string and an overall per-signal reason; nothing is silently chosen.
+
+Known limitations:
+
+- The repository map extracts only top-level declarations, so leaf signal names (nets/registers) generally do not resolve to a declaration; mapping targets the declaring module/scope, not the individual signal line.
+- Instance names in the hierarchy are not resolved to their module types (that requires connectivity/elaboration, which is deliberately out of scope); only path components whose names coincide with declaration names resolve.
+- Matching is exact or case-insensitive name matching only; no fuzzy, partial, or parameter-aware matching.

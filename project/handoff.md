@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Passing-vs-Failing Waveform Comparison
+Signal-to-RTL Source Mapping
 
 ## Completed Work
 
