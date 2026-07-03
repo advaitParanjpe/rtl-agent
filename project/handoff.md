@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-No-Change Implementation Example Check
+VCD Failure Window Extraction
 
 ## Completed Work
 
