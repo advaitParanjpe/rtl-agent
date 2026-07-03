@@ -424,3 +424,25 @@ Known limitations:
 
 - Consolidation covers only the three example-check scripts that share the CLI-invocation pattern.
 - No workflow behavior, artifact schema, CLI behavior, or provider behavior changed.
+
+## 2026-07-03 - No-Change Implementation Example Check
+
+Completed a compact local example check for the deterministic no-op (no-change) implementation path. `scripts/no_change_example_check.py` copies checked-in examples into a temporary workspace, scopes `rtl/top.sv` via the existing `reset-behavior.md` issue, drives `implement-task` with the existing `no-change.json` provider plan, and validates emitted artifacts through the current typed models. The check reuses the shared `scripts/_example_check.py` helper and is registered in `scripts/check.py`. It confirms that a successful `replace_text` tool call with identical old/new content produces a `proposed_diff` implementation report, an empty diff artifact, unchanged file content, zero validation results, an `unacceptable` review (`det-validation-missing`), an `insufficient` verification-strength result (`no-validation`, `failed-review` weak patterns), and a passing evidence-bundle export that includes the empty diff artifact and omits any `commands/` artifacts.
+
+Validation evidence:
+
+- `python3 scripts/no_change_example_check.py` - passed.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 83 pytest tests, agent portability check, compact end-to-end example check, compact failure example check, compact tool-failure example check, compact no-change example check, and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The no-change example reuses the existing `reset-behavior.md` issue (already scoped to `rtl/top.sv`) and the existing `no-change.json` stub-provider plan rather than adding new fixtures.
+- Assertions cover the deterministic downstream consequence of a proposed diff with no requested validation commands: an error-severity `det-validation-missing` review finding and an `insufficient` verification-strength result, rather than treating "no validation" as a silent success.
+- README's example-check summary paragraph was updated to describe the new check alongside the existing three.
+
+Known limitations:
+
+- The check covers one deterministic no-op tool-application path, not every possible zero-validation implementation scenario.
+- It remains a compact local workflow smoke; no real provider, external repository, CI, container, dashboard, database, queue, UI, semantic waveform analysis, or broad orchestration feature was added.

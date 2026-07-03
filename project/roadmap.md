@@ -23,8 +23,9 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 15. **Failure Report Example Check** - Completed compact local scripted example check for the honest terminal-failure path, failed report artifact, command evidence, review disposition, verification-strength result, and evidence-bundle export.
 16. **Tool Failure Report Example Check** - Completed compact local scripted example check for deterministic structured-tool failure reporting, failed tool-result evidence, absent validation execution, review disposition, verification-strength result, and evidence-bundle export.
 17. **Example Script Helper Consolidation** - Completed shared `scripts/_example_check.py` helper for repository root, venv-aware interpreter, source-path setup, and the `run_cli` CLI subprocess helper; the end-to-end, failure, and tool-failure example scripts now reuse it without changing workflow behavior.
-18. **No-Change Implementation Example Check** - Active next milestone: add a compact local example check for the deterministic no-op (no-change) implementation path using the existing `no-change.json` provider plan and shared helper, without changing workflow behavior.
+18. **No-Change Implementation Example Check** - Completed compact local example check for the deterministic no-op (no-change) implementation path, covering a successful `replace_text` application with identical old/new content that still ends in an unacceptable review and insufficient verification strength because no validation command ran.
+19. **Prohibited-Shortcut Review Finding Example Check** - Active next milestone: add a compact local example check exercising the existing but currently untested `det-prohibited-shortcut-N` review finding, using a deliberate diff that textually conflicts with a task-contract prohibited shortcut.
 
 ## Current Status
 
-Stages 1 through 17 are complete. Stage 18 is active.
+Stages 1 through 18 are complete. Stage 19 is active.
