@@ -402,3 +402,25 @@ Known limitations:
 
 - The check covers one deterministic structured-tool failure mode, not every possible provider, permission, or malformed tool-call failure.
 - It remains a compact local workflow smoke; no real provider, external repository, CI, container, dashboard, database, queue, UI, semantic waveform analysis, or broad orchestration feature was added.
+
+## 2026-07-02 - Example Script Helper Consolidation
+
+Consolidated the duplicated CLI-invocation helper shared by the local example-check scripts. Added a small `scripts/_example_check.py` module that exposes the repository root, the venv-aware Python interpreter, source-path setup, and the `run_cli` subprocess helper. The end-to-end, failure, and tool-failure example scripts now import that helper instead of each redefining `ROOT`, `PYTHON`, `sys.path` insertion, and a near-identical `run_cli`, and their per-example assertions are unchanged.
+
+Validation evidence:
+
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 83 pytest tests, agent portability check, compact end-to-end example check, compact failure example check, compact tool-failure example check, and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The shared helper is a single dependency-free module in `scripts/`; no framework, package, or new dependency was introduced.
+- Removing the mid-file `sys.path.insert` let the two `# ruff: noqa: E402` suppressions be dropped while keeping the source tree importable via the helper's import-time path setup.
+- `run_cli(args, expected_exit=0)` unifies the success-path and expected-failure-path callers so each example still reads its own exit expectation inline.
+- The structurally different `agent_portability_check.py` and `packaging_smoke.py` scripts were intentionally left untouched; they do not share the CLI-subprocess-JSON pattern.
+
+Known limitations:
+
+- Consolidation covers only the three example-check scripts that share the CLI-invocation pattern.
+- No workflow behavior, artifact schema, CLI behavior, or provider behavior changed.

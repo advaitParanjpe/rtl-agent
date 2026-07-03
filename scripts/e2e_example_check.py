@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import json
-import os
 import shutil
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, cast
+
+from _example_check import ROOT, run_cli
 
 from rtl_agent.benchmark_models import BenchmarkReport
 from rtl_agent.evidence_bundle_models import EvidenceBundleReport
@@ -18,9 +16,6 @@ from rtl_agent.review_models import ReviewReport
 from rtl_agent.task_contract import TaskContract
 from rtl_agent.triage_models import TriageReport
 from rtl_agent.verification_strength_models import VerificationStrengthReport
-
-ROOT = Path(__file__).resolve().parents[1]
-PYTHON = Path(sys.executable)
 
 
 def main() -> int:
@@ -225,38 +220,6 @@ def main() -> int:
 
     print("compact end-to-end example check passed")
     return 0
-
-
-def run_cli(args: list[str]) -> dict[str, Any]:
-    env = os.environ.copy()
-    src = str(ROOT / "src")
-    existing_pythonpath = env.get("PYTHONPATH")
-    env["PYTHONPATH"] = (
-        src if not existing_pythonpath else f"{src}{os.pathsep}{existing_pythonpath}"
-    )
-    result = subprocess.run(
-        [str(PYTHON), "-m", "rtl_agent", *args],
-        cwd=ROOT,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-        shell=False,
-    )
-    if result.returncode != 0:
-        raise AssertionError(
-            "\n".join(
-                [
-                    f"command failed: rtl-agent {' '.join(args)}",
-                    f"exit_code: {result.returncode}",
-                    "stdout:",
-                    result.stdout[-4000:],
-                    "stderr:",
-                    result.stderr[-4000:],
-                ]
-            )
-        )
-    return cast(dict[str, Any], json.loads(result.stdout))
 
 
 if __name__ == "__main__":

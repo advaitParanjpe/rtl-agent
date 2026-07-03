@@ -1,18 +1,11 @@
-# ruff: noqa: E402
-
 from __future__ import annotations
 
-import json
-import os
 import shutil
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, cast
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
+from _example_check import ROOT, run_cli
 
 from rtl_agent.evidence_bundle_models import EvidenceBundleReport
 from rtl_agent.implementation_models import ImplementationReport
@@ -20,9 +13,6 @@ from rtl_agent.repository_map import RepositoryMap
 from rtl_agent.review_models import ReviewReport
 from rtl_agent.task_contract import TaskContract
 from rtl_agent.verification_strength_models import VerificationStrengthReport
-
-VENV_PYTHON = ROOT / ".venv" / "bin" / "python"
-PYTHON = VENV_PYTHON if VENV_PYTHON.exists() else Path(sys.executable)
 
 
 def main() -> int:
@@ -213,39 +203,6 @@ def main() -> int:
 
     print("compact tool-failure example check passed")
     return 0
-
-
-def run_cli(args: list[str], expected_exit: int = 0) -> dict[str, Any]:
-    env = os.environ.copy()
-    src = str(ROOT / "src")
-    existing_pythonpath = env.get("PYTHONPATH")
-    env["PYTHONPATH"] = (
-        src if not existing_pythonpath else f"{src}{os.pathsep}{existing_pythonpath}"
-    )
-    result = subprocess.run(
-        [str(PYTHON), "-m", "rtl_agent", *args],
-        cwd=ROOT,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-        shell=False,
-    )
-    if result.returncode != expected_exit:
-        raise AssertionError(
-            "\n".join(
-                [
-                    f"unexpected exit for: rtl-agent {' '.join(args)}",
-                    f"expected_exit: {expected_exit}",
-                    f"actual_exit: {result.returncode}",
-                    "stdout:",
-                    result.stdout[-4000:],
-                    "stderr:",
-                    result.stderr[-4000:],
-                ]
-            )
-        )
-    return cast(dict[str, Any], json.loads(result.stdout))
 
 
 if __name__ == "__main__":
