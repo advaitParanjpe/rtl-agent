@@ -6,6 +6,7 @@ This repository uses a milestone-driven workflow. The authoritative project-cont
 - `project/current.md`
 - `project/roadmap.md`
 - `project/history.md`
+- `project/handoff.md` when marked active
 
 ## Required Session Flow
 
@@ -14,18 +15,61 @@ Every agent session must:
 1. Read `AGENTS.md`.
 2. Read `project/current.md`.
 3. Consult only the relevant parts of `project/roadmap.md` and `project/history.md`.
-4. Inspect the minimum repository surface needed for the active milestone.
-5. Implement and validate the active milestone completely.
-6. Iterate on failures until the milestone is complete or a genuine blocker is proven.
-7. Update project-control documents before finishing.
-8. Leave a concise final handoff suitable for pasting into ChatGPT.
-9. Use GitHub checkpoints for coherent, validated repository states according to the repository Git policy below.
+4. Read `project/handoff.md` only when it exists and is marked `Status: ACTIVE`.
+5. Inspect the minimum repository surface needed for the active milestone.
+6. Implement and validate the active milestone completely, or create an explicit partial checkpoint and active handoff before stopping.
+7. Iterate on failures until the milestone is complete or a genuine blocker is proven.
+8. Update project-control documents before finishing.
+9. Leave a concise final handoff suitable for pasting into ChatGPT.
+10. Use GitHub checkpoints for coherent, validated repository states according to the repository Git policy below.
 
 There must be exactly one active implementation milestone in `project/current.md`.
 
+## Agent Portability
+
+This repository may be developed with Codex, Claude Code, or another coding agent. Checked-in repository state is authoritative; agents must not rely on prior chat or hidden conversation history. At session start, agents must read `AGENTS.md`, `project/current.md`, relevant sections of `project/roadmap.md` and `project/history.md`, and `project/handoff.md` only when it exists and is marked active. There must be exactly one authoritative active milestone in `project/current.md`.
+
+Tool-specific instruction files may only be thin adapters that point back to `AGENTS.md`. Agents must not create parallel project-state files such as Claude-specific or Codex-specific milestone documents. At session end, agents must either finish the milestone, validate it, update project-control files, commit, push, and return the standard handoff, or create an explicit partial checkpoint and active handoff before stopping.
+
+`project/handoff.md` is temporary continuity state, not a second milestone file. After a milestone is fully completed and pushed, set it to `Status: INACTIVE`, remove stale partial-work details, and keep only compact resume guidance. If stopping before milestone completion, set it to `Status: ACTIVE`, record the active milestone, branch, last commit hash, completed work, remaining work, commands already run, current failures or blockers, modified/untracked files, and exact next action; create and push a coherent checkpoint commit when safe; never claim completion; and do not replace `project/current.md` with a new milestone.
+
+## Session Checklists
+
+At session start:
+
+```bash
+git status --short --branch
+git log --oneline -5
+git remote -v
+```
+
+- Confirm the current branch.
+- Inspect whether `project/handoff.md` is active.
+- Confirm `project/current.md` matches the branch's intended milestone.
+- Pull only when the worktree is clean and doing so is safe.
+- Never discard local changes automatically.
+
+At session end for a completed milestone:
+
+- Run required validation.
+- Update history, roadmap, current milestone, and inactive handoff.
+- Commit coherent checkpoints.
+- Push the active branch.
+- Report tool, handoff state, branch, commits, and push status.
+
+At session end for incomplete work:
+
+- Run the focused validation currently possible.
+- Update active handoff.
+- Commit a coherent checkpoint when safe.
+- Push the branch when a safe checkpoint exists.
+- Report `STATUS: PARTIAL` or `STATUS: BLOCKED`.
+
+Do not commit broken, unsafe, secret-containing, or misleading state. Document exact uncommitted state in `project/handoff.md` when a safe checkpoint cannot be made.
+
 ## Token-Efficient Work Rules
 
-- Keep authoritative state in the four project-control files only.
+- Keep authoritative project state in `AGENTS.md`, `project/current.md`, `project/roadmap.md`, `project/history.md`, and active `project/handoff.md` only.
 - Do not duplicate the same instructions across many files.
 - Keep `project/current.md` short, explicit, and executable.
 - Keep roadmap entries concise.
@@ -70,8 +114,12 @@ Do not leave `project/current.md` ambiguous or containing several possible next 
 ## Final Handoff Template
 
 ```text
-STATUS: COMPLETE | BLOCKED
+STATUS: COMPLETE | PARTIAL | BLOCKED
 MILESTONE: <name>
+
+AGENT:
+- Tool: Codex | Claude Code | Other
+- Handoff: INACTIVE | ACTIVE
 
 SUMMARY:
 <brief result>
