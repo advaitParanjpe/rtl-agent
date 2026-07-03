@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Assertion-to-Waveform Failure Linking
+Waveform Evidence Bundle Integration
 
 ## Completed Work
 

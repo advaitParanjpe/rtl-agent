@@ -4,8 +4,13 @@ import json
 from pathlib import Path
 
 from rtl_agent.artifacts import RunStore
+from rtl_agent.assertion_link import link_assertion_to_waveform, write_link_report
 from rtl_agent.evidence_bundle import export_evidence_bundle, write_evidence_bundle_report
 from rtl_agent.models import CommandResult, CommandStatus, utc_now
+from rtl_agent.waveform import extract_waveform_window, write_waveform_slice
+
+FIXTURE_VCD = Path("examples/waveforms/failure.vcd")
+FIXTURE_TRIAGE = Path("examples/waveforms/triage-report.json")
 
 
 def make_run(tmp_path: Path) -> Path:
@@ -107,6 +112,55 @@ def test_evidence_bundle_failed_when_run_metadata_missing(tmp_path: Path) -> Non
     assert report.failure_reason is not None
     assert "run.json" in report.failure_reason
     assert (tmp_path / "bundle" / "bundle.json").exists()
+
+
+def add_waveform_artifacts(run_dir: Path) -> None:
+    waveform_dir = run_dir / "waveform"
+    slice_report = extract_waveform_window(FIXTURE_VCD, failure_time=40, before=15, after=5)
+    write_waveform_slice(slice_report, waveform_dir / "slice.json")
+    link_report = link_assertion_to_waveform(
+        FIXTURE_TRIAGE,
+        waveform_dir / "assertion-link-slice.json",
+        assertion_id="assertion-0",
+        before=15,
+        after=5,
+    )
+    write_link_report(link_report, waveform_dir / "assertion-link.json")
+
+
+def test_evidence_bundle_classifies_waveform_and_assertion_link_artifacts(
+    tmp_path: Path,
+) -> None:
+    run_dir = make_run(tmp_path)
+    add_waveform_artifacts(run_dir)
+
+    report = export_evidence_bundle(run_dir, tmp_path / "bundle")
+
+    by_path = {artifact.relative_path: artifact for artifact in report.artifacts}
+    slice_artifact = by_path["waveform/slice.json"]
+    assert slice_artifact.kind == "waveform_slice_report"
+    assert slice_artifact.schema_version == 1
+    assert slice_artifact.sha256 is not None
+    link_artifact = by_path["waveform/assertion-link.json"]
+    assert link_artifact.kind == "assertion_waveform_link_report"
+    assert link_artifact.schema_version == 1
+    assert link_artifact.sha256 is not None
+    # The link's generated slice is still classified as a waveform slice.
+    assert by_path["waveform/assertion-link-slice.json"].kind == "waveform_slice_report"
+
+
+def test_evidence_bundle_with_waveform_artifacts_is_deterministic(tmp_path: Path) -> None:
+    run_dir = make_run(tmp_path)
+    add_waveform_artifacts(run_dir)
+
+    report = export_evidence_bundle(run_dir, tmp_path / "bundle")
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+
+    write_evidence_bundle_report(report, first)
+    write_evidence_bundle_report(report, second)
+
+    assert first.read_text(encoding="utf-8") == second.read_text(encoding="utf-8")
 
 
 def test_evidence_bundle_does_not_mutate_source_artifacts(tmp_path: Path) -> None:
