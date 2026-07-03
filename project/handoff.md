@@ -8,11 +8,11 @@ None
 
 ## Last Completed Checkpoint
 
-None
+Tool Failure Report Example Check
 
 ## Completed Work
 
-- None
+- Completed active milestone; see `project/history.md`.
 
 ## Remaining Work
 
@@ -32,7 +32,7 @@ None
 
 ## Last Commit
 
-- None
+- See latest Git commit on the active branch.
 
 ## Resume Instructions
 

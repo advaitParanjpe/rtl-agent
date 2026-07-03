@@ -380,3 +380,25 @@ Architectural decisions:
 Known limitations:
 
 - The portability check is deterministic file-policy validation, not automatic conflict resolution or branch synchronization.
+
+## 2026-07-03 - Tool Failure Report Example Check
+
+Completed a compact local structured-tool failure example check. The canonical `scripts/check.py` workflow now runs `scripts/tool_failure_example_check.py`, which copies checked-in examples into a temporary workspace, uses the existing stub-provider plan against a deliberately mismatched temporary fixture file, expects the real `replace_text` tool call to fail, and validates emitted artifacts through the existing Pydantic models. The check covers failed implementation status and reason, failed tool-result evidence, absence of validation execution and command artifacts, unacceptable review disposition, insufficient verification-strength result, and evidence-bundle export of the failed run artifacts.
+
+Validation evidence:
+
+- `python3 scripts/tool_failure_example_check.py` - passed.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 83 pytest tests, agent portability check, compact end-to-end example check, compact failure example check, compact tool-failure example check, and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short --branch` - reviewed before commit.
+
+Architectural decisions:
+
+- The tool-failure example reuses checked-in examples, the existing `retry-after-failure` stub-provider plan, real CLI stages, run artifacts, and schemas rather than adding a parallel demo path.
+- The temporary workspace file is changed before implementation so the allowed structured `replace_text` call fails deterministically with zero matches.
+- No validation command executes after the tool failure; review, verification-strength, and evidence-bundle stages consume the failed implementation artifact directly.
+
+Known limitations:
+
+- The check covers one deterministic structured-tool failure mode, not every possible provider, permission, or malformed tool-call failure.
+- It remains a compact local workflow smoke; no real provider, external repository, CI, container, dashboard, database, queue, UI, semantic waveform analysis, or broad orchestration feature was added.
