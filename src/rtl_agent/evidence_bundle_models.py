@@ -26,6 +26,8 @@ class EvidenceArtifactKind(StrEnum):
     TRIAGE_REPORT = "triage_report"
     VERIFICATION_STRENGTH_REPORT = "verification_strength_report"
     BENCHMARK_REPORT = "benchmark_report"
+    WAVEFORM_SLICE_REPORT = "waveform_slice_report"
+    ASSERTION_WAVEFORM_LINK_REPORT = "assertion_waveform_link_report"
     OTHER_JSON = "other_json"
     OTHER_ARTIFACT = "other_artifact"
 

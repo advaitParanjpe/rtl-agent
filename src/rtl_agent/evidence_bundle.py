@@ -143,6 +143,10 @@ def _json_artifact_kind(path: Path) -> EvidenceArtifactKind:
         return EvidenceArtifactKind.TRIAGE_REPORT
     if {"strength", "weak_patterns", "implementation_report_path"} <= keys:
         return EvidenceArtifactKind.VERIFICATION_STRENGTH_REPORT
+    if {"selected_assertion", "selected_waveform", "timestamp_conversion"} <= keys:
+        return EvidenceArtifactKind.ASSERTION_WAVEFORM_LINK_REPORT
+    if {"window", "value_changes", "parse_statistics", "selected_signals"} <= keys:
+        return EvidenceArtifactKind.WAVEFORM_SLICE_REPORT
     return EvidenceArtifactKind.OTHER_JSON
 
 

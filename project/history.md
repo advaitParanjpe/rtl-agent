@@ -495,3 +495,23 @@ Known limitations:
 
 - Textual VCD only; no FST/FSDB, semantic waveform interpretation, signal-dependency tracing, automatic signal selection, source localization, stimulus minimization, or patch generation.
 - Assertion timestamps expressed in clock cycles or without an explicit SI time unit are treated as ambiguous and rejected, since converting them would require clock-period assumptions.
+
+## 2026-07-03 - Waveform Evidence Bundle Integration
+
+Extended the deterministic evidence-bundle exporter so waveform-slice and assertion-to-waveform linkage artifacts under a run directory are recognized alongside the other typed reports. Added two `EvidenceArtifactKind` values (`waveform_slice_report`, `assertion_waveform_link_report`) and two content-based classifiers in `_json_artifact_kind`, reusing the existing hashing, schema-version detection, run-relative provenance, and omitted-content rules with no changes to export flow, manifest/report schema shape, or any other artifact schema.
+
+Validation evidence:
+
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 123 pytest tests, agent portability check, compact end-to-end/failure/tool-failure/no-change example checks, and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Classification uses distinctive JSON key-sets (`selected_assertion`/`selected_waveform`/`timestamp_conversion` for linkage; `window`/`value_changes`/`parse_statistics`/`selected_signals` for slices), matching the existing review/triage/verification-strength detection style rather than inventing fixed run-relative paths that these user-specified outputs do not have.
+- Tests generate real slice and linkage artifacts from the checked-in VCD and triage fixtures, so a future field rename in either model surfaces as a classification-test failure.
+
+Known limitations:
+
+- Detection is content-based on stable top-level keys; deeply restructured future report schemas would need the key-sets updated.
+- The linkage report's own generated waveform slice is classified as a waveform-slice artifact, which is correct but means one linkage run contributes two waveform-related artifacts to a bundle.
