@@ -21,8 +21,9 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 13. **Packaging Smoke Verification** - Completed bounded local wheel/install smoke verification for console-script and module invocation as part of the canonical check workflow.
 14. **Compact End-to-End Example Check** - Completed compact local scripted example check across checked-in fixtures, deterministic implementation retry, review, verification-strength, benchmark, evidence export, and schema-backed artifact assertions.
 15. **Failure Report Example Check** - Completed compact local scripted example check for the honest terminal-failure path, failed report artifact, command evidence, review disposition, verification-strength result, and evidence-bundle export.
-16. **Tool Failure Report Example Check** - Active next milestone: add a compact local example check for deterministic structured-tool failure reporting.
+16. **Tool Failure Report Example Check** - Completed compact local scripted example check for deterministic structured-tool failure reporting, failed tool-result evidence, absent validation execution, review disposition, verification-strength result, and evidence-bundle export.
+17. **Example Script Helper Consolidation** - Active next milestone: consolidate duplicated local example-check CLI helper code without changing workflow behavior.
 
 ## Current Status
 
-Stages 1 through 15 are complete. Stage 16 is active.
+Stages 1 through 16 are complete. Stage 17 is active.
