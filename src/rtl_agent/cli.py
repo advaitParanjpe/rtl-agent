@@ -7,6 +7,11 @@ from typing import Annotated
 import typer
 
 from rtl_agent.artifacts import RunStore
+from rtl_agent.assertion_link import (
+    AssertionLinkError,
+    link_assertion_to_waveform,
+    write_link_report,
+)
 from rtl_agent.benchmark import (
     BenchmarkError,
     report_summary_payload,
@@ -360,6 +365,70 @@ def extract_waveform_window_command(
     _print_waveform_slice_summary(report, output)
 
 
+@app.command("link-assertion-waveform")
+def link_assertion_waveform_command(
+    triage_report: Annotated[
+        Path,
+        typer.Option("--triage-report", help="Existing triage-report JSON."),
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Path for the linkage-report JSON.")],
+    slice_output: Annotated[
+        Path,
+        typer.Option("--slice-output", help="Path for the generated waveform-slice JSON."),
+    ],
+    assertion_index: Annotated[
+        int | None,
+        typer.Option("--assertion-index", help="Zero-based index of the assertion finding."),
+    ] = None,
+    assertion_id: Annotated[
+        str | None,
+        typer.Option("--assertion-id", help="Stable assertion id, e.g. 'assertion-0'."),
+    ] = None,
+    before: Annotated[
+        int,
+        typer.Option("--before", min=0, help="Time units to include before the failure."),
+    ] = 0,
+    after: Annotated[
+        int,
+        typer.Option("--after", min=0, help="Time units to include after the failure."),
+    ] = 0,
+    signal: Annotated[
+        list[str] | None,
+        typer.Option("--signal", help="Exact hierarchical signal name; may be repeated."),
+    ] = None,
+    signal_prefix: Annotated[
+        list[str] | None,
+        typer.Option("--signal-prefix", help="Hierarchical signal-name prefix; may be repeated."),
+    ] = None,
+    waveform_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--waveform-path",
+            help="Disambiguate which referenced VCD to use when triage lists several.",
+        ),
+    ] = None,
+) -> None:
+    """Link a triaged assertion failure to a bounded VCD waveform slice."""
+    try:
+        report = link_assertion_to_waveform(
+            triage_report,
+            slice_output,
+            assertion_index=assertion_index,
+            assertion_id=assertion_id,
+            before=before,
+            after=after,
+            signal_names=signal or [],
+            signal_prefixes=signal_prefix or [],
+            waveform_path=waveform_path,
+        )
+        write_link_report(report, output)
+    except AssertionLinkError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_assertion_link_summary(report, output)
+
+
 @app.command("assess-verification")
 def assess_verification(
     task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
@@ -600,6 +669,27 @@ def _print_waveform_slice_summary(report: object, output: Path) -> None:
             "selected_signals": len(report.selected_signals),
             "value_changes": len(report.value_changes),
             "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_assertion_link_summary(report: object, output: Path) -> None:
+    from rtl_agent.assertion_waveform_link_models import AssertionWaveformLinkReport
+
+    assert isinstance(report, AssertionWaveformLinkReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "assertion_id": report.selected_assertion.assertion_id,
+            "waveform": str(report.selected_waveform.resolved_path),
+            "failure_timestamp_ticks": report.timestamp_conversion.failure_timestamp_ticks,
+            "timescale": report.timestamp_conversion.vcd_timescale,
+            "exact_conversion": report.timestamp_conversion.exact,
+            "waveform_slice_path": str(report.waveform_slice_path),
+            "value_changes": report.slice_value_change_count,
+            "warnings": len(report.warnings),
+            "unresolved_ambiguities": len(report.unresolved_ambiguities),
         }
     )
 

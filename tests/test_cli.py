@@ -68,6 +68,7 @@ def test_readme_documented_commands_have_help() -> None:
         "implement-task",
         "inspect-config",
         "inspect-repo",
+        "link-assertion-waveform",
         "parse-issue",
         "review-task",
         "run-benchmark",
