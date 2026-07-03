@@ -1,28 +1,26 @@
-# Automatic Relevant-Signal Reduction
+# Passing-vs-Failing Waveform Comparison
 
 ## Objective
 
-Deterministically reduce a waveform slice's signal set to a bounded, evidence-ranked "relevant" subset for a failure, using only explicit textual and transition evidence already present in existing artifacts. Never interpret causal meaning, trace signal dependencies, or claim root cause.
+Deterministically compare a failing waveform slice against a passing (reference) waveform slice over their shared signals and time window, and emit a typed, versioned comparison artifact that reports per-signal value-timeline divergences. Report only observable differences; never interpret causal meaning or claim root cause.
 
 ## Scope
 
-- Add a typed, versioned relevant-signal-reduction report schema.
-- Add a deterministic service that consumes an existing waveform-slice report (and optionally the assertion-link and/or triage report for context) and ranks each slice signal by explicit, evidence-cited criteria:
-  - the signal name or label appears in the selected assertion summary/`signal_or_label`;
-  - the signal has one or more value transitions inside the window;
-  - the signal carries unknown (`x`) or high-impedance (`z`) values inside the window;
-  - the signal shares a hierarchical scope prefix with the assertion's named signal.
-- Emit a bounded, stably ordered reduced signal set, each entry citing which criteria matched and a deterministic score, plus the signals excluded with reasons summarized.
-- Add a CLI command such as `reduce-signals`.
-- Reuse existing waveform-slice, assertion-link, and triage models; do not re-parse VCD or re-extract windows.
-- Fail or warn honestly: no candidate signals, an empty slice, or no matching evidence yields an empty reduced set with a clear warning; never silently invent relevance.
-- Add compact fixtures and tests covering assertion-name matches, transition-only signals, `x`/`z` signals, hierarchical-prefix matches, empty results, and deterministic output.
+- Add a typed, versioned waveform-comparison report schema.
+- Add a deterministic service that consumes two existing waveform-slice reports (a failing slice and a passing/reference slice) and, for each signal present in both, compares the ordered value timeline (initial value at window start plus in-window transitions).
+- For each compared signal, report: whether timelines are identical, the first divergence time, the differing values at that point, and counts of differing transition points.
+- Report signals present in only one slice (added/removed relative to the reference) and any window or timescale mismatch as explicit warnings.
+- Add a CLI command such as `compare-waveforms`.
+- Reuse the existing waveform-slice models and, where practical, the relevant-signal-reduction output as the signal set to compare; do not re-parse VCD or re-extract windows.
+- Emit bounded, stably ordered output with deterministic serialization.
+- Fail or warn honestly: no shared signals, empty slices, or incompatible windows yield clear warnings; never invent divergences.
+- Add compact fixtures and tests covering identical timelines, first-divergence detection, added/removed signals, window/timescale mismatch, empty results, and deterministic output.
 - Add one concise runnable README example.
 
 ## Acceptance Criteria
 
-- Reduction is deterministic, bounded, and cites explicit evidence per retained signal.
-- The reduced set is a strict subset of the input slice's signals; nothing is invented.
+- Comparison is deterministic, bounded, and reports only observable value/timeline differences with explicit evidence (times and values).
+- Signals compared are those present in both slices; added/removed signals are reported separately, not silently dropped.
 - Output ordering and serialization are stable across repeated runs.
 - No existing artifact schema, CLI behavior, provider behavior, or product workflow changes.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
@@ -35,8 +33,8 @@ Deterministically reduce a waveform slice's signal set to a bounded, evidence-ra
 
 ## Exclusions
 
-- Do not add signal-dependency tracing, semantic waveform interpretation, model-based analysis, source localization, stimulus minimization, or patch generation.
-- Do not re-parse VCD or duplicate waveform-window extraction; consume the existing slice artifact.
+- Do not make causal claims, trace signal dependencies, interpret waveform semantics, localize RTL source, perform model-based analysis, or minimize stimulus.
+- Do not re-parse VCD or duplicate waveform-window extraction; consume the existing slice artifacts.
 - Do not add real model-provider integration, external repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 

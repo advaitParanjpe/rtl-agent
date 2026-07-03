@@ -70,6 +70,7 @@ def test_readme_documented_commands_have_help() -> None:
         "inspect-repo",
         "link-assertion-waveform",
         "parse-issue",
+        "reduce-signals",
         "review-task",
         "run-benchmark",
         "run-command",
