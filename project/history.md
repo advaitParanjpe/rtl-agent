@@ -446,3 +446,28 @@ Known limitations:
 
 - The check covers one deterministic no-op tool-application path, not every possible zero-validation implementation scenario.
 - It remains a compact local workflow smoke; no real provider, external repository, CI, container, dashboard, database, queue, UI, semantic waveform analysis, or broad orchestration feature was added.
+
+## 2026-07-03 - VCD Failure Window Extraction
+
+Built the first deterministic RTL failure-intelligence capability. Added a typed, versioned waveform-slice schema (`src/rtl_agent/waveform_slice_models.py`), a deterministic textual-VCD parser and window extractor (`src/rtl_agent/waveform/service.py`), and an `extract-waveform-window` CLI command. Given a VCD path, a failure timestamp, configurable time before/after, and optional exact signal names or hierarchical prefixes, the extractor parses headers, scopes, variables, timescale, and value changes, then emits only the bounded window as a compact waveform-slice artifact. It preserves hierarchical signal names, widths, identifiers, and bit ranges; represents scalar, vector, unknown (`x`), and high-impedance (`z`) values verbatim; records each selected signal's value at the window start when a prior change makes it determinable; and records source metadata (path, size, SHA-256, timescale, requested window, observed bounds, selected signals, warnings, and parse statistics). The Prohibited-Shortcut Review Finding Example Check that had been auto-proposed as the next milestone was deliberately deferred in the roadmap in favor of this product milestone.
+
+Validation evidence:
+
+- `PYTHONPATH=src .venv/bin/rtl-agent extract-waveform-window --vcd examples/waveforms/failure.vcd --failure-time 40 --before 15 --after 5 --signal-prefix top.dut --output .rtl-agent/waveform-slice.json` - passed; emitted a bounded two-signal slice with observed bounds inside the requested window.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 103 pytest tests, agent portability check, compact end-to-end/failure/tool-failure/no-change example checks, and packaging smoke verification (which now also verifies `extract-waveform-window --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Textual VCD only. Parsing is a single deterministic token stream over the header plus a bounded scan of the value-change section; only selected identifiers and in-window changes are retained, so memory stays bounded (with a file-size guard and truncation warnings).
+- Timestamp boundaries are inclusive; a signal's initial value at the window start is the most recent change strictly before `requested_start`, and is marked non-determinable when no such change exists.
+- The waveform-slice artifact is intentionally kept out of `examples/schema-artifacts/` because the existing schema-example guard forbids `.vcd` fragments; VCD fixtures live under `examples/waveforms/` instead, and no existing schema-example test was modified.
+- Optional `--triage-report` source resolution reuses existing triage `waveform_references` without redesigning triage.
+- The extractor never interprets causal meaning or claims root cause; parser notes state this explicitly.
+
+Known limitations:
+
+- Textual VCD only; no FST/FSDB, model-based analysis, source-driver tracing, or stimulus minimization.
+- Value-change scanning reads to end-of-file for honest total statistics rather than early-exiting at the window end; bounded by a file-size guard and output caps.
+- Signal aliasing (multiple `$var` references sharing one identifier) is supported by expanding per selected signal, but exotic array bit-selects are recorded by base name plus an optional raw bit-range string only.

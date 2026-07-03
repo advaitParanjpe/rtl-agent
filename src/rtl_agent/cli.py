@@ -35,6 +35,11 @@ from rtl_agent.verification_strength_service import (
     assess_verification_strength,
     write_verification_strength_report,
 )
+from rtl_agent.waveform import (
+    WaveformSliceError,
+    extract_waveform_window,
+    write_waveform_slice,
+)
 
 app = typer.Typer(
     help="Deterministic orchestration foundation for RTL engineering workflows.",
@@ -299,6 +304,62 @@ def triage_command(
     _print_triage_summary(report, output)
 
 
+@app.command("extract-waveform-window")
+def extract_waveform_window_command(
+    output: Annotated[Path, typer.Option("--output", help="Path for waveform-slice JSON.")],
+    failure_time: Annotated[
+        int,
+        typer.Option("--failure-time", help="Failure timestamp in VCD time units."),
+    ],
+    vcd: Annotated[
+        Path | None,
+        typer.Option("--vcd", help="Textual VCD waveform path."),
+    ] = None,
+    before: Annotated[
+        int,
+        typer.Option("--before", min=0, help="Time units to include before the failure."),
+    ] = 0,
+    after: Annotated[
+        int,
+        typer.Option("--after", min=0, help="Time units to include after the failure."),
+    ] = 0,
+    signal: Annotated[
+        list[str] | None,
+        typer.Option("--signal", help="Exact hierarchical signal name; may be repeated."),
+    ] = None,
+    signal_prefix: Annotated[
+        list[str] | None,
+        typer.Option("--signal-prefix", help="Hierarchical signal-name prefix; may be repeated."),
+    ] = None,
+    triage_report: Annotated[
+        Path | None,
+        typer.Option(
+            "--triage-report",
+            help="Optional triage report used to locate a VCD when --vcd is omitted.",
+        ),
+    ] = None,
+) -> None:
+    """Extract a bounded VCD failure window into a waveform-slice artifact."""
+    try:
+        source = _resolve_waveform_source(vcd, triage_report)
+        if output.resolve() == source.resolve():
+            raise WaveformSliceError("output path would overwrite the source waveform")
+        report = extract_waveform_window(
+            vcd_path=source,
+            failure_time=failure_time,
+            before=before,
+            after=after,
+            signal_names=signal or [],
+            signal_prefixes=signal_prefix or [],
+        )
+        write_waveform_slice(report, output)
+    except WaveformSliceError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_waveform_slice_summary(report, output)
+
+
 @app.command("assess-verification")
 def assess_verification(
     task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
@@ -497,6 +558,47 @@ def _print_triage_summary(report: object, output: Path) -> None:
             "assertion_failures": len(report.assertion_failures),
             "waveform_references": len(report.waveform_references),
             "simulator_context": len(report.simulator_context),
+            "warnings": len(report.warnings),
+        }
+    )
+
+
+def _resolve_waveform_source(vcd: Path | None, triage_report: Path | None) -> Path:
+    if vcd is not None:
+        return vcd
+    if triage_report is None:
+        raise WaveformSliceError("either --vcd or --triage-report must be provided")
+
+    from pydantic import ValidationError
+
+    from rtl_agent.triage_models import TriageReport
+
+    try:
+        report = TriageReport.model_validate_json(triage_report.read_text(encoding="utf-8"))
+    except (OSError, ValidationError, ValueError) as exc:
+        raise WaveformSliceError(f"could not load triage report: {triage_report}") from exc
+    for reference in report.waveform_references:
+        if reference.exists and reference.resolved_path and reference.path.endswith(".vcd"):
+            return reference.resolved_path
+    raise WaveformSliceError("no existing .vcd waveform reference found in triage report")
+
+
+def _print_waveform_slice_summary(report: object, output: Path) -> None:
+    from rtl_agent.waveform_slice_models import WaveformSliceReport
+
+    assert isinstance(report, WaveformSliceReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "source": str(report.source.path),
+            "timescale": report.source.timescale,
+            "requested_start": report.window.requested_start,
+            "requested_end": report.window.requested_end,
+            "observed_start": report.window.observed_start,
+            "observed_end": report.window.observed_end,
+            "selected_signals": len(report.selected_signals),
+            "value_changes": len(report.value_changes),
             "warnings": len(report.warnings),
         }
     )

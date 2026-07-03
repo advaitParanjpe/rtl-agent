@@ -24,8 +24,9 @@ Models propose. Tools decide. The platform must produce either a reproducible ve
 16. **Tool Failure Report Example Check** - Completed compact local scripted example check for deterministic structured-tool failure reporting, failed tool-result evidence, absent validation execution, review disposition, verification-strength result, and evidence-bundle export.
 17. **Example Script Helper Consolidation** - Completed shared `scripts/_example_check.py` helper for repository root, venv-aware interpreter, source-path setup, and the `run_cli` CLI subprocess helper; the end-to-end, failure, and tool-failure example scripts now reuse it without changing workflow behavior.
 18. **No-Change Implementation Example Check** - Completed compact local example check for the deterministic no-op (no-change) implementation path, covering a successful `replace_text` application with identical old/new content that still ends in an unacceptable review and insufficient verification strength because no validation command ran.
-19. **Prohibited-Shortcut Review Finding Example Check** - Active next milestone: add a compact local example check exercising the existing but currently untested `det-prohibited-shortcut-N` review finding, using a deliberate diff that textually conflicts with a task-contract prohibited shortcut.
+19. **VCD Failure Window Extraction** - Completed the first deterministic RTL failure-intelligence capability: typed, versioned waveform-slice schema, deterministic textual-VCD parser and bounded window extractor, `extract-waveform-window` CLI, source metadata with SHA-256 and parse statistics, accurate scalar/vector/`x`/`z` representation, pre-window initial values, optional triage-report source resolution, checked-in VCD fixtures, README example, and tests. No causal or root-cause interpretation; textual VCD only.
+20. **Prohibited-Shortcut Review Finding Example Check** - Active next milestone (previously deferred in favor of the VCD product milestone): add a compact local example check exercising the existing but currently untested `det-prohibited-shortcut-N` review finding, using a deliberate diff that textually conflicts with a task-contract prohibited shortcut.
 
 ## Current Status
 
-Stages 1 through 18 are complete. Stage 19 is active.
+Stages 1 through 19 are complete. Stage 20 is active.

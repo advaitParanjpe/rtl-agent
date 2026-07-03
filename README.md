@@ -230,6 +230,22 @@ Triage extracts explicit assertion failures, simulator context lines, and wavefo
 
 `review-task` can also consume a triage report with `--triage-report` so missing waveform references or captured assertion failures are cited in review findings.
 
+## VCD Failure Window Extraction
+
+`extract-waveform-window` reads a standard textual VCD waveform and emits a compact, bounded, versioned waveform-slice JSON artifact around a failure timestamp:
+
+```bash
+rtl-agent extract-waveform-window \
+  --vcd examples/waveforms/failure.vcd \
+  --failure-time 40 \
+  --before 15 \
+  --after 5 \
+  --signal-prefix top.dut \
+  --output .rtl-agent/waveform-slice.json
+```
+
+The extractor parses VCD headers, scopes, variables, timescale, and value changes deterministically. It selects signals by exact hierarchical name (`--signal`) or simple hierarchical prefix (`--signal-prefix`), emits only value transitions inside the requested window, and records each selected signal's value at the window start when a prior change makes it determinable. Scalar, vector, unknown (`x`), and high-impedance (`z`) values are preserved verbatim. Source metadata records the path, size, SHA-256 hash, timescale, requested window, and observed bounds. When `--vcd` is omitted, `--triage-report` locates an existing `.vcd` reference from a triage report. Textual VCD only; the tool never copies the full waveform, interprets causal meaning, or claims root cause.
+
 ## Verification Strength Assessment
 
 `assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:
