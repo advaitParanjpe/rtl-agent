@@ -70,6 +70,7 @@ def test_readme_documented_commands_have_help() -> None:
         "inspect-config",
         "inspect-repo",
         "link-assertion-waveform",
+        "map-signals",
         "parse-issue",
         "reduce-signals",
         "review-task",

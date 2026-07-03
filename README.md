@@ -295,6 +295,25 @@ rtl-agent compare-waveforms \
 
 For each signal present in both slices it reconstructs the value timeline (initial value plus in-window transitions) and reports whether the timelines are identical, the first divergence time and the value on each side there, per-side transition counts, `x`/`z` differences, and the divergence duration and intervals. It also reports signals added or removed relative to the reference, the global earliest divergence, and a deterministic ranking of the most divergent signals. The time basis is explicit: identical timescales compare in shared ticks, differing-but-parseable timescales are normalized to femtoseconds (recorded in `time_basis`), and ambiguous or incompatible timescales are compared as raw ticks with a warning. Incompatible timescales, window mismatches, ambiguous duplicate names, and missing overlap are reported as warnings; incompatible traces are never silently aligned. It never claims causal meaning or localizes RTL source.
 
+## Signal-to-RTL Source Mapping
+
+`map-signals` maps hierarchical waveform signal names to candidate RTL declarations from an existing repository map:
+
+```bash
+rtl-agent inspect-repo \
+  --repo examples/simple-rtl \
+  --config examples/simple-rtl-agent.yaml \
+  --output .rtl-agent/repo-map.json
+
+rtl-agent map-signals \
+  --repository-map .rtl-agent/repo-map.json \
+  --signal top.u_child.clk \
+  --signal top \
+  --output .rtl-agent/signal-source-map.json
+```
+
+Signals can be given directly with `--signal`, or read from a `--waveform-slice` or a `--comparison` report. For each signal the command matches the hierarchical path components and leaf name against declaration names in the repository map (`module`/`interface`/`package`/`program`/`checker`, with file and line) and classifies the result as `exact` (an unambiguous scope-component match), `probable` (a weaker leaf or case-insensitive match), `ambiguous` (a name with multiple declarations — all candidates preserved), or `unresolved`. Every candidate carries a score and an explicit match reason. It consumes the existing repository-map and waveform artifacts only; it performs no semantic elaboration, preprocessing, connectivity or driver tracing, and makes no causal claims.
+
 ## Verification Strength Assessment
 
 `assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:

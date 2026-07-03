@@ -39,6 +39,11 @@ from rtl_agent.signal_reduction import (
     reduce_relevant_signals,
     write_reduction_report,
 )
+from rtl_agent.signal_source_map import (
+    SignalSourceMapError,
+    map_signals_to_source,
+    write_signal_source_map,
+)
 from rtl_agent.triage import TriageError, triage_command_result, write_triage_report
 from rtl_agent.verification_strength_service import (
     VerificationStrengthError,
@@ -512,6 +517,44 @@ def compare_waveforms_command(
     _print_comparison_summary(report, output)
 
 
+@app.command("map-signals")
+def map_signals_command(
+    repository_map: Annotated[Path, typer.Option("--repository-map", help="Repository-map JSON.")],
+    output: Annotated[Path, typer.Option("--output", help="Path for the mapping-report JSON.")],
+    signal: Annotated[
+        list[str] | None,
+        typer.Option("--signal", help="Hierarchical signal name to map; may be repeated."),
+    ] = None,
+    waveform_slice: Annotated[
+        Path | None,
+        typer.Option("--waveform-slice", help="Waveform slice to read signal names from."),
+    ] = None,
+    comparison: Annotated[
+        Path | None,
+        typer.Option("--comparison", help="Comparison report to read signal names from."),
+    ] = None,
+    max_signals: Annotated[
+        int,
+        typer.Option("--max-signals", min=1, help="Maximum signals mapped."),
+    ] = 1024,
+) -> None:
+    """Map hierarchical waveform signals to candidate RTL declaration sources."""
+    try:
+        report = map_signals_to_source(
+            repository_map,
+            signal_names=signal or [],
+            waveform_slice_path=waveform_slice,
+            comparison_path=comparison,
+            max_signals=max_signals,
+        )
+        write_signal_source_map(report, output)
+    except SignalSourceMapError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_signal_source_map_summary(report, output)
+
+
 @app.command("assess-verification")
 def assess_verification(
     task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
@@ -751,6 +794,24 @@ def _print_waveform_slice_summary(report: object, output: Path) -> None:
             "observed_end": report.window.observed_end,
             "selected_signals": len(report.selected_signals),
             "value_changes": len(report.value_changes),
+            "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_signal_source_map_summary(report: object, output: Path) -> None:
+    from rtl_agent.signal_source_map_models import SignalSourceMapReport
+
+    assert isinstance(report, SignalSourceMapReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "total_signals": report.total_signals,
+            "exact": report.exact_count,
+            "probable": report.probable_count,
+            "ambiguous": report.ambiguous_count,
+            "unresolved": report.unresolved_count,
             "warnings": len(report.warnings),
         }
     )
