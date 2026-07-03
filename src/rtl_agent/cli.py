@@ -34,6 +34,11 @@ from rtl_agent.implementation import (
 )
 from rtl_agent.issues import IssueParsingError, parse_issue_file, write_task_contract
 from rtl_agent.review import ReviewError, review_implementation, write_review_report
+from rtl_agent.rtl_driver_trace import (
+    RtlDriverTraceError,
+    trace_drivers,
+    write_driver_trace,
+)
 from rtl_agent.signal_reduction import (
     SignalReductionError,
     reduce_relevant_signals,
@@ -555,6 +560,39 @@ def map_signals_command(
     _print_signal_source_map_summary(report, output)
 
 
+@app.command("trace-drivers")
+def trace_drivers_command(
+    signal_source_map: Annotated[
+        Path,
+        typer.Option("--signal-source-map", help="Signal-source-map report JSON."),
+    ],
+    repository_map: Annotated[Path, typer.Option("--repository-map", help="Repository-map JSON.")],
+    output: Annotated[Path, typer.Option("--output", help="Path for the driver-trace JSON.")],
+    max_depth: Annotated[
+        int,
+        typer.Option("--max-depth", min=0, help="Upstream dependency expansion depth."),
+    ] = 2,
+    max_nodes: Annotated[
+        int,
+        typer.Option("--max-nodes", min=1, help="Maximum dependency nodes visited."),
+    ] = 64,
+) -> None:
+    """Extract bounded textual driver and dependency evidence for mapped signals."""
+    try:
+        report = trace_drivers(
+            signal_source_map,
+            repository_map,
+            max_depth=max_depth,
+            max_nodes=max_nodes,
+        )
+        write_driver_trace(report, output)
+    except RtlDriverTraceError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_driver_trace_summary(report, output)
+
+
 @app.command("assess-verification")
 def assess_verification(
     task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
@@ -794,6 +832,27 @@ def _print_waveform_slice_summary(report: object, output: Path) -> None:
             "observed_end": report.window.observed_end,
             "selected_signals": len(report.selected_signals),
             "value_changes": len(report.value_changes),
+            "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_driver_trace_summary(report: object, output: Path) -> None:
+    from rtl_agent.rtl_driver_trace_models import RtlDriverTraceReport
+
+    assert isinstance(report, RtlDriverTraceReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "traced_signals": len(report.traced_signals),
+            "signals_with_drivers": sum(
+                1 for signal in report.traced_signals if signal.status == "traced"
+            ),
+            "dependency_nodes": len(report.dependency_nodes),
+            "dependency_edges": len(report.dependency_edges),
+            "unresolved_identifiers": len(report.unresolved_identifiers),
+            "truncated": report.truncated,
             "warnings": len(report.warnings),
         }
     )

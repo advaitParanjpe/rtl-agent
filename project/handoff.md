@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Signal-to-RTL Source Mapping
+Static RTL Driver and Dependency Tracing
 
 ## Completed Work
 
