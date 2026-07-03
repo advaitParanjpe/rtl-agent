@@ -471,3 +471,27 @@ Known limitations:
 - Textual VCD only; no FST/FSDB, model-based analysis, source-driver tracing, or stimulus minimization.
 - Value-change scanning reads to end-of-file for honest total statistics rather than early-exiting at the window end; bounded by a file-size guard and output caps.
 - Signal aliasing (multiple `$var` references sharing one identifier) is supported by expanding per selected signal, but exotic array bit-selects are recorded by base name plus an optional raw bit-range string only.
+
+## 2026-07-03 - Assertion-to-Waveform Failure Linking
+
+Connected existing simulator/assertion triage artifacts to VCD failure-window extraction. Added a typed, versioned linkage report schema (`src/rtl_agent/assertion_waveform_link_models.py`), a deterministic linkage service (`src/rtl_agent/assertion_link/service.py`), and a `link-assertion-waveform` CLI command. Given an existing triage report, the workflow selects one assertion finding by stable id (`assertion-<index>`) or index, resolves its associated `.vcd` waveform reference, converts the assertion's simulator time into VCD tick units using the waveform's `$timescale`, and invokes the existing `extract_waveform_window` service (reusing its parser via a new `read_vcd_timescale` helper) rather than duplicating VCD parsing. It supports configurable before/after window and optional exact-name and hierarchical-prefix signal filters, and emits a linkage report recording the selected assertion, source triage report, selected waveform, timestamp-conversion details, generated waveform-slice path and SHA-256, warnings, and unresolved ambiguities. A compact runnable triage fixture (`examples/waveforms/triage-report.json`, VCD referenced by repository-relative path) drives the README example and a repo-root test.
+
+Validation evidence:
+
+- `PYTHONPATH=src .venv/bin/rtl-agent link-assertion-waveform --triage-report examples/waveforms/triage-report.json --assertion-id assertion-0 --before 15 --after 5 --signal-prefix top.dut --slice-output .rtl-agent/waveform-slice.json --output .rtl-agent/assertion-link.json` - passed; converted `40 ns` at a `1ns` timescale to tick 40 and generated a bounded slice.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 121 pytest tests, agent portability check, compact end-to-end/failure/tool-failure/no-change example checks, and packaging smoke verification (which now also verifies `link-assertion-waveform --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The linkage service reuses `extract_waveform_window` and a thin new `read_vcd_timescale` helper (both delegating to the same header parser) so VCD parsing is never duplicated.
+- Timestamp conversion is exact integer arithmetic in femtoseconds via `fractions.Fraction`; only explicit `fs/ps/ns/us/ms/s` assertion units and `1|10|100` VCD timescales convert. Missing timestamps, non-time units (e.g. `cycles`), and absent/unsupported timescales fail honestly rather than guessing. Non-integer tick results are floored with an explicit warning.
+- Ambiguity is never resolved silently: assertion selection is required (no default pick), and multiple distinct existing `.vcd` candidates require `--waveform-path`, which then records the unselected candidates in `unresolved_ambiguities`.
+- Waveform candidates are re-validated on disk at link time; missing files and non-`.vcd` formats (unsupported) produce distinct honest errors, and malformed VCDs surface the parser's error.
+- The linkage never infers root cause; parser notes state this explicitly.
+
+Known limitations:
+
+- Textual VCD only; no FST/FSDB, semantic waveform interpretation, signal-dependency tracing, automatic signal selection, source localization, stimulus minimization, or patch generation.
+- Assertion timestamps expressed in clock cycles or without an explicit SI time unit are treated as ambiguous and rejected, since converting them would require clock-period assumptions.

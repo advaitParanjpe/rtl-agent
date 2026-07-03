@@ -155,6 +155,20 @@ def _ensure_safe_output(output: Path) -> None:
         raise WaveformSliceError(f"output path is a directory: {output}")
 
 
+def read_vcd_timescale(vcd_path: Path) -> str | None:
+    """Return the VCD timescale string, reusing the shared header parser.
+
+    Raises ``WaveformSliceError`` when the file is missing or the header is
+    malformed, matching ``extract_waveform_window``.
+    """
+
+    resolved = vcd_path.resolve()
+    if not resolved.exists() or not resolved.is_file():
+        raise WaveformSliceError(f"VCD file does not exist: {vcd_path}")
+    _, timescale, _ = _parse_header(resolved)
+    return timescale
+
+
 def _parse_header(path: Path) -> tuple[list[_Variable], str | None, int]:
     tokens = _iter_tokens(path)
     timescale: str | None = None

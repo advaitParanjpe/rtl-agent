@@ -246,6 +246,23 @@ rtl-agent extract-waveform-window \
 
 The extractor parses VCD headers, scopes, variables, timescale, and value changes deterministically. It selects signals by exact hierarchical name (`--signal`) or simple hierarchical prefix (`--signal-prefix`), emits only value transitions inside the requested window, and records each selected signal's value at the window start when a prior change makes it determinable. Scalar, vector, unknown (`x`), and high-impedance (`z`) values are preserved verbatim. Source metadata records the path, size, SHA-256 hash, timescale, requested window, and observed bounds. When `--vcd` is omitted, `--triage-report` locates an existing `.vcd` reference from a triage report. Textual VCD only; the tool never copies the full waveform, interprets causal meaning, or claims root cause.
 
+## Assertion-to-Waveform Failure Linking
+
+`link-assertion-waveform` connects a triaged assertion failure to a bounded VCD slice, so you do not have to supply the failure timestamp and waveform path by hand:
+
+```bash
+rtl-agent link-assertion-waveform \
+  --triage-report examples/waveforms/triage-report.json \
+  --assertion-id assertion-0 \
+  --before 15 \
+  --after 5 \
+  --signal-prefix top.dut \
+  --slice-output .rtl-agent/waveform-slice.json \
+  --output .rtl-agent/assertion-link.json
+```
+
+The command selects one assertion finding by stable id (`--assertion-id assertion-<index>`) or `--assertion-index`, resolves its associated VCD waveform reference, converts the assertion's simulator time into VCD tick units using the waveform's `$timescale`, and then invokes the existing waveform-window extractor. It emits a versioned linkage report recording the selected assertion, source triage report, selected waveform, timestamp-conversion details, generated waveform-slice path and hash, warnings, and unresolved ambiguities. It fails honestly when no assertion is selected, the assertion has no usable timestamp, no compatible textual VCD is associated, the timescale conversion is ambiguous, or the waveform is missing or malformed, and it never silently chooses between multiple candidate waveforms (use `--waveform-path` to disambiguate). It never infers root cause.
+
 ## Verification Strength Assessment
 
 `assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:

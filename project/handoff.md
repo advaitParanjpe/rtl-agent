@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-VCD Failure Window Extraction
+Assertion-to-Waveform Failure Linking
 
 ## Completed Work
 

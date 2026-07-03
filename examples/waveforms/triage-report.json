@@ -1,0 +1,34 @@
+{
+  "assertion_failures": [
+    {
+      "line": 7,
+      "signal_or_label": "a_valid_stable",
+      "source": "stderr",
+      "summary": "UVM_ERROR assertion a_valid_stable failed at time 40 ns",
+      "time_context": "40 ns"
+    }
+  ],
+  "bounded_evidence": [],
+  "command_exit_code": 1,
+  "command_name": "sim-uvm",
+  "command_result_path": ".rtl-agent/example/result.json",
+  "command_status": "failed",
+  "parser_notes": [
+    "Compact checked-in triage example for assertion-to-waveform linking."
+  ],
+  "schema_version": 1,
+  "simulator_context": [],
+  "stderr_path": ".rtl-agent/example/stderr.log",
+  "stdout_path": ".rtl-agent/example/stdout.log",
+  "warnings": [],
+  "waveform_references": [
+    {
+      "evidence": "Dumped waveform examples/waveforms/failure.vcd",
+      "exists": true,
+      "line": 3,
+      "path": "examples/waveforms/failure.vcd",
+      "resolved_path": null,
+      "source": "stdout"
+    }
+  ]
+}
