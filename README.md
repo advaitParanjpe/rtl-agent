@@ -314,6 +314,21 @@ rtl-agent map-signals \
 
 Signals can be given directly with `--signal`, or read from a `--waveform-slice` or a `--comparison` report. For each signal the command matches the hierarchical path components and leaf name against declaration names in the repository map (`module`/`interface`/`package`/`program`/`checker`, with file and line) and classifies the result as `exact` (an unambiguous scope-component match), `probable` (a weaker leaf or case-insensitive match), `ambiguous` (a name with multiple declarations — all candidates preserved), or `unresolved`. Every candidate carries a score and an explicit match reason. It consumes the existing repository-map and waveform artifacts only; it performs no semantic elaboration, preprocessing, connectivity or driver tracing, and makes no causal claims.
 
+## Static RTL Driver and Dependency Tracing
+
+`trace-drivers` extracts bounded, textual driver and dependency evidence for mapped signals from a signal-source-map report and a repository map:
+
+```bash
+rtl-agent trace-drivers \
+  --signal-source-map .rtl-agent/signal-source-map.json \
+  --repository-map .rtl-agent/repo-map.json \
+  --max-depth 2 \
+  --max-nodes 64 \
+  --output .rtl-agent/driver-trace.json
+```
+
+For each mapped signal it scans the declaring RTL file(s) for statements that reference the signal's leaf name — continuous assignments (`assign`), procedural assignments (`<=`/`=`), and port connections — recording the file, line, statement kind, bounded text, LHS/RHS identifiers, the enclosing declaration, and the nearest conditional guard where practical. It then performs a bounded upstream dependency expansion (configurable `--max-depth` and `--max-nodes`) over the referenced right-hand-side identifiers, emitting edges labeled `textual` (identifier appears in a matched assignment) or `inferred_textual` (name-based port connection). Multiple drivers are all preserved and never collapsed; unresolved identifiers (inputs, constants, undriven nets) are reported explicitly. The scan is purely textual — it performs no elaboration, preprocessing, generate expansion, simulation, semantic connectivity, or causal reasoning.
+
 ## Verification Strength Assessment
 
 `assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:

@@ -76,6 +76,7 @@ def test_readme_documented_commands_have_help() -> None:
         "review-task",
         "run-benchmark",
         "run-command",
+        "trace-drivers",
         "triage-command",
     }
     runner = CliRunner()

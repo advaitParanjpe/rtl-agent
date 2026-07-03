@@ -586,3 +586,27 @@ Known limitations:
 - The repository map extracts only top-level declarations, so leaf signal names (nets/registers) generally do not resolve to a declaration; mapping targets the declaring module/scope, not the individual signal line.
 - Instance names in the hierarchy are not resolved to their module types (that requires connectivity/elaboration, which is deliberately out of scope); only path components whose names coincide with declaration names resolve.
 - Matching is exact or case-insensitive name matching only; no fuzzy, partial, or parameter-aware matching.
+
+## 2026-07-03 - Static RTL Driver and Dependency Tracing
+
+Added deterministic, bounded, explicitly-textual driver and dependency tracing for mapped signals. New typed, versioned report schema (`src/rtl_agent/rtl_driver_trace_models.py`), a tracing service (`src/rtl_agent/rtl_driver_trace/service.py`), and a `trace-drivers` CLI command consume an existing signal-source-map report plus the repository map (for `repository_root` and per-file declarations) and, for each mapped signal, scan the declaring RTL file(s) for statements referencing the signal's leaf name: continuous assignments (`assign`), procedural assignments (`<=`/`=`), and port connections. Each match records file, line, statement kind, bounded statement text, LHS and RHS identifiers, the enclosing declaration (from repository-map evidence), and the nearest conditional guard where practical. A bounded upstream dependency expansion (configurable `--max-depth` and `--max-nodes`) walks the referenced RHS identifiers, emitting edges labeled `textual` (identifier appears in a matched assignment) or `inferred_textual` (name-based port connection). Comments and string literals are masked before scanning, and Verilog sized/based literals (e.g. `1'b0`) are stripped so they do not leak spurious identifiers.
+
+Validation evidence:
+
+- Live run on a synthetic `dut.sv` (`assign valid = a & b;`, guarded procedural `a <= ...`): `dut.valid` resolved to the continuous assign with RHS `[a, b]`; `dut.a` preserved both procedural drivers (guards `if (!rst_n)` and `else`); dependency edges `valid->a`, `valid->b`, `a->b`, `a->valid`; `b` reported unresolved.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 177 pytest tests, agent portability check, compact end-to-end/failure/tool-failure/no-change example checks, and packaging smoke verification (which now also verifies `trace-drivers --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The scan is purely textual and bounded (masked comments/strings, per-file match cap, file-size cap, configurable depth/node limits); it never elaborates, preprocesses, expands generates, resolves parameters, simulates, or builds a semantic dataflow graph.
+- Every edge cites source evidence (file + line + statement kind) and is labeled `textual` or `inferred_textual`; nothing is asserted as semantic or causal.
+- Ambiguity is preserved: a signal with multiple drivers keeps all of them, and undriven/unknown identifiers (inputs, constants) are reported in `unresolved_identifiers` rather than silently resolved.
+- The set of files scanned comes from the signal-source-map candidates, so tracing reuses the existing mapping artifact instead of re-scanning the repository.
+
+Known limitations:
+
+- Statement recognition is line-oriented regex matching, so assignments spanning multiple physical lines, and blocking `=` inside vs outside procedural blocks, are approximated; guards are the nearest preceding `if`/`else`/`case`/`always` line within a bounded lookback (best-effort, textual).
+- Cross-module driver resolution is limited to textual port-connection matches by name; instance-to-module-type connectivity is not resolved.
+- RHS identifiers are textual candidates, not proven dependencies; concatenations, function calls, and macro-expanded references are captured only as their surface identifiers.
