@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Automatic Relevant-Signal Reduction
+Passing-vs-Failing Waveform Comparison
 
 ## Completed Work
 
