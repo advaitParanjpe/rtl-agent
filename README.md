@@ -43,6 +43,36 @@ python -m pip install ".[dev]"
 
 For source-tree development without reinstalling after edits, use `PYTHONPATH=src python -m rtl_agent ...`.
 
+## Using Codex or Claude Code
+
+Codex:
+
+```bash
+cd ~/Desktop/Projects/rtl-agent
+codex
+```
+
+Prompt:
+
+```text
+Read AGENTS.md and project/current.md, then complete the active milestone fully.
+```
+
+Claude Code:
+
+```bash
+cd ~/Desktop/Projects/rtl-agent
+claude
+```
+
+Prompt:
+
+```text
+Complete the active milestone.
+```
+
+Claude reads `CLAUDE.md`, which points back to authoritative `AGENTS.md`. Both tools rely on the same checked-in milestone and handoff files. Switching is safest between milestones; when switching mid-milestone, the outgoing agent must leave `project/handoff.md` active and push a checkpoint branch.
+
 ## Quick Start
 
 ```bash

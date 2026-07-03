@@ -357,3 +357,26 @@ Known limitations:
 
 - The check covers a deterministic validation-failure terminal path, not every possible provider, permission, or structured-tool failure mode.
 - It remains a compact local workflow smoke; no real provider, external repository, CI, container, dashboard, database, queue, UI, semantic waveform analysis, or broad orchestration feature was added.
+
+## 2026-07-03 - Cross-Agent Workflow Portability
+
+Completed a focused repository-workflow portability update so Codex, Claude Code, or another coding agent can resume from checked-in repository state. Added a thin `CLAUDE.md` adapter, inactive `project/handoff.md` template, concise portability/session-start/session-end rules in `AGENTS.md`, launcher documentation in README, and a canonical deterministic portability check.
+
+Validation evidence:
+
+- `python3 scripts/agent_portability_check.py` - passed.
+- `python3 scripts/check.py` - passed.
+- `git diff --check` - passed.
+- `git status --short --branch` - reviewed before commit.
+- `grep -n "AGENTS.md" CLAUDE.md` - passed.
+- `grep -n "Status:" project/handoff.md` - passed.
+
+Architectural decisions:
+
+- `AGENTS.md` remains authoritative; `CLAUDE.md` is only a thin adapter.
+- `project/current.md` remains the only active milestone; `project/handoff.md` is inactive continuity state unless explicitly marked active.
+- The existing active product milestone was preserved.
+
+Known limitations:
+
+- The portability check is deterministic file-policy validation, not automatic conflict resolution or branch synchronization.
