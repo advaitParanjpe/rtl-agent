@@ -147,6 +147,16 @@ def _json_artifact_kind(path: Path) -> EvidenceArtifactKind:
         return EvidenceArtifactKind.ASSERTION_WAVEFORM_LINK_REPORT
     if {"window", "value_changes", "parse_statistics", "selected_signals"} <= keys:
         return EvidenceArtifactKind.WAVEFORM_SLICE_REPORT
+    if {"retained_signals", "reduced_slice_path", "total_candidate_signals"} <= keys:
+        return EvidenceArtifactKind.RELEVANT_SIGNAL_REDUCTION_REPORT
+    if {"diverging_signals", "time_basis", "shared_signal_count"} <= keys:
+        return EvidenceArtifactKind.WAVEFORM_COMPARISON_REPORT
+    if {"mappings", "exact_count", "ambiguous_count"} <= keys:
+        return EvidenceArtifactKind.SIGNAL_SOURCE_MAP_REPORT
+    if {"traced_signals", "dependency_nodes", "dependency_edges"} <= keys:
+        return EvidenceArtifactKind.RTL_DRIVER_TRACE_REPORT
+    if {"root_identifiers", "nodes", "edges"} <= keys:
+        return EvidenceArtifactKind.FAILURE_DIVERGENCE_GRAPH_REPORT
     return EvidenceArtifactKind.OTHER_JSON
 
 

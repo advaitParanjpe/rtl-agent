@@ -28,6 +28,11 @@ class EvidenceArtifactKind(StrEnum):
     BENCHMARK_REPORT = "benchmark_report"
     WAVEFORM_SLICE_REPORT = "waveform_slice_report"
     ASSERTION_WAVEFORM_LINK_REPORT = "assertion_waveform_link_report"
+    RELEVANT_SIGNAL_REDUCTION_REPORT = "relevant_signal_reduction_report"
+    WAVEFORM_COMPARISON_REPORT = "waveform_comparison_report"
+    SIGNAL_SOURCE_MAP_REPORT = "signal_source_map_report"
+    RTL_DRIVER_TRACE_REPORT = "rtl_driver_trace_report"
+    FAILURE_DIVERGENCE_GRAPH_REPORT = "failure_divergence_graph_report"
     OTHER_JSON = "other_json"
     OTHER_ARTIFACT = "other_artifact"
 
