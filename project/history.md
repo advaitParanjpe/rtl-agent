@@ -610,3 +610,27 @@ Known limitations:
 - Statement recognition is line-oriented regex matching, so assignments spanning multiple physical lines, and blocking `=` inside vs outside procedural blocks, are approximated; guards are the nearest preceding `if`/`else`/`case`/`always` line within a bounded lookback (best-effort, textual).
 - Cross-module driver resolution is limited to textual port-connection matches by name; instance-to-module-type connectivity is not resolved.
 - RHS identifiers are textual candidates, not proven dependencies; concatenations, function calls, and macro-expanded references are captured only as their surface identifiers.
+
+## 2026-07-03 - Failure Divergence Graph
+
+Added a deterministic, purely compositional failure-divergence-graph capability. New typed, versioned report schema (`src/rtl_agent/failure_divergence_graph_models.py`), a composition service (`src/rtl_agent/failure_divergence_graph/service.py`), and a `divergence-graph` CLI command consume an existing waveform-comparison report, signal-source-map report, and driver-trace report and build a bounded directed graph rooted at the diverging signals. Roots are the comparison's diverging signals mapped to their leaf identifiers (with first divergence time, values, and score attached); each node composes its mapping status and declaration location (from the signal-source map) and driver-resolution status (from the driver trace); edges are the driver-trace dependency edges, retaining their `textual`/`inferred_textual` label and citing source file and line. A bounded BFS from the roots (configurable `--max-depth`/`--max-nodes`) traverses only the existing driver-trace edge set — no new RTL scanning, VCD parsing, or recomputation.
+
+Validation evidence:
+
+- Live run composing real signal-source-map + driver-trace (synthetic `dut.sv`) with a comparison where `dut.valid` diverges: root `valid` (divergence attached), edges `valid->a`/`valid->b`/`a->b` with textual evidence lines, `a` resolved via mapping, `b` preserved as unresolved.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 190 pytest tests, agent portability check, compact end-to-end/failure/tool-failure/no-change example checks, and packaging smoke verification (which now also verifies `divergence-graph --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The graph is composed strictly from the three prior artifacts; it performs no new analysis. The BFS traverses the already-extracted driver-trace edges, so it inherits (rather than recomputes) the textual/inferred-textual evidence.
+- Divergence roots are bridged to the driver-trace's leaf-identifier space via the signal-source map (hierarchical signal -> leaf); a diverging signal absent from the map falls back to its textual leaf with a warning.
+- Every edge cites its source evidence (file, line, statement kind) and label; no node or edge is asserted as semantic, causal, or a root cause.
+- Ambiguity and honesty are preserved: multiple diverging signals collapsing to one leaf warn and pick deterministically (earliest divergence, then name); unresolved identifiers are reported; a driver-trace produced from a different signal-source map warns about possible inconsistency.
+
+Known limitations:
+
+- Root bridging relies on the signal-source map's leaf; hierarchical signals sharing a leaf are collapsed to one graph root (with a warning), since the driver-trace edge space is leaf-identifier keyed.
+- The graph reflects only edges the driver-trace already extracted; it neither deepens nor re-scans beyond that evidence, and inherits the driver-trace's textual approximations.
+- Node divergence attributes are attached only to identifiers that are diverging-signal leaves; upstream nodes carry mapping/driver attributes but no divergence unless they are themselves diverging leaves.

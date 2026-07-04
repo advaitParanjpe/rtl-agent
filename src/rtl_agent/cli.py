@@ -27,6 +27,11 @@ from rtl_agent.evidence_bundle import (
     report_summary_payload as evidence_bundle_summary_payload,
 )
 from rtl_agent.execution import CommandRunner
+from rtl_agent.failure_divergence_graph import (
+    FailureDivergenceGraphError,
+    build_failure_divergence_graph,
+    write_divergence_graph,
+)
 from rtl_agent.implementation import (
     ImplementationError,
     run_bounded_implementation,
@@ -593,6 +598,47 @@ def trace_drivers_command(
     _print_driver_trace_summary(report, output)
 
 
+@app.command("divergence-graph")
+def divergence_graph_command(
+    comparison: Annotated[
+        Path,
+        typer.Option("--comparison", help="Waveform-comparison report JSON."),
+    ],
+    signal_source_map: Annotated[
+        Path,
+        typer.Option("--signal-source-map", help="Signal-source-map report JSON."),
+    ],
+    driver_trace: Annotated[
+        Path,
+        typer.Option("--driver-trace", help="Driver-trace report JSON."),
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Path for the divergence-graph JSON.")],
+    max_depth: Annotated[
+        int,
+        typer.Option("--max-depth", min=0, help="Graph depth from divergence roots."),
+    ] = 3,
+    max_nodes: Annotated[
+        int,
+        typer.Option("--max-nodes", min=1, help="Maximum graph nodes."),
+    ] = 128,
+) -> None:
+    """Compose comparison divergences and driver evidence into a failure divergence graph."""
+    try:
+        report = build_failure_divergence_graph(
+            comparison,
+            signal_source_map,
+            driver_trace,
+            max_depth=max_depth,
+            max_nodes=max_nodes,
+        )
+        write_divergence_graph(report, output)
+    except FailureDivergenceGraphError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_divergence_graph_summary(report, output)
+
+
 @app.command("assess-verification")
 def assess_verification(
     task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
@@ -832,6 +878,25 @@ def _print_waveform_slice_summary(report: object, output: Path) -> None:
             "observed_end": report.window.observed_end,
             "selected_signals": len(report.selected_signals),
             "value_changes": len(report.value_changes),
+            "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_divergence_graph_summary(report: object, output: Path) -> None:
+    from rtl_agent.failure_divergence_graph_models import FailureDivergenceGraphReport
+
+    assert isinstance(report, FailureDivergenceGraphReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "root_identifiers": report.root_identifiers,
+            "global_earliest_divergence_time": report.global_earliest_divergence_time,
+            "nodes": len(report.nodes),
+            "edges": len(report.edges),
+            "unresolved_identifiers": len(report.unresolved_identifiers),
+            "truncated": report.truncated,
             "warnings": len(report.warnings),
         }
     )

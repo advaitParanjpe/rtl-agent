@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Static RTL Driver and Dependency Tracing
+Failure Divergence Graph
 
 ## Completed Work
 
