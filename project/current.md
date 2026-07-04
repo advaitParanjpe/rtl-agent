@@ -1,30 +1,29 @@
-# Compact Failure Intelligence Example Check
+# Compact Failure Report Synthesis
 
 ## Objective
 
-Add a compact, deterministic local scripted example check that exercises the full failure-intelligence pipeline over checked-in fixtures, validating that the commands compose end-to-end and emit stable, schema-backed artifacts. Assert only stable fields; introduce no new product behavior.
+Deterministically compose the existing failure-intelligence artifacts into a single typed, versioned failure-report artifact: a compact, evidence-cited summary of the observed failure signature. The report is a compositional view over prior artifacts; it makes no causal or root-cause claims and performs no new analysis.
 
 ## Scope
 
-- Add `scripts/failure_intelligence_example_check.py` that, in a temporary workspace, chains the real CLI:
-  - `extract-waveform-window` for a failing slice (the checked-in `examples/waveforms/failure.vcd`) and a passing/reference slice (a checked-in or generated variant);
-  - `compare-waveforms` over the two slices;
-  - `inspect-repo` on `examples/simple-rtl`;
-  - `map-signals` for the diverging signals (from the comparison);
-  - `trace-drivers` from the signal-source map;
-  - `divergence-graph` composing comparison + signal-source map + driver trace;
-  - `reduce-signals` on the failing slice.
-- Reuse the shared `scripts/_example_check.py` helper for repository root, interpreter selection, and `run_cli`.
-- Validate emitted artifacts through the existing typed models, asserting stable schema versions, statuses, and structural fields (not volatile timestamps, hashes, durations, UUIDs, or absolute paths).
-- Register the new check in `scripts/check.py` and mention it in the README's example-check summary where the other example checks are described.
-- Add a compact checked-in passing-waveform fixture under `examples/waveforms/` if one is needed for a deterministic comparison.
-- Keep generated outputs in temporary or ignored artifact directories.
+- Add a typed, versioned failure-report schema.
+- Add a deterministic service that consumes an existing failure-divergence-graph report plus its upstream artifacts (waveform comparison, signal-source map, driver trace, relevant-signal reduction, and optionally triage and verification-strength reports) and produces a compact summary:
+  - the observed failure signature: diverging signals with first divergence time and values, and the global earliest divergence;
+  - per-signal mapped source locations (declaration file/line/kind) and driver-resolution status, composed from the prior reports;
+  - referenced upstream artifact paths (with recorded provenance) for every cited fact;
+  - counts of resolved / unresolved identifiers and any cross-artifact warnings.
+- Add a CLI command such as `synthesize-failure-report`.
+- Reuse the existing comparison, signal-source-map, driver-trace, divergence-graph, reduction, triage, and verification-strength models; do not re-scan RTL, re-parse VCD, or recompute divergences, mappings, or drivers.
+- Emit bounded, stably ordered output with deterministic serialization.
+- Fail or warn honestly: missing optional inputs, empty divergences, and cross-artifact inconsistencies are reported explicitly; ambiguity and unresolved identifiers are preserved.
+- Add compact fixtures and tests covering signature summarization, source-location composition, optional-input handling, empty input, and deterministic output.
+- Add one concise runnable README example.
 
 ## Acceptance Criteria
 
-- The example check is local, deterministic, compact, and independently runnable.
-- It reuses the shared helper without adding new dependencies or a framework.
-- It asserts on stable schema versions, statuses, identifiers, and structural fields rather than volatile values.
+- The failure report is deterministic, bounded, and composed strictly from prior-artifact evidence; every cited fact references its source artifact.
+- Diverging signals, source locations, and driver/unresolved status are derived from the input reports without new RTL scanning or semantic inference.
+- Output ordering and serialization are stable across repeated runs.
 - No existing artifact schema, CLI behavior, provider behavior, or product workflow changes.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
@@ -36,9 +35,10 @@ Add a compact, deterministic local scripted example check that exercises the ful
 
 ## Exclusions
 
+- Do not make causal or root-cause claims, rank signals as causes, or infer semantic dataflow.
+- Do not re-scan RTL, re-parse VCD, elaborate, or recompute comparison/mapping/driver evidence; compose only.
+- Do not add source rewriting, patch generation, FST/FSDB support, model-based analysis, or stimulus minimization.
 - Do not add real model-provider integration, external repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
-- Do not change generated artifact schemas, CLI behavior, provider behavior, or product workflow features.
-- Do not add semantic waveform interpretation, dependency-tracing beyond existing textual evidence, model-based analysis, causal claims, or large generated artifacts under tracked paths.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 
 ## Completion State
