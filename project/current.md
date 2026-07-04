@@ -1,21 +1,21 @@
-# Real AXI Router Repository Pilot
+# Cross-Module Ambiguity and Multi-Instance Robustness Pilot
 
 ## Objective
 
-Pilot the existing failure-intelligence pipeline against a larger, multi-file AXI-router-style RTL repository whose signal hierarchy spans several modules across files, proving the pipeline resolves cross-file signal-source mapping and cross-module driver/dependency evidence and still localizes a seeded divergence. Reuse the existing services and example-check helper; add no new analysis behavior, no simulator, and no model providers.
+Validate that the existing failure-intelligence pipeline handles genuinely ambiguous hierarchical RTL honestly — reporting ambiguous signal-source mappings and preserved multi-candidate evidence rather than a false-confident single answer — while still localizing a seeded divergence. This milestone stresses the current architecture on ambiguity; it introduces no new analysis behaviour.
 
 ## Scope
 
-- Add a compact but multi-file checked-in RTL repository under `examples/` (an AXI-router-style top module instantiating at least two distinct child modules across separate `.sv` files, with real continuous and procedural drivers and a signal hierarchy that crosses module boundaries) plus an rtl-agent config.
-- Add a seeded failing-vs-passing VCD pair over that hierarchy's signals, differing deterministically on a divergent signal whose driver and dependencies live in a child module reached through the top module (so localization must resolve across files/modules).
-- Add `scripts/axi_router_repository_pilot_check.py` that drives the existing pipeline (the `run-failure-intelligence` orchestrator plus `inspect-run` and `export-failure-package`, reusing the shared `scripts/_example_check.py` helper) over the checked-in fixtures in a temporary workspace, and register it in `scripts/check.py`.
-- Assert, against the typed schemas, that the pipeline: identifies the expected earliest divergent signal and time; maps the divergent signal to the correct child module and file (not merely the top module); extracts real driver and dependency evidence spanning more than one module/file; produces a connected divergence graph with cited cross-file edges; surfaces the correct source location and textual driver evidence in the synthesized failure report; exports and validates a portable failure package; and preserves ambiguity without causal or root-cause claims — using stable, schema-backed assertions only (no timestamps, hashes, durations, UUIDs, or absolute paths).
-- Add one concise README mention of the multi-file repository pilot.
+- Extend the checked-in multi-file RTL fixtures with a case that legitimately creates ambiguity, such as: the same child module instantiated more than once, and/or a leaf signal name that appears in more than one module across separate files.
+- Add a passing and a seeded-failing VCD pair over that hierarchy with a deterministic divergence on a signal whose source-mapping is genuinely ambiguous (matches more than one declaration/module) or whose leaf name is non-unique.
+- Add a scripted check (for example `scripts/axi_router_ambiguity_pilot_check.py`) that drives the existing pipeline (the `run-failure-intelligence` orchestrator plus `inspect-run` and `export-failure-package`, reusing `scripts/_example_check.py`) over the fixtures in a temporary workspace, and register it in `scripts/check.py`.
+- Assert, against the typed schemas, that the pipeline: identifies the expected earliest divergence; reports the ambiguous signal with an `ambiguous` (or multi-candidate) mapping status and preserves all candidate declarations/locations rather than collapsing to one; keeps the corresponding driver/dependency evidence multi-valued or explicitly unresolved where the RTL is genuinely ambiguous; still surfaces the divergence and its cited candidate locations in the failure report; exports and validates a portable failure package; and makes no causal or root-cause claim — using stable, schema-backed assertions only.
+- Add one concise README mention of the ambiguity/multi-instance pilot.
 
 ## Acceptance Criteria
 
-- The pilot exercises genuine cross-file and cross-module resolution (a signal declared/driven in a child module, reached through the top module), not just intra-file tracing.
-- The seeded divergence is localized to the correct child module/file with cited driver and dependency evidence, and the divergence graph is connected across files.
+- The fixture creates real ambiguity (duplicate module instantiation and/or a non-unique leaf signal name across files), and the pipeline reports it honestly (ambiguous status and preserved multiple candidates), not a single false-confident mapping.
+- The seeded divergence is still localized and its candidate source locations are cited; ambiguity is preserved end-to-end into the failure report.
 - The check is local, deterministic, compact, independently runnable, and reuses the shared helper and existing services (no new product behavior, no simulator, no providers).
 - No existing artifact schema, CLI behavior, provider behavior, or product workflow changes.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
@@ -29,7 +29,7 @@ Pilot the existing failure-intelligence pipeline against a larger, multi-file AX
 ## Exclusions
 
 - Do not add a simulator, waveform generation from RTL, real model-provider integration, external/remote repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
-- Do not add new analysis behavior, dependency-graph algorithms, semantic elaboration, causal claims, or root-cause conclusions beyond what the existing services already produce.
+- Do not add new analysis behavior, disambiguation heuristics, dependency-graph algorithms, semantic elaboration, causal claims, or root-cause conclusions beyond what the existing services already produce.
 - Do not hard-code expected answers into product services or create a parallel analysis path; keep fixtures compact.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 

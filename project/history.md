@@ -844,3 +844,26 @@ Known limitations:
 - The fixture is a single-file compact RTL fragment; it exercises intra-file driver tracing and dependency expansion but not cross-file or multi-module hierarchy resolution.
 - The check asserts the seeded signal is localized with cited evidence; it deliberately does not assert an exhaustive edge/node count, so the fixture can grow without churn as long as the seeded localization holds.
 - The waveforms are hand-authored VCDs, not simulator output, consistent with the no-simulator exclusion.
+
+## 2026-07-04 - Real AXI Router Repository Pilot
+
+Validated that the existing failure-intelligence architecture scales to hierarchical, multi-file RTL, with no new analysis behaviour, heuristics, AXI-specific logic, or parallel path. Added a compact multi-file repository (`examples/axi-router-repo/` with `rtl/axi_router.sv`, `rtl/axi_ingress.sv`, `rtl/axi_route.sv`, a passing VCD, a seeded failing VCD, and `examples/axi-router-repo-agent.yaml`): a top module `axi_router` instantiates two child modules — `axi_ingress` (drives `payload_staged` from `payload_in`) and `axi_route` (drives `payload_out` from the cross-module `payload_staged`) — from separate files, wiring the staged payload across the module boundary. The seeded fault corrupts `payload_staged` in the ingress under backpressure at t=40 and propagates to `payload_out` in the route at t=50. A new scripted check (`scripts/axi_router_repository_pilot_check.py`, registered in `scripts/check.py`) drives the real orchestrator plus `inspect-run` and `export-failure-package` and asserts, against the typed schemas, that the pipeline: recognizes three modules across three files; identifies `payload_staged` as the earliest divergence at t=40; maps `payload_staged` to `axi_ingress.sv` and `payload_out` to `axi_route.sv` (cross-file source mapping to the correct child modules); reconstructs the `payload_out → payload_staged → payload_in` chain with its two links cited to two different files (`axi_route.sv` and `axi_ingress.sv`) — genuine cross-module driver/dependency tracing; produces a divergence graph whose two roots localize to two child files and whose edges connect across them; cites both child source files in the synthesized failure report; exports and validates a portable failure package; and preserves ambiguity (module inputs unresolved) with no root-cause claim.
+
+Validation evidence:
+
+- Confirmed the cross-file behaviour by running the real pipeline and reading its actual outputs before codifying assertions: `payload_staged`→`rtl/axi_ingress.sv`, `payload_out`→`rtl/axi_route.sv`, dependency edges `payload_out→payload_staged @ axi_route.sv:18` and `payload_staged→payload_in @ axi_ingress.sv:26`.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 258 pytest tests, agent portability check, all seven example checks (including the new repository pilot check), and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- No product code changed: the check drives only the existing orchestrator and CLI. Cross-file behaviour is an emergent property of the existing services — the driver trace scans the union of all traced signals' declaring files, so when two signals map to two child files the dependency expansion naturally reconstructs edges across them.
+- The VCD hierarchy names the two child instance scopes to match the child module names (`axi_ingress`, `axi_route`) under a non-module `dut` instance scope, so each signal resolves to its own child file rather than collapsing to the shallower top module; this is what forces the existing mapping to exercise cross-file resolution. The top module remains in the repository (indexed by discovery) to establish the instantiating hierarchy.
+- The seeded fault is physically consistent with the RTL text (staged payload corrupts first in the ingress, then the routed output that continuously assigns from it), so the earliest-divergence signal and the cross-module chain agree.
+
+Known limitations:
+
+- The hierarchy is two levels deep with two children; deeper or wider trees and same-named signals across unrelated modules are not exercised here.
+- Cross-file dependency reconstruction relies on both endpoints being among the traced signals' declaring files (the union scanned by the existing driver trace); a dependency whose driver lives in a file no observed signal maps to is still left unresolved, by design.
+- Waveforms are hand-authored VCDs, not simulator output, consistent with the no-simulator exclusion.

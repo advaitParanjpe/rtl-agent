@@ -1,0 +1,17 @@
+schema_version: 1
+repository_path: axi-router-repo
+run_artifact_dir: ../.rtl-agent/runs
+allowed_working_paths:
+  - axi-router-repo
+protected_paths: []
+execution:
+  timeout_seconds: 30
+  max_output_bytes: 1048576
+commands:
+  smoke:
+    argv:
+      - python3
+      - -c
+      - "print('axi router repo smoke ok')"
+    cwd: axi-router-repo
+    timeout_seconds: 10
