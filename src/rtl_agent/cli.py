@@ -54,6 +54,11 @@ from rtl_agent.rtl_driver_trace import (
     trace_drivers,
     write_driver_trace,
 )
+from rtl_agent.run_inspection import (
+    RunInspectionError,
+    inspect_run,
+    write_inspection_report,
+)
 from rtl_agent.signal_reduction import (
     SignalReductionError,
     reduce_relevant_signals,
@@ -779,6 +784,31 @@ def run_failure_intelligence_command(
         raise typer.Exit(1)
 
 
+@app.command("inspect-run")
+def inspect_run_command(
+    run_dir: Annotated[
+        Path,
+        typer.Option("--run-dir", help="Existing failure-intelligence run directory."),
+    ],
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional path for the JSON inspection report."),
+    ] = None,
+) -> None:
+    """Validate an existing run directory against its manifest (read-only)."""
+    try:
+        report = inspect_run(run_dir)
+        if output is not None:
+            write_inspection_report(report, output)
+    except RunInspectionError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_inspection_summary(report, output)
+    if not report.valid:
+        raise typer.Exit(1)
+
+
 @app.command("assess-verification")
 def assess_verification(
     task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
@@ -1018,6 +1048,27 @@ def _print_waveform_slice_summary(report: object, output: Path) -> None:
             "observed_end": report.window.observed_end,
             "selected_signals": len(report.selected_signals),
             "value_changes": len(report.value_changes),
+            "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_inspection_summary(report: object, output: Path | None) -> None:
+    from rtl_agent.run_inspection_models import RunInspectionReport
+
+    assert isinstance(report, RunInspectionReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "run_dir": str(report.run_dir),
+            "output": str(output) if output is not None else None,
+            "valid": report.valid,
+            "manifest_status": report.manifest_status,
+            "valid_artifacts": report.valid_artifacts,
+            "missing_artifacts": report.missing_artifacts,
+            "invalid_artifacts": report.invalid_artifacts,
+            "external_inputs_present": report.external_inputs_present,
+            "stages": [{"name": stage.name, "validity": stage.validity} for stage in report.stages],
             "warnings": len(report.warnings),
         }
     )
