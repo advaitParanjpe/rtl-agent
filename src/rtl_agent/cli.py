@@ -32,6 +32,10 @@ from rtl_agent.failure_divergence_graph import (
     build_failure_divergence_graph,
     write_divergence_graph,
 )
+from rtl_agent.failure_intelligence_run import (
+    FailureIntelligenceRunError,
+    run_failure_intelligence,
+)
 from rtl_agent.failure_report import (
     FailureReportError,
     synthesize_failure_report,
@@ -695,6 +699,74 @@ def synthesize_failure_report_command(
     _print_failure_report_summary(report, output, markdown_path)
 
 
+@app.command("run-failure-intelligence")
+def run_failure_intelligence_command(
+    failing_vcd: Annotated[Path, typer.Option("--failing-vcd", help="Failing VCD waveform.")],
+    passing_vcd: Annotated[
+        Path,
+        typer.Option("--passing-vcd", help="Passing/reference VCD waveform."),
+    ],
+    repo: Annotated[Path, typer.Option("--repo", help="RTL repository root to discover.")],
+    failure_time: Annotated[
+        int,
+        typer.Option("--failure-time", help="Failure timestamp in VCD time units."),
+    ],
+    run_root: Annotated[
+        Path,
+        typer.Option("--run-root", help="Directory holding run artifact directories."),
+    ] = Path(".rtl-agent/runs"),
+    before: Annotated[
+        int,
+        typer.Option("--before", min=0, help="Time units to include before the failure."),
+    ] = 0,
+    after: Annotated[
+        int,
+        typer.Option("--after", min=0, help="Time units to include after the failure."),
+    ] = 0,
+    config: Annotated[
+        Path | None,
+        typer.Option("--config", "-c", help="Optional rtl-agent YAML config for discovery limits."),
+    ] = None,
+    run_id: Annotated[
+        str | None,
+        typer.Option("--run-id", help="Explicit run identifier (default: generated)."),
+    ] = None,
+    verification_strength: Annotated[
+        Path | None,
+        typer.Option("--verification-strength", help="Optional verification-strength report JSON."),
+    ] = None,
+    review: Annotated[
+        Path | None,
+        typer.Option("--review", help="Optional review report JSON."),
+    ] = None,
+) -> None:
+    """Orchestrate the failure-intelligence stages into one run directory."""
+    try:
+        loaded = load_config(config) if config else None
+        discovery_config = loaded.discovery if loaded else None
+        run_store = RunStore(run_root, run_id=run_id)
+        run_store.create()
+        manifest = run_failure_intelligence(
+            run_store,
+            failing_vcd=failing_vcd,
+            passing_vcd=passing_vcd,
+            repository_root=repo,
+            failure_time=failure_time,
+            before=before,
+            after=after,
+            discovery_config=discovery_config,
+            verification_strength_path=verification_strength,
+            review_path=review,
+        )
+    except (FailureIntelligenceRunError, ValueError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_run_manifest_summary(manifest)
+    if manifest.status == "failed":
+        raise typer.Exit(1)
+
+
 @app.command("assess-verification")
 def assess_verification(
     task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
@@ -935,6 +1007,25 @@ def _print_waveform_slice_summary(report: object, output: Path) -> None:
             "selected_signals": len(report.selected_signals),
             "value_changes": len(report.value_changes),
             "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_run_manifest_summary(manifest: object) -> None:
+    from rtl_agent.failure_intelligence_run_models import FailureIntelligenceRunManifest
+
+    assert isinstance(manifest, FailureIntelligenceRunManifest)
+    _print_json(
+        {
+            "schema_version": manifest.schema_version,
+            "run_id": manifest.run_id,
+            "run_dir": str(manifest.run_dir),
+            "status": manifest.status,
+            "stages": [{"name": stage.name, "status": stage.status} for stage in manifest.stages],
+            "artifacts": len(manifest.artifacts),
+            "failure_report_path": manifest.failure_report_path,
+            "failure_report_markdown_path": manifest.failure_report_markdown_path,
+            "failure_reason": manifest.failure_reason,
         }
     )
 

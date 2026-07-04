@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Compact Failure Report Synthesis
+Failure Intelligence Run Orchestration
 
 ## Completed Work
 

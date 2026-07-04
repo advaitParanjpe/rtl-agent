@@ -1,34 +1,27 @@
-# Failure Intelligence Run Orchestration
+# Failure Intelligence Run Resume and Replay
 
 ## Objective
 
-Add one bounded, deterministic CLI command that invokes the existing failure-intelligence stages in sequence and writes all artifacts under a single run directory, without duplicating any stage's implementation. The command is a thin orchestrator over the existing services; it adds no new analysis behavior.
+Extend the failure-intelligence run orchestration so a previously-started run directory can be resumed (skipping stages whose valid artifacts already exist) or replayed from a chosen stage, reusing the existing stage services and run manifest. The behavior is deterministic and bounded and honestly reports which stages were skipped, reused, or re-run; it adds no new analysis behavior.
 
 ## Scope
 
-- Add a deterministic orchestration service and a CLI command (such as `run-failure-intelligence`) that runs the existing stages in order, reusing their service functions directly (not by shelling out and not by reimplementing them):
-  - waveform extraction of a failing slice and a passing/reference slice;
-  - passing/failing comparison;
-  - repository discovery;
-  - signal-source mapping of the compared signals;
-  - static driver tracing;
-  - failure-divergence graph composition;
-  - relevant-signal reduction;
-  - failure-report synthesis (JSON + Markdown).
-- Create a run directory (via the existing `RunStore`) and write every stage artifact under it with stable, documented relative paths; append run events where the existing run-artifact conventions apply.
-- Accept the failing and passing VCD inputs, the repository and config, and the failure window parameters; expose only bounded, existing options (no new analysis knobs).
-- Emit a small orchestration summary (the run directory, the produced artifact paths, and per-stage status) plus the existing per-stage artifacts.
-- Reuse the existing typed models and services; do not re-parse VCD, re-scan RTL, or recompute any stage.
-- Fail or warn honestly: a stage error is surfaced with its originating stage; partial runs record what completed.
-- Add compact fixtures and tests (reusing the checked-in waveform and RTL fixtures) covering a successful end-to-end run, artifact placement under the run directory, and deterministic artifact contents.
-- Add one concise runnable README example, and register any scripted check as appropriate.
+- Extend the existing orchestration service (do not fork it) to support:
+  - resume: given an existing run directory, skip each stage whose expected output artifact already exists and validates through its typed model, and run only the remaining stages in the fixed sequence;
+  - replay-from: re-run the sequence starting at an explicitly named stage, discarding and regenerating that stage and every stage after it while reusing earlier valid artifacts.
+- Reuse the existing stage services, run manifest schema, and artifact layout; do not duplicate any stage or introduce a second run format. Extend the run manifest only as needed to record per-stage disposition (executed / reused / skipped / regenerated) without breaking the existing schema version contract (bump the schema version if fields change).
+- Add CLI options to the existing `run-failure-intelligence` command (such as `--resume` and `--replay-from <stage>`) rather than adding a parallel command, unless a separate thin command reads more clearly; either way, reuse the orchestration service.
+- Validate reused artifacts before trusting them; if a reused artifact is missing or invalid, honestly fall back to re-running that stage and record why.
+- Preserve honest failure handling: a terminal error still stops the run, preserves completed artifacts, and writes the manifest.
+- Add compact fixtures and tests covering a clean resume (all reused), a partial resume (some stages re-run), replay-from a chosen stage, invalid-artifact fallback, and deterministic stage artifacts.
+- Add one concise runnable README example.
 
 ## Acceptance Criteria
 
-- The orchestrator reuses the existing stage services with no duplicated stage logic and no new analysis behavior.
-- All stage artifacts are written under a single run directory with stable relative paths and validate through the existing schemas.
-- The command is deterministic and bounded; repeated runs over identical inputs produce identical stage artifact contents (excluding inherently volatile run metadata).
-- No existing artifact schema, provider behavior, or product workflow changes beyond adding the orchestration command.
+- Resume and replay reuse the existing stage services with no duplicated stage logic and no new analysis behavior.
+- Reused stages are validated before being trusted; skipped/reused/regenerated dispositions are recorded in the run manifest.
+- Stage artifact contents remain deterministic for identical inputs (excluding volatile run metadata).
+- No existing artifact schema is broken; if the run-manifest schema changes, its schema version is bumped and existing readers/tests are updated.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
 ## Required Validation Commands
@@ -39,7 +32,7 @@ Add one bounded, deterministic CLI command that invokes the existing failure-int
 
 ## Exclusions
 
-- Do not duplicate or reimplement any stage; invoke the existing services.
+- Do not duplicate or reimplement any stage; reuse the existing services and orchestration.
 - Do not add new waveform, dependency, or semantic analysis, causal claims, or root-cause conclusions.
 - Do not add real model-provider integration, external repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
