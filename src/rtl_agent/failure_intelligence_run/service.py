@@ -5,7 +5,7 @@ import json
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from pydantic import BaseModel, ValidationError
 
@@ -22,7 +22,10 @@ from rtl_agent.failure_divergence_graph_models import (
     FailureDivergenceGraphReport,
 )
 from rtl_agent.failure_intelligence_run_models import (
+    ExternalInput,
     FailureIntelligenceRunManifest,
+    PathKind,
+    PathRef,
     RunArtifact,
     RunStage,
     RunStatus,
@@ -82,6 +85,8 @@ _STAGE_ERRORS = (
     ValueError,
 )
 
+_SUPPORTED_PRIOR_SCHEMA_VERSIONS = frozenset({2, 3})
+
 
 class FailureIntelligenceRunError(RuntimeError):
     pass
@@ -99,9 +104,31 @@ class _Output:
 @dataclass
 class _Stage:
     name: str
-    inputs: list[str]
+    inputs: list[PathRef]
     outputs: list[_Output]
     action: Callable[[], list[str]]
+
+
+def resolve_run_relative(run_dir: Path, relative_path: str) -> Path:
+    """Resolve a run-relative path against ``run_dir``, rejecting escapes.
+
+    Rejects absolute paths, ``..`` traversal, and any path that resolves
+    outside the run directory. Used so a moved/copied run directory can be
+    resolved safely without trusting recorded paths.
+    """
+
+    if not _is_safe_run_relative(relative_path):
+        raise FailureIntelligenceRunError(f"unsafe run-relative path: {relative_path}")
+    return (run_dir / relative_path).resolve()
+
+
+def _is_safe_run_relative(relative_path: str) -> bool:
+    if not relative_path or relative_path.startswith("/") or relative_path.startswith("\\"):
+        return False
+    pure = PurePosixPath(relative_path)
+    if pure.is_absolute():
+        return False
+    return not any(part == ".." for part in pure.parts)
 
 
 def run_failure_intelligence(
@@ -154,7 +181,9 @@ def run_failure_intelligence(
         warnings.append("no prior run manifest to resume; all stages will run")
     elif prior is not None and not reusable:
         warnings.append("prior run inputs differ from current inputs; all stages will regenerate")
-    prior_dispositions, prior_artifacts = _prior_index(prior)
+    prior_dispositions, prior_artifacts, unsafe_prior_paths = _prior_index(prior)
+    for unsafe in unsafe_prior_paths:
+        warnings.append(f"ignored unsafe recorded artifact path (escapes run directory): {unsafe}")
 
     recorded_stages: list[RunStage] = []
     artifacts: list[RunArtifact] = []
@@ -195,7 +224,10 @@ def run_failure_intelligence(
                         disposition=StageDisposition.REUSED,
                         reason="existing artifact validated (existence, sha256, schema, inputs)",
                         inputs=stage.inputs,
-                        outputs=[a.relative_path for a in stage_artifacts],
+                        outputs=[
+                            PathRef(kind=PathKind.RUN_RELATIVE, path=a.relative_path)
+                            for a in stage_artifacts
+                        ],
                         duration_seconds=round(time.monotonic() - start, 6),
                     )
                 )
@@ -244,7 +276,10 @@ def run_failure_intelligence(
                 disposition=disposition,
                 reason=regen_reason if disposition == StageDisposition.REGENERATED else None,
                 inputs=stage.inputs,
-                outputs=[a.relative_path for a in stage_artifacts],
+                outputs=[
+                    PathRef(kind=PathKind.RUN_RELATIVE, path=a.relative_path)
+                    for a in stage_artifacts
+                ],
                 duration_seconds=round(time.monotonic() - start, 6),
                 warnings=stage_warnings,
             )
@@ -268,6 +303,22 @@ def run_failure_intelligence(
             report_json_rel = "failure-report.json"
             report_md_rel = "failure-report.md"
 
+    external_specs = [
+        ("failing_vcd", failing_vcd),
+        ("passing_vcd", passing_vcd),
+        ("repository_root", repository_root),
+    ]
+    if verification_strength_path is not None:
+        external_specs.append(("verification_strength", verification_strength_path))
+    if review_path is not None:
+        external_specs.append(("review", review_path))
+    external_inputs: list[ExternalInput] = []
+    for name, path in external_specs:
+        exists = path.exists()
+        external_inputs.append(ExternalInput(name=name, path=str(path.resolve()), exists=exists))
+        if not exists:
+            warnings.append(f"external input is missing: {name} ({path.resolve()})")
+
     manifest = FailureIntelligenceRunManifest(
         run_id=run_store.run_id,
         run_dir=run_dir.resolve(),
@@ -278,6 +329,7 @@ def run_failure_intelligence(
         failing_vcd=failing_vcd.resolve(),
         passing_vcd=passing_vcd.resolve(),
         repository_root=repository_root.resolve(),
+        external_inputs=external_inputs,
         failure_time=failure_time,
         before=before,
         after=after,
@@ -293,6 +345,10 @@ def run_failure_intelligence(
             "Reused artifacts are validated (existence, recorded sha256, typed model, schema "
             "version, and matching run inputs) before being trusted; regeneration cascades to "
             "downstream stages and completed artifacts are preserved on failure.",
+            "Artifacts inside the run directory are recorded as run-relative paths and resolved "
+            "against the current run directory, so a moved or copied run remains inspectable and "
+            "resumable; external inputs are recorded explicitly and are never silently "
+            "reinterpreted, and recorded paths that escape the run directory are rejected.",
         ],
     )
     write_run_manifest(manifest, run_dir / "run-manifest.json")
@@ -333,8 +389,11 @@ def _build_stages(
     failure_report_json = run_dir / "failure-report.json"
     failure_report_md = run_dir / "failure-report.md"
 
-    def rel(path: Path) -> str:
-        return path.relative_to(run_dir).as_posix()
+    def internal(path: Path) -> PathRef:
+        return PathRef(kind=PathKind.RUN_RELATIVE, path=path.relative_to(run_dir).as_posix())
+
+    def external(path: Path) -> PathRef:
+        return PathRef(kind=PathKind.EXTERNAL, path=str(path.resolve()))
 
     def write[R: BaseModel](report: R, path: Path, writer: Callable[[R, Path], None]) -> list[str]:
         writer(report, path)
@@ -385,16 +444,16 @@ def _build_stages(
         write_failure_markdown(report, failure_report_md)
         return [str(item) for item in report.warnings]
 
-    synth_inputs = [rel(divergence_graph), rel(reduction_report), rel(driver_trace)]
+    synth_inputs = [internal(divergence_graph), internal(reduction_report), internal(driver_trace)]
     if verification_strength_path is not None:
-        synth_inputs.append(str(verification_strength_path))
+        synth_inputs.append(external(verification_strength_path))
     if review_path is not None:
-        synth_inputs.append(str(review_path))
+        synth_inputs.append(external(review_path))
 
     return [
         _Stage(
             "extract-failing",
-            [str(failing_vcd)],
+            [external(failing_vcd)],
             [
                 _Output(
                     "failing-slice",
@@ -408,7 +467,7 @@ def _build_stages(
         ),
         _Stage(
             "extract-passing",
-            [str(passing_vcd)],
+            [external(passing_vcd)],
             [
                 _Output(
                     "passing-slice",
@@ -422,7 +481,7 @@ def _build_stages(
         ),
         _Stage(
             "compare-waveforms",
-            [rel(failing_slice), rel(passing_slice)],
+            [internal(failing_slice), internal(passing_slice)],
             [
                 _Output(
                     "comparison",
@@ -436,7 +495,7 @@ def _build_stages(
         ),
         _Stage(
             "inspect-repo",
-            [str(repository_root)],
+            [external(repository_root)],
             [
                 _Output(
                     "repository-map",
@@ -450,7 +509,7 @@ def _build_stages(
         ),
         _Stage(
             "map-signals",
-            [rel(repository_map), rel(comparison)],
+            [internal(repository_map), internal(comparison)],
             [
                 _Output(
                     "signal-source-map",
@@ -464,7 +523,7 @@ def _build_stages(
         ),
         _Stage(
             "trace-drivers",
-            [rel(signal_map), rel(repository_map)],
+            [internal(signal_map), internal(repository_map)],
             [
                 _Output(
                     "driver-trace",
@@ -478,7 +537,7 @@ def _build_stages(
         ),
         _Stage(
             "divergence-graph",
-            [rel(comparison), rel(signal_map), rel(driver_trace)],
+            [internal(comparison), internal(signal_map), internal(driver_trace)],
             [
                 _Output(
                     "divergence-graph",
@@ -492,7 +551,7 @@ def _build_stages(
         ),
         _Stage(
             "reduce-signals",
-            [rel(failing_slice)],
+            [internal(failing_slice)],
             [
                 _Output(
                     "reduction",
@@ -585,11 +644,12 @@ def _invalidate_outputs(stage: _Stage) -> None:
 
 def _prior_index(
     prior: dict[str, object] | None,
-) -> tuple[dict[str, str], dict[str, dict[str, object]]]:
+) -> tuple[dict[str, str], dict[str, dict[str, object]], list[str]]:
     dispositions: dict[str, str] = {}
     artifacts: dict[str, dict[str, object]] = {}
+    unsafe: list[str] = []
     if prior is None:
-        return dispositions, artifacts
+        return dispositions, artifacts, unsafe
     stages = prior.get("stages")
     if isinstance(stages, list):
         for entry in stages:
@@ -598,9 +658,16 @@ def _prior_index(
     recorded = prior.get("artifacts")
     if isinstance(recorded, list):
         for entry in recorded:
-            if isinstance(entry, dict):
-                artifacts[str(entry.get("relative_path"))] = entry
-    return dispositions, artifacts
+            if not isinstance(entry, dict):
+                continue
+            relative = str(entry.get("relative_path"))
+            # Reject recorded artifact paths that escape the run directory; such
+            # entries are never trusted, so their stage will regenerate.
+            if not _is_safe_run_relative(relative):
+                unsafe.append(relative)
+                continue
+            artifacts[relative] = entry
+    return dispositions, artifacts, unsafe
 
 
 def _load_prior_manifest(run_dir: Path) -> dict[str, object] | None:
@@ -613,10 +680,9 @@ def _load_prior_manifest(run_dir: Path) -> dict[str, object] | None:
         return None
     if not isinstance(raw, dict):
         return None
-    if (
-        raw.get("schema_version")
-        != FailureIntelligenceRunManifest.model_fields["schema_version"].default
-    ):
+    # Read a small set of supported prior schema versions for reuse (no migration):
+    # the fields consulted for reuse are stable across these versions.
+    if raw.get("schema_version") not in _SUPPORTED_PRIOR_SCHEMA_VERSIONS:
         return None
     return raw
 

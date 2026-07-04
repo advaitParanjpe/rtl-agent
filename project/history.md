@@ -750,3 +750,26 @@ Known limitations:
 - The linear-pipeline cascade regenerates all stages after the first changed stage even when a later stage is not data-dependent on it; this is safe and deterministic but may recompute more than a dependency-aware scheduler would (deliberately out of scope).
 - Reuse trusts the prior manifest's recorded SHA-256 and run inputs; it does not re-derive provenance from artifact contents beyond typed-model and schema-version validation.
 - Unsupported prior-manifest schema versions are ignored (treated as no prior manifest) rather than migrated, matching the no-automatic-migration exclusion.
+
+## 2026-07-03 - Failure Intelligence Run Portability and Relative Provenance
+
+Made the failure-intelligence run directory portable, reusing the existing orchestration and run manifest. Stage inputs and outputs are now recorded as typed `PathRef`s carrying a `kind` of `run_relative` (a POSIX path under the run directory) or `external` (an absolute path outside it), and the manifest records the external run inputs explicitly (`external_inputs`: failing VCD, passing VCD, repository root, and any verification/review reports) with their absolute paths and existence at write time. Run-relative artifact references are resolved against the current run directory, so a moved or copied run directory remains inspectable and can be resumed or replayed from its new location while hashes and typed-model validation are still enforced. A new `resolve_run_relative` helper rejects absolute paths, `..` traversal, and any path escaping the run directory; recorded artifact paths that escape the run directory are ignored (their stage regenerates) with a warning. Missing external inputs are recorded and warned about and are never silently reinterpreted — a stage that needs a missing external input fails honestly. The run-manifest schema was bumped to version 3; prior manifests at versions 2 and 3 are both accepted for reuse (no migration framework), since the fields consulted for reuse are stable across them.
+
+Validation evidence:
+
+- Live runs: copy a completed run to a new location and `--resume` (all reused); `--replay-from divergence-graph` after relocation (earlier reused, from-stage regenerated); corrupt an artifact after moving then `--resume` (sha256-mismatch regeneration with downstream cascade); tamper a recorded path to `../escape.json` (ignored-unsafe warning, stage regenerated, nothing written outside the run dir); missing external VCD (external `exists=false`, warning, `extract-failing` failed honestly, run status failed).
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 228 pytest tests, agent portability check, all five example checks, and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Relocation resume already worked because artifact validation keys on run-relative `relative_path` + recorded SHA-256; this milestone made provenance explicit (path kinds, external-input records) and added an explicit safe-resolution boundary rather than changing the reuse mechanism.
+- The top-level `failing_vcd`/`passing_vcd`/`repository_root` Path fields were kept (alongside the new `external_inputs`) so the input-match gate and v2 manifest reuse keep working without a migration layer.
+- Path-traversal defense is centralized in `resolve_run_relative`/`_is_safe_run_relative`; recorded artifact paths are filtered through the safe check during prior-manifest indexing, so an unsafe path can never be resolved to the filesystem and simply forces regeneration.
+
+Known limitations:
+
+- The manifest's `run_dir` field still records the write-time absolute location (informational); resume re-derives the actual run directory from the run store, and a future inspection command should resolve artifacts against the manifest's real location rather than the recorded `run_dir`.
+- External-input consistency across relocation is matched on the recorded absolute external paths; if an external input is itself moved, it must be re-supplied (by design, since external inputs live outside the run).
+- Only manifest schema versions 2 and 3 are accepted for reuse; older or newer versions are treated as no prior manifest, not migrated.
