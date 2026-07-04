@@ -655,3 +655,25 @@ Known limitations:
 
 - Detection is content-based on stable top-level keys; deeply restructured future report schemas would need the key-sets updated.
 - The waveform-comparison classifier keys on `time_basis`/`diverging_signals`/`shared_signal_count`; a comparison-report schema that renamed those would fall back to `other_json`.
+
+## 2026-07-03 - Compact Failure Intelligence Example Check
+
+Added a compact, deterministic local integration check over the real failure-intelligence services and CLI. `scripts/failure_intelligence_example_check.py` builds a run directory in a temporary workspace and chains the actual CLI end-to-end: waveform extraction (a failing slice from `examples/waveforms/failure.vcd` and a passing reference from a new `examples/waveforms/passing.vcd`), relevant-signal reduction, passing/failing comparison, repository discovery on `examples/simple-rtl`, signal-source mapping of the compared signals, static driver tracing, failure-divergence graph composition, and evidence-bundle export. It validates every emitted artifact through the existing typed models and reuses the shared `scripts/_example_check.py` helper; it is registered in `scripts/check.py`.
+
+Validation evidence:
+
+- `python3 scripts/failure_intelligence_example_check.py` - passed.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 192 pytest tests, agent portability check, compact end-to-end/failure/tool-failure/no-change/failure-intelligence example checks, and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The check drives the real CLI commands over checked-in fixtures (no parallel implementation path) and asserts stable semantic properties — schema versions, the diverging-signal set `{top.dut.state, top.dut.valid}`, the identical signals, the global earliest divergence tick (25), `exact` source mappings to `rtl/top.sv`, `top.clk`'s port-connection driver evidence, the graph roots `[state, valid]` with composed divergence/mapping attributes, and the evidence-bundle artifact kinds — rather than timestamps, UUIDs, durations, absolute paths, or exact hashes.
+- A compact `examples/waveforms/passing.vcd` fixture (identical declarations and clk/data timelines to the failing fixture, but with `valid` held high and `state` held at `0011`) was added so the comparison deterministically diverges on `valid` and `state` with `x`/`z` differences.
+- The check writes each pipeline artifact under a `RunStore` run directory so the final `export-evidence` exercises the stage-27 failure-intelligence artifact classification as part of the same flow.
+
+Known limitations:
+
+- The example RTL (`examples/simple-rtl`) does not assign the waveform-only signals, so driver tracing honestly reports `no_drivers` for the diverging signals and the divergence graph has no dependency edges; the check validates composition and honest unresolved reporting, not a richly connected graph.
+- It is a compact deterministic smoke of the pipeline, not an exhaustive matrix over every command option.

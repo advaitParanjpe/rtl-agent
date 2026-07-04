@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Failure Intelligence Evidence Bundle Integration
+Compact Failure Intelligence Example Check
 
 ## Completed Work
 
