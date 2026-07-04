@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Failure Intelligence Run Resume and Replay
+Failure Intelligence Run Portability and Relative Provenance
 
 ## Completed Work
 

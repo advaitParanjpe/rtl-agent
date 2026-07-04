@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,7 @@ from test_failure_report import make_review, make_verification
 from rtl_agent.artifacts import RunStore
 from rtl_agent.failure_intelligence_run import (
     FailureIntelligenceRunError,
+    resolve_run_relative,
     run_failure_intelligence,
 )
 from rtl_agent.failure_intelligence_run_models import FailureIntelligenceRunManifest
@@ -37,18 +39,20 @@ def run(
     run_id: str,
     *,
     passing: Path = PASSING_VCD,
+    failing: Path = FAILING_VCD,
     failure_time: int = 40,
+    run_root: Path | None = None,
     verification_strength_path: Path | None = None,
     review_path: Path | None = None,
     resume: bool = False,
     replay_from: str | None = None,
 ) -> FailureIntelligenceRunManifest:
-    store = RunStore(tmp_path / "runs", run_id=run_id)
+    store = RunStore(run_root or (tmp_path / "runs"), run_id=run_id)
     if not ((resume or replay_from is not None) and store.run_dir.exists()):
         store.create()
     return run_failure_intelligence(
         store,
-        failing_vcd=FAILING_VCD,
+        failing_vcd=failing,
         passing_vcd=passing,
         repository_root=SIMPLE_RTL,
         failure_time=failure_time,
@@ -70,7 +74,7 @@ def test_successful_run_completes_all_stages(tmp_path: Path) -> None:
     assert manifest.failure_reason is None
     assert manifest.failure_report_path == "failure-report.json"
     assert manifest.failure_report_markdown_path == "failure-report.md"
-    assert manifest.schema_version == 2
+    assert manifest.schema_version == 3
 
 
 def test_all_artifacts_placed_under_run_dir(tmp_path: Path) -> None:
@@ -151,7 +155,10 @@ def test_optional_inputs_flow_into_report(tmp_path: Path) -> None:
     assert report.review_status is not None
     assert report.review_status.outcome == "unacceptable"
     synth_stage = next(s for s in manifest.stages if s.name == "synthesize-failure-report")
-    assert any("vs.json" in item for item in synth_stage.inputs)
+    # The verification-strength input is recorded as an external path reference.
+    vs_ref = next(ref for ref in synth_stage.inputs if "vs.json" in ref.path)
+    assert vs_ref.kind == "external"
+    assert any(ext.name == "verification_strength" for ext in manifest.external_inputs)
 
 
 def test_artifact_kinds_and_hashes_recorded(tmp_path: Path) -> None:
@@ -239,3 +246,109 @@ def test_unknown_replay_stage_errors(tmp_path: Path) -> None:
 
     with pytest.raises(FailureIntelligenceRunError, match="unknown replay stage"):
         run(tmp_path, "r1", replay_from="not-a-stage")
+
+
+def _relocate(tmp_path: Path, run_id: str) -> Path:
+    src = tmp_path / "runs" / run_id
+    moved_root = tmp_path / "moved"
+    shutil.copytree(src, moved_root / run_id)
+    return moved_root
+
+
+def test_moved_run_directory_resumes_all_reused(tmp_path: Path) -> None:
+    run(tmp_path, "r1")
+    moved_root = _relocate(tmp_path, "r1")
+
+    manifest = run(tmp_path, "r1", run_root=moved_root, resume=True)
+
+    assert manifest.status == "completed"
+    assert all(stage.disposition == "reused" for stage in manifest.stages)
+
+
+def test_replay_after_relocation(tmp_path: Path) -> None:
+    run(tmp_path, "r1")
+    moved_root = _relocate(tmp_path, "r1")
+
+    manifest = run(tmp_path, "r1", run_root=moved_root, replay_from="divergence-graph")
+
+    by_name = {stage.name: stage.disposition for stage in manifest.stages}
+    assert by_name["map-signals"] == "reused"
+    assert by_name["divergence-graph"] == "regenerated"
+    assert by_name["synthesize-failure-report"] == "regenerated"
+
+
+def test_corrupted_artifact_after_relocation_regenerates(tmp_path: Path) -> None:
+    run(tmp_path, "r1")
+    moved_root = _relocate(tmp_path, "r1")
+    (moved_root / "r1" / "signal-source-map.json").write_text("corrupt", encoding="utf-8")
+
+    manifest = run(tmp_path, "r1", run_root=moved_root, resume=True)
+
+    by_name = {stage.name: stage.disposition for stage in manifest.stages}
+    assert by_name["compare-waveforms"] == "reused"
+    assert by_name["map-signals"] == "regenerated"
+    assert by_name["synthesize-failure-report"] == "regenerated"
+
+
+def test_external_inputs_recorded_and_marked(tmp_path: Path) -> None:
+    manifest = run(tmp_path, "r1")
+
+    names = {external.name for external in manifest.external_inputs}
+    assert {"failing_vcd", "passing_vcd", "repository_root"} <= names
+    assert all(external.exists for external in manifest.external_inputs)
+    extract = next(s for s in manifest.stages if s.name == "extract-failing")
+    assert extract.inputs[0].kind == "external"
+    compare = next(s for s in manifest.stages if s.name == "compare-waveforms")
+    assert all(ref.kind == "run_relative" for ref in compare.inputs)
+
+
+def test_missing_external_input_fails_honestly(tmp_path: Path) -> None:
+    manifest = run(tmp_path, "r1", failing=tmp_path / "missing.vcd")
+
+    assert manifest.status == "failed"
+    assert manifest.failure_reason is not None
+    assert "extract-failing" in manifest.failure_reason
+    failing_input = next(e for e in manifest.external_inputs if e.name == "failing_vcd")
+    assert failing_input.exists is False
+    assert any("external input is missing" in warning for warning in manifest.warnings)
+
+
+def test_unsafe_recorded_path_is_rejected(tmp_path: Path) -> None:
+    run(tmp_path, "r1")
+    manifest_path = tmp_path / "runs" / "r1" / "run-manifest.json"
+    raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for artifact in raw["artifacts"]:
+        if artifact["relative_path"] == "waveform/comparison.json":
+            artifact["relative_path"] = "../escape.json"
+    manifest_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    manifest = run(tmp_path, "r1", resume=True)
+
+    assert any("unsafe recorded artifact path" in warning for warning in manifest.warnings)
+    by_name = {stage.name: stage.disposition for stage in manifest.stages}
+    assert by_name["compare-waveforms"] == "regenerated"
+    # No artifact escaped the run directory.
+    assert not (tmp_path / "runs" / "escape.json").exists()
+
+
+def test_supported_prior_schema_version_two_still_reusable(tmp_path: Path) -> None:
+    run(tmp_path, "r1")
+    manifest_path = tmp_path / "runs" / "r1" / "run-manifest.json"
+    raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    raw["schema_version"] = 2  # a prior supported version; reuse fields are stable
+    manifest_path.write_text(json.dumps(raw), encoding="utf-8")
+
+    manifest = run(tmp_path, "r1", resume=True)
+
+    assert all(stage.disposition == "reused" for stage in manifest.stages)
+
+
+def test_resolve_run_relative_rejects_traversal(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    assert resolve_run_relative(run_dir, "waveform/slice.json") == (
+        run_dir / "waveform" / "slice.json"
+    )
+    for unsafe in ("../escape.json", "/etc/passwd", "a/../../b.json"):
+        with pytest.raises(FailureIntelligenceRunError, match="unsafe run-relative path"):
+            resolve_run_relative(run_dir, unsafe)

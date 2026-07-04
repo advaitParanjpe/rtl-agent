@@ -1,25 +1,28 @@
-# Failure Intelligence Run Portability and Relative Provenance
+# Failure Intelligence Run Inspection and Validation
 
 ## Objective
 
-Make a failure-intelligence run directory portable: record run-relative (not absolute) provenance so a completed run can be inspected, resumed, or replayed after the run directory is moved or copied. Reuse the existing orchestration and stage services; add no new analysis behavior.
+Add a read-only command that inspects an existing failure-intelligence run directory and validates it against its run manifest without re-running any stage. Reuse the existing manifest and validation helpers; add no new analysis behavior.
 
 ## Scope
 
-- Record run-relative artifact provenance in the run manifest: store artifact locations, and the run inputs where they live under the run directory, as paths relative to the run directory rather than absolute paths, so the manifest does not depend on the run directory's absolute location.
-- Resolve run-relative provenance against the current run directory when reading the manifest for resume/replay, so validation works after the directory is relocated.
-- Keep resume/replay artifact validation working across relocation: existence, recorded SHA-256, typed-model validation, supported schema version, and run-input matching must all still hold when the run directory has moved (compare on run-relative terms for run-internal inputs; keep external inputs such as the source VCDs and repository absolute since they live outside the run).
-- Where the underlying stage artifacts embed absolute run-internal paths that defeat portability, record enough run-relative provenance in the manifest to resume/replay without depending on those absolute values; do not change the stage artifact schemas.
-- Bump the run-manifest schema version if fields change, and update existing readers and tests accordingly; do not add automatic migration of unsupported schemas.
-- Add compact tests covering: a run directory that is moved/copied and then resumed (all reused), replayed from a stage after relocation, and validation that still regenerates on tampered artifacts after relocation.
-- Add one concise runnable README note on portability.
+- Add a deterministic, read-only inspection service and a CLI command (such as `inspect-run`) that reads a run directory's `run-manifest.json` and validates the run against it.
+- Resolve run-relative artifact references against the actual run directory (using the existing safe run-relative resolution that rejects traversal/escaping paths), independent of the manifest's recorded absolute `run_dir`.
+- For each recorded artifact, validate: existence, recorded SHA-256 (recompute and compare), typed-model validation for known kinds, and supported schema version. Report per-artifact validity with a clear reason on failure.
+- Report per-stage validity derived from its outputs, the overall run status from the manifest, and findings for missing artifacts, unsafe recorded paths, and missing or non-existent external inputs.
+- Emit a typed, versioned inspection report (or reuse existing typed structures where practical) summarizing valid / invalid / missing artifacts and stages, and exit non-zero when the run is invalid.
+- Reuse the existing run-manifest models, the safe-path resolver, and the artifact typed models; do not re-run stages, re-parse VCD, or recompute any stage output.
+- Fail or warn honestly: an unreadable or unsupported-version manifest, missing artifacts, hash mismatches, unsafe paths, and missing external inputs are all reported explicitly.
+- Add compact tests covering a valid run, a run with a tampered/corrupted artifact, a moved run directory, an unsafe recorded path, a missing external input, and an unsupported manifest version.
+- Add one concise runnable README example.
 
 ## Acceptance Criteria
 
-- A completed run directory can be copied to a new location and resumed or replayed with correct dispositions (reused where valid) using only run-relative provenance.
-- Resume/replay validation (existence, SHA-256, model, schema version, inputs) continues to hold after relocation and still regenerates on tampered or stale artifacts.
-- The run remains deterministic and bounded; reuse the existing orchestration with no duplicated stage logic and no new analysis behavior.
-- No existing artifact schema is broken; if the run-manifest schema changes, its version is bumped and readers/tests are updated.
+- Inspection is read-only and deterministic: it never re-runs a stage, re-parses VCD, or mutates the run directory.
+- Every recorded artifact is validated (existence, SHA-256, typed model, schema version) and reported with a clear per-artifact result.
+- Run-relative references resolve against the actual run directory, so a moved/copied run inspects correctly; unsafe recorded paths and missing external inputs are reported, not silently resolved.
+- The command exits non-zero when the run is invalid.
+- No existing artifact schema, provider behavior, or product workflow changes beyond adding the inspection command; if a new report schema is added it is typed and versioned.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
 ## Required Validation Commands
@@ -30,9 +33,9 @@ Make a failure-intelligence run directory portable: record run-relative (not abs
 
 ## Exclusions
 
-- Do not duplicate or reimplement any stage; reuse the existing services and orchestration.
+- Do not re-run, re-parse, recompute, or mutate any stage or artifact; inspection is read-only.
 - Do not add new waveform, dependency, or semantic analysis, causal claims, or root-cause conclusions.
-- Do not add automatic migration of unsupported manifest schemas, distributed execution, remote caching, model providers, databases, CI, or UI.
+- Do not add automatic migration of unsupported manifest schemas, remote artifact storage, cloud synchronization, databases, distributed execution, model providers, CI, or UI.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 
 ## Completion State
