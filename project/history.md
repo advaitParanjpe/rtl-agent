@@ -726,3 +726,27 @@ Known limitations:
 - The manifest records wall-clock stage durations, so it is not byte-identical across runs; determinism is asserted on the stage artifacts, not the manifest.
 - Comparison, mapping, graph, and report artifacts embed absolute run-directory input paths, so those specific files are not byte-identical across differently-named run directories even though their semantic content is stable.
 - The orchestrator exposes only the bounded window options (`--failure-time`/`--before`/`--after`) plus the optional passthrough inputs; per-stage tuning knobs use the existing service defaults.
+
+## 2026-07-03 - Failure Intelligence Run Resume and Replay
+
+Extended the existing run orchestration (no second execution path) with deterministic, manifest-driven resume and replay. The `run-failure-intelligence` command gained `--resume` (reuse valid existing stage artifacts and run only the remaining or invalid stages) and `--replay-from <stage>` (regenerate from an explicitly named stage onward). Before reusing any artifact the run verifies its existence, its recorded SHA-256, its typed model and supported schema version, and that the prior run's inputs (VCDs, repository root, failure window) match the current inputs; a missing, stale, incompatible, or unprovenanced artifact is regenerated rather than trusted, and regenerating any stage invalidates and regenerates the downstream stages. The run manifest schema was bumped to version 2: each stage now records a `disposition` (executed / reused / regenerated / skipped / failed) and each artifact records its SHA-256; skipped stages after a failure are recorded explicitly, and a run event explains every reuse or invalidation decision.
+
+Validation evidence:
+
+- Live runs: fresh (all executed) → `--resume` (all reused) → `--replay-from trace-drivers` (earlier reused, trace-drivers onward regenerated) → corrupt an intermediate artifact then `--resume` (regenerated from the first invalid stage with downstream cascade) → `--replay-from bogus` (clear error, exit 2).
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 220 pytest tests, agent portability check, all five example checks, and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The orchestrator was refactored into a declarative list of stages (name, inputs, typed outputs, action) so resume/replay iterate the same fixed sequence used by a fresh run; there is one execution path, not two.
+- Reuse validation is layered exactly as required: existence → recorded SHA-256 → typed-model validation → supported schema version → run-input match; the run-level input match enforces upstream-input consistency, and any failed check triggers regeneration.
+- Downstream invalidation is conservative in the linear pipeline: once any stage regenerates, every subsequent stage regenerates (and its stale output is deleted before re-running), which is deterministic and avoids introducing a dependency scheduler.
+- Terminal errors still stop the run, preserve completed artifacts, record the failing stage, and mark the remaining stages `skipped`; the manifest is always written.
+
+Known limitations:
+
+- The linear-pipeline cascade regenerates all stages after the first changed stage even when a later stage is not data-dependent on it; this is safe and deterministic but may recompute more than a dependency-aware scheduler would (deliberately out of scope).
+- Reuse trusts the prior manifest's recorded SHA-256 and run inputs; it does not re-derive provenance from artifact contents beyond typed-model and schema-version validation.
+- Unsupported prior-manifest schema versions are ignored (treated as no prior manifest) rather than migrated, matching the no-automatic-migration exclusion.

@@ -1,27 +1,25 @@
-# Failure Intelligence Run Resume and Replay
+# Failure Intelligence Run Portability and Relative Provenance
 
 ## Objective
 
-Extend the failure-intelligence run orchestration so a previously-started run directory can be resumed (skipping stages whose valid artifacts already exist) or replayed from a chosen stage, reusing the existing stage services and run manifest. The behavior is deterministic and bounded and honestly reports which stages were skipped, reused, or re-run; it adds no new analysis behavior.
+Make a failure-intelligence run directory portable: record run-relative (not absolute) provenance so a completed run can be inspected, resumed, or replayed after the run directory is moved or copied. Reuse the existing orchestration and stage services; add no new analysis behavior.
 
 ## Scope
 
-- Extend the existing orchestration service (do not fork it) to support:
-  - resume: given an existing run directory, skip each stage whose expected output artifact already exists and validates through its typed model, and run only the remaining stages in the fixed sequence;
-  - replay-from: re-run the sequence starting at an explicitly named stage, discarding and regenerating that stage and every stage after it while reusing earlier valid artifacts.
-- Reuse the existing stage services, run manifest schema, and artifact layout; do not duplicate any stage or introduce a second run format. Extend the run manifest only as needed to record per-stage disposition (executed / reused / skipped / regenerated) without breaking the existing schema version contract (bump the schema version if fields change).
-- Add CLI options to the existing `run-failure-intelligence` command (such as `--resume` and `--replay-from <stage>`) rather than adding a parallel command, unless a separate thin command reads more clearly; either way, reuse the orchestration service.
-- Validate reused artifacts before trusting them; if a reused artifact is missing or invalid, honestly fall back to re-running that stage and record why.
-- Preserve honest failure handling: a terminal error still stops the run, preserves completed artifacts, and writes the manifest.
-- Add compact fixtures and tests covering a clean resume (all reused), a partial resume (some stages re-run), replay-from a chosen stage, invalid-artifact fallback, and deterministic stage artifacts.
-- Add one concise runnable README example.
+- Record run-relative artifact provenance in the run manifest: store artifact locations, and the run inputs where they live under the run directory, as paths relative to the run directory rather than absolute paths, so the manifest does not depend on the run directory's absolute location.
+- Resolve run-relative provenance against the current run directory when reading the manifest for resume/replay, so validation works after the directory is relocated.
+- Keep resume/replay artifact validation working across relocation: existence, recorded SHA-256, typed-model validation, supported schema version, and run-input matching must all still hold when the run directory has moved (compare on run-relative terms for run-internal inputs; keep external inputs such as the source VCDs and repository absolute since they live outside the run).
+- Where the underlying stage artifacts embed absolute run-internal paths that defeat portability, record enough run-relative provenance in the manifest to resume/replay without depending on those absolute values; do not change the stage artifact schemas.
+- Bump the run-manifest schema version if fields change, and update existing readers and tests accordingly; do not add automatic migration of unsupported schemas.
+- Add compact tests covering: a run directory that is moved/copied and then resumed (all reused), replayed from a stage after relocation, and validation that still regenerates on tampered artifacts after relocation.
+- Add one concise runnable README note on portability.
 
 ## Acceptance Criteria
 
-- Resume and replay reuse the existing stage services with no duplicated stage logic and no new analysis behavior.
-- Reused stages are validated before being trusted; skipped/reused/regenerated dispositions are recorded in the run manifest.
-- Stage artifact contents remain deterministic for identical inputs (excluding volatile run metadata).
-- No existing artifact schema is broken; if the run-manifest schema changes, its schema version is bumped and existing readers/tests are updated.
+- A completed run directory can be copied to a new location and resumed or replayed with correct dispositions (reused where valid) using only run-relative provenance.
+- Resume/replay validation (existence, SHA-256, model, schema version, inputs) continues to hold after relocation and still regenerates on tampered or stale artifacts.
+- The run remains deterministic and bounded; reuse the existing orchestration with no duplicated stage logic and no new analysis behavior.
+- No existing artifact schema is broken; if the run-manifest schema changes, its version is bumped and readers/tests are updated.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
 ## Required Validation Commands
@@ -34,7 +32,7 @@ Extend the failure-intelligence run orchestration so a previously-started run di
 
 - Do not duplicate or reimplement any stage; reuse the existing services and orchestration.
 - Do not add new waveform, dependency, or semantic analysis, causal claims, or root-cause conclusions.
-- Do not add real model-provider integration, external repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
+- Do not add automatic migration of unsupported manifest schemas, distributed execution, remote caching, model providers, databases, CI, or UI.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 
 ## Completion State

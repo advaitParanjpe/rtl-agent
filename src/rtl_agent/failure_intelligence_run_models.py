@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-FAILURE_INTELLIGENCE_RUN_SCHEMA_VERSION = 1
+FAILURE_INTELLIGENCE_RUN_SCHEMA_VERSION = 2
 
 
 class RunStatus(StrEnum):
@@ -14,15 +14,18 @@ class RunStatus(StrEnum):
     FAILED = "failed"
 
 
-class StageStatus(StrEnum):
-    COMPLETED = "completed"
-    FAILED = "failed"
+class StageDisposition(StrEnum):
+    EXECUTED = "executed"
+    REUSED = "reused"
+    REGENERATED = "regenerated"
     SKIPPED = "skipped"
+    FAILED = "failed"
 
 
 class RunStage(BaseModel):
     name: str
-    status: StageStatus
+    disposition: StageDisposition
+    reason: str | None = None
     inputs: list[str] = Field(default_factory=list)
     outputs: list[str] = Field(default_factory=list)
     duration_seconds: float = Field(ge=0)
@@ -35,6 +38,7 @@ class RunArtifact(BaseModel):
     kind: str
     relative_path: str
     schema_version: int | None = None
+    sha256: str | None = None
 
 
 class FailureIntelligenceRunManifest(BaseModel):
@@ -45,6 +49,8 @@ class FailureIntelligenceRunManifest(BaseModel):
     run_dir: Path
     created_at: datetime
     status: RunStatus
+    resumed: bool = False
+    replay_from: str | None = None
     failing_vcd: Path
     passing_vcd: Path
     repository_root: Path
