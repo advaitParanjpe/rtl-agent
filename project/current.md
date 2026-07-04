@@ -1,28 +1,28 @@
-# Failure Intelligence Run Inspection and Validation
+# Portable Failure Package Export
 
 ## Objective
 
-Add a read-only command that inspects an existing failure-intelligence run directory and validates it against its run manifest without re-running any stage. Reuse the existing manifest and validation helpers; add no new analysis behavior.
+Add a read-only command that packages an existing failure-intelligence run directory into a single portable, self-contained failure package that can be transported, verified, and inspected elsewhere. Reuse the existing run manifest, inspection validation, hashing, and safe path resolution; deterministic, bounded, and local. Add no new analysis behavior.
 
 ## Scope
 
-- Add a deterministic, read-only inspection service and a CLI command (such as `inspect-run`) that reads a run directory's `run-manifest.json` and validates the run against it.
-- Resolve run-relative artifact references against the actual run directory (using the existing safe run-relative resolution that rejects traversal/escaping paths), independent of the manifest's recorded absolute `run_dir`.
-- For each recorded artifact, validate: existence, recorded SHA-256 (recompute and compare), typed-model validation for known kinds, and supported schema version. Report per-artifact validity with a clear reason on failure.
-- Report per-stage validity derived from its outputs, the overall run status from the manifest, and findings for missing artifacts, unsafe recorded paths, and missing or non-existent external inputs.
-- Emit a typed, versioned inspection report (or reuse existing typed structures where practical) summarizing valid / invalid / missing artifacts and stages, and exit non-zero when the run is invalid.
-- Reuse the existing run-manifest models, the safe-path resolver, and the artifact typed models; do not re-run stages, re-parse VCD, or recompute any stage output.
-- Fail or warn honestly: an unreadable or unsupported-version manifest, missing artifacts, hash mismatches, unsafe paths, and missing external inputs are all reported explicitly.
-- Add compact tests covering a valid run, a run with a tampered/corrupted artifact, a moved run directory, an unsafe recorded path, a missing external input, and an unsupported manifest version.
+- Add a deterministic export service and a CLI command (such as `export-failure-package`) that reads a run directory and writes a single portable package to a caller-specified output location.
+- The package must be self-contained and carry: the run manifest, the failure report (JSON and Markdown), and the run-relative run artifacts referenced by the manifest, laid out under a stable package structure.
+- Emit a typed, versioned package manifest that indexes every packaged file with its run-relative path, kind, and SHA-256 (reusing the existing hashing), so the package can be verified after transport.
+- Before packaging, validate the run using the existing inspection service; refuse to export (or clearly mark) an invalid run per an explicit, documented rule, and never package unsafe or escaping paths.
+- Resolve run-relative artifacts against the actual run directory using the existing safe resolver; never follow paths that escape the run directory.
+- Produce a deterministic package: identical run inputs produce identical package contents except for inherently volatile metadata (timestamps); use stable ordering and sorted serialization.
+- The command is read-only with respect to the source run directory: it must not modify, regenerate, delete, resume, or replay anything in the run.
+- Add compact tests covering a valid-run package, package-manifest hashes, refusal/handling of an invalid run, an unsafe recorded path, and deterministic package contents.
 - Add one concise runnable README example.
 
 ## Acceptance Criteria
 
-- Inspection is read-only and deterministic: it never re-runs a stage, re-parses VCD, or mutates the run directory.
-- Every recorded artifact is validated (existence, SHA-256, typed model, schema version) and reported with a clear per-artifact result.
-- Run-relative references resolve against the actual run directory, so a moved/copied run inspects correctly; unsafe recorded paths and missing external inputs are reported, not silently resolved.
-- The command exits non-zero when the run is invalid.
-- No existing artifact schema, provider behavior, or product workflow changes beyond adding the inspection command; if a new report schema is added it is typed and versioned.
+- The exported package is self-contained (run manifest + failure report JSON/Markdown + referenced artifacts) and indexed by a typed, versioned package manifest with per-file SHA-256.
+- Export reuses the existing inspection validation, hashing, and safe path resolution; it never packages unsafe/escaping paths and never mutates the source run.
+- Invalid runs are handled per an explicit, documented rule (refused or clearly marked), not silently exported as valid.
+- Package contents are deterministic for identical inputs aside from volatile timestamps.
+- No existing artifact schema, provider behavior, or product workflow changes beyond adding the export command; any new report is typed and versioned.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
 ## Required Validation Commands
@@ -33,9 +33,9 @@ Add a read-only command that inspects an existing failure-intelligence run direc
 
 ## Exclusions
 
-- Do not re-run, re-parse, recompute, or mutate any stage or artifact; inspection is read-only.
-- Do not add new waveform, dependency, or semantic analysis, causal claims, or root-cause conclusions.
-- Do not add automatic migration of unsupported manifest schemas, remote artifact storage, cloud synchronization, databases, distributed execution, model providers, CI, or UI.
+- Do not add remote artifact storage, cloud synchronization, databases, distributed execution, model providers, CI, UI, or new analysis behavior.
+- Do not mutate, regenerate, resume, or replay the source run during export.
+- Do not add automatic migration of unsupported manifest schemas.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 
 ## Completion State

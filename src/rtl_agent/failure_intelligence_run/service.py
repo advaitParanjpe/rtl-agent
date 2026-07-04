@@ -706,7 +706,9 @@ def _inputs_match(
     )
 
 
-def _schema_version(path: Path) -> int | None:
+def schema_version_of(path: Path) -> int | None:
+    """Return the top-level ``schema_version`` of a JSON artifact, or None."""
+
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
@@ -718,9 +720,16 @@ def _schema_version(path: Path) -> int | None:
     return None
 
 
-def _sha256(path: Path) -> str:
+def sha256_file(path: Path) -> str:
+    """Return the SHA-256 hex digest of a file's bytes."""
+
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+# Backward-compatible private aliases used elsewhere in this module.
+_schema_version = schema_version_of
+_sha256 = sha256_file

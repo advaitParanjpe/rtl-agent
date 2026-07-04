@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Failure Intelligence Run Portability and Relative Provenance
+Failure Intelligence Run Inspection and Validation
 
 ## Completed Work
 

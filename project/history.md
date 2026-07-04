@@ -773,3 +773,27 @@ Known limitations:
 - The manifest's `run_dir` field still records the write-time absolute location (informational); resume re-derives the actual run directory from the run store, and a future inspection command should resolve artifacts against the manifest's real location rather than the recorded `run_dir`.
 - External-input consistency across relocation is matched on the recorded absolute external paths; if an external input is itself moved, it must be re-supplied (by design, since external inputs live outside the run).
 - Only manifest schema versions 2 and 3 are accepted for reuse; older or newer versions are treated as no prior manifest, not migrated.
+
+## 2026-07-03 - Failure Intelligence Run Inspection and Validation
+
+Added a read-only `inspect-run` command that validates an existing run directory against its manifest without re-running any stage, reusing the existing manifest, typed artifact models, hashing (`sha256_file`), schema-version detection (`schema_version_of`), external-input records, and safe run-relative path resolution (`resolve_run_relative`, promoted from the run service). A new typed, versioned inspection report (`src/rtl_agent/run_inspection_models.py`) and service (`src/rtl_agent/run_inspection/service.py`) classify each recorded artifact as `valid`, `missing`, `hash_mismatch`, `schema_malformed`, `schema_unsupported`, or `unsafe_path`; each stage as `valid`, `incomplete`, `stale`, or `invalid`; re-check whether recorded external inputs still exist; and compute overall run validity. Run-relative artifacts are resolved against the actual inspected directory (rejecting `..`/absolute/escaping paths), so a moved or copied run inspects correctly. The CLI prints a concise summary, optionally writes the full JSON report with `--output`, exits non-zero on an invalid run (still writing the report), and exits 2 on an unreadable/absent manifest.
+
+Validation evidence:
+
+- Live: valid run (all valid, exit 0); corrupted artifact (hash_mismatch → stage invalid, downstream stale, exit 1); moved run (still valid); tampered `../escape.json` recorded path (unsafe_path, warning, exit 1, no file written outside the run); unsupported manifest version 99 (invalid + warning); missing manifest (exit 2).
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 244 pytest tests, agent portability check, all five example checks, and packaging smoke verification (which now also verifies `inspect-run --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Inspection is strictly read-only: it never resolves an unsafe recorded path to the filesystem, never writes into the run directory, and a dedicated test snapshots the run directory's file bytes before and after to prove it is unchanged.
+- The service reads the manifest defensively as raw JSON and accepts manifest schema versions 2 and 3 (the fields consulted are stable); an unsupported version yields an explicit invalid report rather than an error, while an absent or unparseable manifest raises `RunInspectionError` (CLI exit 2).
+- Overall run validity requires a completed manifest status with all stages valid and no missing/invalid artifacts; missing external inputs are reported separately (they live outside the run) and do not, by themselves, flip artifact validity.
+- Staleness is derived deterministically in manifest stage order: once any stage is invalid or incomplete, later stages whose own outputs are valid are marked `stale`, mirroring the orchestrator's linear cascade.
+
+Known limitations:
+
+- Inspection trusts the manifest's recorded artifact list; artifacts present on disk but not recorded in the manifest are not inspected.
+- Overall validity is computed for a completed run; a legitimately failed run is reported invalid (it did not produce a complete artifact set), which is correct but means "invalid" spans both corruption and honest terminal failure.
+- Only artifact kinds known to the inspection registry get typed-model validation; unknown kinds are validated by existence and hash only.

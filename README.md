@@ -381,6 +381,14 @@ Re-run an existing run directory with `--resume` (reuse valid stage artifacts, r
 
 The run directory is portable: artifacts inside it are recorded with run-relative paths (and each stage input is marked `run_relative` or `external`), so a run directory can be moved or copied and then inspected, resumed, or replayed from its new location — validation resolves run-relative paths against the current directory and still enforces hashes and typed-model checks. External inputs (the source VCDs, the repository, and any verification/review reports) are recorded explicitly with their absolute paths and existence; they must be supplied again and are never silently reinterpreted, and a recorded path that escapes the run directory is rejected rather than resolved.
 
+`inspect-run` validates an existing run directory against its manifest, read-only, without re-running anything:
+
+```bash
+rtl-agent inspect-run --run-dir .rtl-agent/runs/my-run --output .rtl-agent/inspection.json
+```
+
+For each recorded artifact it resolves the run-relative path against the actual directory (rejecting traversal) and reports one of `valid`, `missing`, `hash_mismatch`, `schema_malformed`, `schema_unsupported`, or `unsafe_path`; each stage is reported as `valid`, `incomplete`, `stale` (own outputs valid but an upstream stage is invalid), or `invalid`. It also re-checks whether the recorded external inputs still exist. The command prints a concise summary and, with `--output`, writes a typed, versioned JSON inspection report; it exits non-zero when the run is invalid (still writing the report), and never modifies, regenerates, deletes, migrates, resumes, or replays anything.
+
 ## Verification Strength Assessment
 
 `assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:
