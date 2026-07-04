@@ -821,3 +821,26 @@ Known limitations:
 - Only a directory package is supported in this milestone (no archive, signing, or encryption, by exclusion).
 - A failed run that produced no artifacts still exports (under `--allow-failed`) as a minimal package of just the run manifest and inspection report, marked `failed`.
 - Verification recomputes hashes of the just-written package files against the validated source hashes; it does not independently re-validate typed models a second time (that already happened during inspection).
+
+## 2026-07-04 - AXI Router Seeded-Failure Validation
+
+Validated the existing failure-intelligence pipeline end-to-end against a compact but realistic AXI-stream-router failure, with no new product behavior. Added a checked-in fixture (`examples/axi-stream-router/` with `rtl/axi_stream_router.sv`, a passing VCD, a seeded failing VCD, and `examples/axi-stream-router-agent.yaml`) whose RTL drives real internal signals with continuous and procedural assignments, so static driver tracing has genuine evidence to cite. The seeded bug is payload instability under backpressure: the locked `payload_out` goes to `x` at t=40 in the failing VCD while the passing reference holds it stable, and the state register diverges strictly later at t=50. A new scripted check (`scripts/axi_router_seeded_failure_check.py`, registered in `scripts/check.py`) drives the real orchestrator (`run-failure-intelligence`) plus `inspect-run` and `export-failure-package` over the fixtures in a temporary workspace and asserts, against the typed schemas, that the pipeline: identifies `payload_out` as the earliest divergence at t=40; ranks the protocol/state signals; maps `payload_out` exactly to the `axi_stream_router` module in `rtl/axi_stream_router.sv`; extracts the real `assign payload_out = payload_reg;` continuous-assignment driver and a connected `payload_out → payload_reg → payload_in` dependency chain with cited file/line edges; produces a connected divergence graph rooted at the divergent signal; surfaces the source location and textual driver evidence in the synthesized JSON and Markdown failure report; exports and validates a portable failure package; and preserves ambiguity (module inputs and localparams left unresolved) while making no causal or root-cause claim.
+
+Validation evidence:
+
+- The new check reads only stable, schema-backed values (divergent-signal set and times, mapped module/file, driver statement text and cited lines, graph roots/edges, report fields, inspection validity, package verification) — never timestamps, hashes, durations, UUIDs, or absolute paths.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 258 pytest tests, agent portability check, all six example checks (including the new AXI router check), and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The check drives the existing orchestrator and CLI only; no product service was changed, no expected answer was hard-coded into a service, and no parallel analysis path was introduced. The fixture RTL is what makes driver tracing produce real evidence — unlike the earlier `simple-rtl` fixture whose signals were undriven (`no_drivers`).
+- The seeded divergence was designed so signals are identical at the window start (t=25) and diverge later, giving a deterministic earliest-divergence signal (`payload_out` at t=40) distinct from the later state divergence (t=50); this was confirmed by running the real pipeline and reading its actual outputs before codifying assertions.
+- Clock and reset live under a `tb` scope with no matching module declaration, so they remain unmapped and identical — realistic testbench context that the pipeline correctly leaves out of the RTL localization.
+
+Known limitations:
+
+- The fixture is a single-file compact RTL fragment; it exercises intra-file driver tracing and dependency expansion but not cross-file or multi-module hierarchy resolution.
+- The check asserts the seeded signal is localized with cited evidence; it deliberately does not assert an exhaustive edge/node count, so the fixture can grow without churn as long as the seeded localization holds.
+- The waveforms are hand-authored VCDs, not simulator output, consistent with the no-simulator exclusion.
