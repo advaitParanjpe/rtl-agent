@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Compact Failure Intelligence Example Check
+Compact Failure Report Synthesis
 
 ## Completed Work
 

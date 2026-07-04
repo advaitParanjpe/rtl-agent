@@ -32,6 +32,12 @@ from rtl_agent.failure_divergence_graph import (
     build_failure_divergence_graph,
     write_divergence_graph,
 )
+from rtl_agent.failure_report import (
+    FailureReportError,
+    synthesize_failure_report,
+    write_failure_markdown,
+    write_failure_report,
+)
 from rtl_agent.implementation import (
     ImplementationError,
     run_bounded_implementation,
@@ -639,6 +645,56 @@ def divergence_graph_command(
     _print_divergence_graph_summary(report, output)
 
 
+@app.command("synthesize-failure-report")
+def synthesize_failure_report_command(
+    divergence_graph: Annotated[
+        Path,
+        typer.Option("--divergence-graph", help="Failure-divergence-graph report JSON."),
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Path for the failure-report JSON.")],
+    markdown_output: Annotated[
+        Path | None,
+        typer.Option(
+            "--markdown-output",
+            help="Path for the Markdown summary (default: output with a .md suffix).",
+        ),
+    ] = None,
+    reduction: Annotated[
+        Path | None,
+        typer.Option("--reduction", help="Optional relevant-signal reduction report JSON."),
+    ] = None,
+    driver_trace: Annotated[
+        Path | None,
+        typer.Option("--driver-trace", help="Optional driver-trace report JSON."),
+    ] = None,
+    verification_strength: Annotated[
+        Path | None,
+        typer.Option("--verification-strength", help="Optional verification-strength report JSON."),
+    ] = None,
+    review: Annotated[
+        Path | None,
+        typer.Option("--review", help="Optional review report JSON."),
+    ] = None,
+) -> None:
+    """Synthesize a compact, evidence-cited failure report (JSON + Markdown)."""
+    try:
+        report = synthesize_failure_report(
+            divergence_graph,
+            reduction_path=reduction,
+            driver_trace_path=driver_trace,
+            verification_strength_path=verification_strength,
+            review_path=review,
+        )
+        write_failure_report(report, output)
+        markdown_path = markdown_output or output.with_suffix(".md")
+        write_failure_markdown(report, markdown_path)
+    except FailureReportError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_failure_report_summary(report, output, markdown_path)
+
+
 @app.command("assess-verification")
 def assess_verification(
     task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
@@ -878,6 +934,28 @@ def _print_waveform_slice_summary(report: object, output: Path) -> None:
             "observed_end": report.window.observed_end,
             "selected_signals": len(report.selected_signals),
             "value_changes": len(report.value_changes),
+            "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_failure_report_summary(report: object, output: Path, markdown_output: Path) -> None:
+    from rtl_agent.failure_report_models import FailureReport
+
+    assert isinstance(report, FailureReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "markdown_output": str(markdown_output),
+            "observed_failure_facts": len(report.observed_failure_facts),
+            "earliest_divergence_time": report.earliest_divergence_time,
+            "ranked_relevant_signals": len(report.ranked_relevant_signals),
+            "candidate_source_locations": len(report.candidate_source_locations),
+            "driver_dependency_evidence": len(report.driver_dependency_evidence),
+            "unresolved_evidence": len(report.unresolved_evidence),
+            "ambiguous_evidence": len(report.ambiguous_evidence),
+            "generated_from": len(report.generated_from),
             "warnings": len(report.warnings),
         }
     )

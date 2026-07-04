@@ -677,3 +677,27 @@ Known limitations:
 
 - The example RTL (`examples/simple-rtl`) does not assign the waveform-only signals, so driver tracing honestly reports `no_drivers` for the diverging signals and the divergence graph has no dependency edges; the check validates composition and honest unresolved reporting, not a richly connected graph.
 - It is a compact deterministic smoke of the pipeline, not an exhaustive matrix over every command option.
+
+## 2026-07-03 - Compact Failure Report Synthesis
+
+Added a deterministic, purely compositional failure-report synthesis capability. New typed, versioned report schema (`src/rtl_agent/failure_report_models.py`), a synthesis service (`src/rtl_agent/failure_report/service.py`), and a `synthesize-failure-report` CLI command consume an existing failure-divergence-graph report (required) plus optional relevant-signal reduction, driver-trace, verification-strength, and review reports, and emit both a typed JSON report and a concise engineer-facing Markdown summary. The report cleanly separates observed failure facts, earliest waveform divergence, ranked relevant signals, candidate RTL source locations, textual driver/dependency evidence, unresolved and ambiguous evidence, verification/review status, and artifact provenance (paths, schema versions, SHA-256 hashes). Every statement cites its originating artifact via a `source` field, and the report never labels a signal or RTL statement as a root cause.
+
+Validation evidence:
+
+- Live run composing real pipeline artifacts (extract → compare → inspect → map → trace → divergence-graph → reduce → synthesize): observed facts for `top.dut.state`/`top.dut.valid` at t=25 with x/z differences, ranked signals from reduction, `exact` source locations at `rtl/top.sv:1`, unresolved `state`/`valid`, and provenance for all five upstream artifacts; both JSON and Markdown emitted.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 204 pytest tests, agent portability check, all five example checks, and packaging smoke verification (which now also verifies `synthesize-failure-report --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The failure-divergence-graph report is the spine (it already composes comparison + signal-source map + driver trace), so the synthesis reads facts from it and cites them, rather than recomputing divergences, mappings, or drivers.
+- Optional inputs enrich specific sections only: reduction → ranked relevant signals; driver-trace → statement text/guard enrichment of the graph's dependency edges; verification-strength → verification status; review → review status. Absent inputs leave their sections empty/none, reported honestly.
+- Provenance lists every loaded input plus the graph's cited upstream paths (comparison, signal-source map, driver trace), deduped by resolved path, each with schema version and SHA-256 following the evidence-bundle convention.
+- Both a typed JSON report and a Markdown summary are emitted; the Markdown carries an explicit "never identifies a root cause" disclaimer and every line cites its source artifact.
+
+Known limitations:
+
+- Ambiguity is surfaced from the graph node `mapping_status == "ambiguous"`; the full ambiguous candidate list lives in the signal-source-map report and is referenced by provenance rather than re-expanded here.
+- Driver/dependency evidence is drawn from the graph's dependency edges (optionally enriched with driver-trace statement text); when the graph has no edges, the section is honestly empty.
+- The report composes only supplied artifacts; it performs no new waveform, dependency, or semantic analysis and makes no causal claims.

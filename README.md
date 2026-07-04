@@ -345,6 +345,22 @@ rtl-agent divergence-graph \
 
 Root nodes are the comparison's diverging signals (mapped to their leaf identifiers), carrying their first divergence time, values, and divergence score. Each node also composes its mapping status and declaration location (from the signal-source map) and its driver-resolution status (from the driver trace). Edges are the driver-trace dependency edges, each retaining its `textual` / `inferred_textual` label and citing the source file and line. The graph is bounded from the roots by `--max-depth` and `--max-nodes` (truncation recorded), multiple drivers and unresolved identifiers are preserved, and cross-artifact mismatches are warned about. It is purely compositional — it performs no new RTL scanning, elaboration, or semantic dataflow, and makes no causal or root-cause claims.
 
+## Failure Report Synthesis
+
+`synthesize-failure-report` composes the failure-intelligence artifacts into a single evidence-cited failure report, emitting both a typed JSON report and a concise engineer-facing Markdown summary:
+
+```bash
+rtl-agent synthesize-failure-report \
+  --divergence-graph .rtl-agent/divergence-graph.json \
+  --reduction .rtl-agent/relevant-signals.json \
+  --driver-trace .rtl-agent/driver-trace.json \
+  --verification-strength .rtl-agent/verification-strength.json \
+  --review .rtl-agent/review-report.json \
+  --output .rtl-agent/failure-report.json
+```
+
+Only `--divergence-graph` is required; the reduction, driver-trace, verification-strength, and review inputs are optional. The report separates observed failure facts, earliest waveform divergence, ranked relevant signals, candidate RTL source locations, textual driver/dependency evidence, unresolved and ambiguous evidence, verification/review status, and artifact provenance (paths, schema versions, and SHA-256 hashes). Every statement cites its originating artifact, and the report never labels a signal or RTL statement as a root cause. The Markdown summary is written next to the JSON output (`--markdown-output` overrides its path). It is purely compositional over the existing artifacts — no new waveform, dependency, or semantic analysis.
+
 ## Verification Strength Assessment
 
 `assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:
