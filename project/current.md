@@ -1,28 +1,24 @@
-# Portable Failure Package Export
+# AXI Router Seeded-Failure Validation
 
 ## Objective
 
-Add a read-only command that packages an existing failure-intelligence run directory into a single portable, self-contained failure package that can be transported, verified, and inspected elsewhere. Reuse the existing run manifest, inspection validation, hashing, and safe path resolution; deterministic, bounded, and local. Add no new analysis behavior.
+Validate the end-to-end failure-intelligence pipeline on a compact, checked-in AXI-router-style RTL example with a seeded, deterministic failure, proving the pipeline localizes the seeded divergence to real RTL driver evidence. Reuse the existing services and example-check helper; add no new analysis behavior, no simulator, and no model providers.
 
 ## Scope
 
-- Add a deterministic export service and a CLI command (such as `export-failure-package`) that reads a run directory and writes a single portable package to a caller-specified output location.
-- The package must be self-contained and carry: the run manifest, the failure report (JSON and Markdown), and the run-relative run artifacts referenced by the manifest, laid out under a stable package structure.
-- Emit a typed, versioned package manifest that indexes every packaged file with its run-relative path, kind, and SHA-256 (reusing the existing hashing), so the package can be verified after transport.
-- Before packaging, validate the run using the existing inspection service; refuse to export (or clearly mark) an invalid run per an explicit, documented rule, and never package unsafe or escaping paths.
-- Resolve run-relative artifacts against the actual run directory using the existing safe resolver; never follow paths that escape the run directory.
-- Produce a deterministic package: identical run inputs produce identical package contents except for inherently volatile metadata (timestamps); use stable ordering and sorted serialization.
-- The command is read-only with respect to the source run directory: it must not modify, regenerate, delete, resume, or replay anything in the run.
-- Add compact tests covering a valid-run package, package-manifest hashes, refusal/handling of an invalid run, an unsafe recorded path, and deterministic package contents.
-- Add one concise runnable README example.
+- Add a compact checked-in AXI-router-style RTL example under `examples/` (a small SystemVerilog design and an rtl-agent config) whose top module actually declares and drives the waveform signals (continuous and/or procedural assignments), so repository discovery, signal-source mapping, and driver tracing produce real declarations and driver edges.
+- Add a seeded failing-vs-passing VCD pair over that design's hierarchical signals, differing deterministically on one seeded output signal (for example an unexpected `x`/wrong value), with the other signals identical, so the comparison yields a clear diverging signal.
+- Add `scripts/axi_router_seeded_failure_check.py` that drives the existing pipeline over the checked-in fixtures (reusing the shared `scripts/_example_check.py` helper and the existing CLI/services — `extract-waveform-window`, `compare-waveforms`, `inspect-repo`, `map-signals`, `trace-drivers`, `divergence-graph`, `reduce-signals`, and the failure report), in a temporary workspace.
+- Assert the pipeline localizes the seeded failure: the seeded signal is among the diverging signals with the expected first divergence, it maps to the AXI-router module source (file/line), driver tracing finds the driver statement(s) for the seeded signal, the divergence graph roots at it with real dependency edges, and the synthesized failure report surfaces it — all via stable, schema-backed assertions (not timestamps, hashes, durations, UUIDs, or absolute paths).
+- Register the new check in `scripts/check.py`; keep generated outputs in temporary or ignored directories.
+- Add one concise README mention of the AXI-router validation example.
 
 ## Acceptance Criteria
 
-- The exported package is self-contained (run manifest + failure report JSON/Markdown + referenced artifacts) and indexed by a typed, versioned package manifest with per-file SHA-256.
-- Export reuses the existing inspection validation, hashing, and safe path resolution; it never packages unsafe/escaping paths and never mutates the source run.
-- Invalid runs are handled per an explicit, documented rule (refused or clearly marked), not silently exported as valid.
-- Package contents are deterministic for identical inputs aside from volatile timestamps.
-- No existing artifact schema, provider behavior, or product workflow changes beyond adding the export command; any new report is typed and versioned.
+- The check is local, deterministic, compact, and independently runnable, and reuses the shared helper and existing services (no new product behavior, no simulator, no providers).
+- The seeded design drives the waveform signals so driver tracing and the divergence graph produce real driver evidence for the seeded signal.
+- Assertions are stable and schema-backed (diverging-signal set, mapped source location, driver statement presence, failure-report content), not volatile values.
+- No existing artifact schema, CLI behavior, provider behavior, or product workflow changes.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
 ## Required Validation Commands
@@ -33,9 +29,9 @@ Add a read-only command that packages an existing failure-intelligence run direc
 
 ## Exclusions
 
-- Do not add remote artifact storage, cloud synchronization, databases, distributed execution, model providers, CI, UI, or new analysis behavior.
-- Do not mutate, regenerate, resume, or replay the source run during export.
-- Do not add automatic migration of unsupported manifest schemas.
+- Do not add a simulator, waveform generation from RTL, real model-provider integration, external repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
+- Do not add new analysis behavior, causal claims, or root-cause conclusions beyond what the existing services already produce.
+- Do not add large generated artifacts under tracked paths; keep the RTL and VCD fixtures compact.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 
 ## Completion State

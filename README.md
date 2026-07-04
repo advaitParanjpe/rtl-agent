@@ -389,6 +389,14 @@ rtl-agent inspect-run --run-dir .rtl-agent/runs/my-run --output .rtl-agent/inspe
 
 For each recorded artifact it resolves the run-relative path against the actual directory (rejecting traversal) and reports one of `valid`, `missing`, `hash_mismatch`, `schema_malformed`, `schema_unsupported`, or `unsafe_path`; each stage is reported as `valid`, `incomplete`, `stale` (own outputs valid but an upstream stage is invalid), or `invalid`. It also re-checks whether the recorded external inputs still exist. The command prints a concise summary and, with `--output`, writes a typed, versioned JSON inspection report; it exits non-zero when the run is invalid (still writing the report), and never modifies, regenerates, deletes, migrates, resumes, or replays anything.
 
+`export-failure-package` packages a validated run directory into a single self-contained, portable failure package (read-only):
+
+```bash
+rtl-agent export-failure-package --run-dir .rtl-agent/runs/my-run --output .rtl-agent/packages/my-run
+```
+
+Export is inspection-gated: it runs the same validation and refuses an invalid run by default. A failed-but-internally-consistent run (a run that ended in an honest terminal failure but whose recorded artifacts are all valid) can be exported only with `--allow-failed`, and the package is clearly marked `failed`. The package contains the run manifest, the freshly written inspection report, the JSON and Markdown failure report, and every validated, manifest-referenced evidence artifact at its run-relative path under `run/`; external inputs, run event logs, caches, and unrelated files are never included, and unsafe or missing artifacts are never packaged. It emits a typed, versioned `package-manifest.json` recording each file's package-relative path, source role, size, SHA-256, schema version (where applicable), and original run-relative provenance, and verifies every packaged file's hash before reporting success. All package paths are relative and traversal-safe, and the source run directory is never modified.
+
 ## Verification Strength Assessment
 
 `assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:

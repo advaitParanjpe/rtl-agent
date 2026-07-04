@@ -797,3 +797,27 @@ Known limitations:
 - Inspection trusts the manifest's recorded artifact list; artifacts present on disk but not recorded in the manifest are not inspected.
 - Overall validity is computed for a completed run; a legitimately failed run is reported invalid (it did not produce a complete artifact set), which is correct but means "invalid" spans both corruption and honest terminal failure.
 - Only artifact kinds known to the inspection registry get typed-model validation; unknown kinds are validated by existence and hash only.
+
+## 2026-07-04 - Portable Failure Package Export
+
+Added a read-only, inspection-gated `export-failure-package` command that packages a validated run directory into a single self-contained portable directory package, reusing the existing run inspection, hashing (`sha256_file`), safe run-relative path resolution, and manifest models. A new typed, versioned package manifest schema (`src/rtl_agent/failure_package_models.py`) and export service (`src/rtl_agent/failure_package/service.py`) run `inspect_run`, refuse an invalid run by default, and (only with `--allow-failed`) export a failed-but-internally-consistent run clearly marked `failed`. The package contains the run manifest, the freshly written inspection report, the JSON and Markdown failure report, and every validated, manifest-referenced evidence artifact at its run-relative path under `run/`; external inputs, run-store event logs (`events.jsonl`, `run.json`), caches, and unrelated files are never included, and unsafe or missing artifacts are never packaged. The package manifest records each file's package-relative path, source role, size, SHA-256, schema version where applicable, and original run-relative provenance; the completed package is verified (each packaged file's hash recomputed and compared) before success is reported.
+
+Validation evidence:
+
+- Live: valid run → 13-file package (`package-manifest.json`, `inspection-report.json`, `run/run-manifest.json`, all 10 artifacts including the failure report JSON/Markdown), `package_status=valid`, `verified=true`; corrupted artifact → refused (exit 2, no package); a run with `status` set to failed → refused without the flag, exported as `failed` with `--allow-failed`; tampered `../escape.json` path → refused; non-empty or inside-run output → refused.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 258 pytest tests, agent portability check, all five example checks, and packaging smoke verification (which now also verifies `export-failure-package --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Export is strictly inspection-gated and read-only: it packages only artifacts that `inspect_run` marked `valid`, resolves each via the shared safe resolver (rejecting traversal), and never writes into or mutates the source run.
+- The gate distinguishes an invalid run (missing/invalid/unsafe artifacts → always refused) from a failed-but-internally-consistent run (`manifest_status == "failed"` with all recorded artifacts valid → exported only with `--allow-failed`, marked `failed`).
+- Only manifest-referenced artifacts plus the run manifest and generated inspection report are packaged, so run-store bookkeeping, external inputs, caches, and unrelated files are excluded by construction.
+- The package is deterministic (sorted file ordering, sorted JSON, no timestamps in the package manifest), so exporting the same run twice yields byte-identical `package-manifest.json` and artifact bytes.
+
+Known limitations:
+
+- Only a directory package is supported in this milestone (no archive, signing, or encryption, by exclusion).
+- A failed run that produced no artifacts still exports (under `--allow-failed`) as a minimal package of just the run manifest and inspection report, marked `failed`.
+- Verification recomputes hashes of the just-written package files against the validated source hashes; it does not independently re-validate typed models a second time (that already happened during inspection).
