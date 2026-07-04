@@ -361,6 +361,22 @@ rtl-agent synthesize-failure-report \
 
 Only `--divergence-graph` is required; the reduction, driver-trace, verification-strength, and review inputs are optional. The report separates observed failure facts, earliest waveform divergence, ranked relevant signals, candidate RTL source locations, textual driver/dependency evidence, unresolved and ambiguous evidence, verification/review status, and artifact provenance (paths, schema versions, and SHA-256 hashes). Every statement cites its originating artifact, and the report never labels a signal or RTL statement as a root cause. The Markdown summary is written next to the JSON output (`--markdown-output` overrides its path). It is purely compositional over the existing artifacts — no new waveform, dependency, or semantic analysis.
 
+## Failure Intelligence Run Orchestration
+
+`run-failure-intelligence` invokes the failure-intelligence stages in one fixed sequence and writes every artifact under a single run directory:
+
+```bash
+rtl-agent run-failure-intelligence \
+  --failing-vcd examples/waveforms/failure.vcd \
+  --passing-vcd examples/waveforms/passing.vcd \
+  --repo examples/simple-rtl \
+  --config examples/simple-rtl-agent.yaml \
+  --failure-time 40 --before 15 --after 15 \
+  --run-root .rtl-agent/runs --run-id my-run
+```
+
+The command runs waveform extraction (failing and passing), comparison, repository discovery, signal-source mapping, driver tracing, divergence-graph composition, relevant-signal reduction, and failure-report synthesis, reusing each stage's existing service (it never reimplements a stage). It creates a `RunStore` run directory, persists every intermediate artifact under it, and emits one typed, versioned `run-manifest.json` recording each stage's status, inputs, outputs, duration, warnings, and failure reason, plus a linked list of all generated artifacts. When every stage succeeds it produces the final JSON and Markdown failure report; on a terminal stage error it stops honestly, preserves the completed intermediate artifacts, records the failing stage, still writes the manifest, and exits non-zero. Optional `--verification-strength` and `--review` inputs flow through to report synthesis. Runs are deterministic for identical inputs apart from the run id and timestamps.
+
 ## Verification Strength Assessment
 
 `assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:

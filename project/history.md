@@ -701,3 +701,28 @@ Known limitations:
 - Ambiguity is surfaced from the graph node `mapping_status == "ambiguous"`; the full ambiguous candidate list lives in the signal-source-map report and is referenced by provenance rather than re-expanded here.
 - Driver/dependency evidence is drawn from the graph's dependency edges (optionally enriched with driver-trace statement text); when the graph has no edges, the section is honestly empty.
 - The report composes only supplied artifacts; it performs no new waveform, dependency, or semantic analysis and makes no causal claims.
+
+## 2026-07-03 - Failure Intelligence Run Orchestration
+
+Added one bounded, deterministic orchestrator that invokes the existing failure-intelligence stages in a fixed sequence and writes all artifacts under a single `RunStore` run directory, without duplicating any stage. New typed, versioned run-manifest schema (`src/rtl_agent/failure_intelligence_run_models.py`), an orchestration service (`src/rtl_agent/failure_intelligence_run/service.py`), and a `run-failure-intelligence` CLI command run: failing/passing waveform extraction → comparison → repository discovery → signal-source mapping → driver tracing → divergence-graph composition → relevant-signal reduction → failure-report synthesis (JSON + Markdown). Each stage reuses its existing service function directly (no subprocesses, no reimplementation). The manifest records per-stage status, inputs, outputs, duration, warnings, and failure reason, and links every generated artifact; run events are appended per stage.
+
+Validation evidence:
+
+- Live success run over the checked-in fixtures: 9 stages completed, 11 artifacts under the run directory, final JSON + Markdown report produced, manifest written.
+- Live failure run (malformed passing VCD): `extract-passing` failed, the run stopped, the completed `extract-failing` slice was preserved, the manifest recorded the failing stage, and the CLI exited 1.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 213 pytest tests, agent portability check, all five example checks, and packaging smoke verification (which now also verifies `run-failure-intelligence --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The orchestrator is a thin sequencer: a generic `one(...)` helper writes each stage's report with its concrete writer, and dedicated actions handle the two-artifact reduce and synthesize stages; a `run_stage` wrapper times each stage, records status/warnings, appends a run event, and raises an internal `_StageFailed` to stop the sequence honestly.
+- Terminal errors stop the run but always write the manifest; completed intermediate artifacts remain on disk, so a failed run is still inspectable.
+- Optional stages exist only where the underlying inputs are genuinely optional: `--verification-strength` and `--review` flow through to report synthesis; the pipeline-produced inputs (reduction, driver-trace) are always present.
+- Determinism: stage artifact contents depend only on their inputs; the manifest's run id, timestamp, and per-stage durations are the only volatile fields. Tests assert byte-identical `failing-slice.json` and `reduced-slice.json` across two runs.
+
+Known limitations:
+
+- The manifest records wall-clock stage durations, so it is not byte-identical across runs; determinism is asserted on the stage artifacts, not the manifest.
+- Comparison, mapping, graph, and report artifacts embed absolute run-directory input paths, so those specific files are not byte-identical across differently-named run directories even though their semantic content is stable.
+- The orchestrator exposes only the bounded window options (`--failure-time`/`--before`/`--after`) plus the optional passthrough inputs; per-stage tuning knobs use the existing service defaults.
