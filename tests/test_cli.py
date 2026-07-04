@@ -64,6 +64,7 @@ def test_readme_documented_commands_have_help() -> None:
         "assess-verification",
         "compare-waveforms",
         "discover",
+        "divergence-graph",
         "export-evidence",
         "extract-waveform-window",
         "implement-task",

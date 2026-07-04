@@ -329,6 +329,22 @@ rtl-agent trace-drivers \
 
 For each mapped signal it scans the declaring RTL file(s) for statements that reference the signal's leaf name — continuous assignments (`assign`), procedural assignments (`<=`/`=`), and port connections — recording the file, line, statement kind, bounded text, LHS/RHS identifiers, the enclosing declaration, and the nearest conditional guard where practical. It then performs a bounded upstream dependency expansion (configurable `--max-depth` and `--max-nodes`) over the referenced right-hand-side identifiers, emitting edges labeled `textual` (identifier appears in a matched assignment) or `inferred_textual` (name-based port connection). Multiple drivers are all preserved and never collapsed; unresolved identifiers (inputs, constants, undriven nets) are reported explicitly. The scan is purely textual — it performs no elaboration, preprocessing, generate expansion, simulation, semantic connectivity, or causal reasoning.
 
+## Failure Divergence Graph
+
+`divergence-graph` composes the prior comparison, signal-source-map, and driver-trace artifacts into a single bounded graph rooted at the diverging signals:
+
+```bash
+rtl-agent divergence-graph \
+  --comparison .rtl-agent/waveform-comparison.json \
+  --signal-source-map .rtl-agent/signal-source-map.json \
+  --driver-trace .rtl-agent/driver-trace.json \
+  --max-depth 3 \
+  --max-nodes 128 \
+  --output .rtl-agent/divergence-graph.json
+```
+
+Root nodes are the comparison's diverging signals (mapped to their leaf identifiers), carrying their first divergence time, values, and divergence score. Each node also composes its mapping status and declaration location (from the signal-source map) and its driver-resolution status (from the driver trace). Edges are the driver-trace dependency edges, each retaining its `textual` / `inferred_textual` label and citing the source file and line. The graph is bounded from the roots by `--max-depth` and `--max-nodes` (truncation recorded), multiple drivers and unresolved identifiers are preserved, and cross-artifact mismatches are warned about. It is purely compositional — it performs no new RTL scanning, elaboration, or semantic dataflow, and makes no causal or root-cause claims.
+
 ## Verification Strength Assessment
 
 `assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:

@@ -1,29 +1,22 @@
-# Failure Divergence Graph
+# Failure Intelligence Evidence Bundle Integration
 
 ## Objective
 
-Deterministically compose existing waveform-comparison divergences and static driver/dependency evidence into a single typed, versioned graph artifact rooted at the diverging signals. The graph is a compositional view over prior artifacts; it makes no causal or root-cause claims and performs no new analysis.
+Extend the existing deterministic evidence-bundle exporter so the remaining failure-intelligence artifacts produced under a run directory are recognized, classified, hashed, and recorded with their schema versions and provenance, exactly like the other typed reports. Do not redesign export or change any existing artifact schema.
 
 ## Scope
 
-- Add a typed, versioned failure-divergence-graph report schema.
-- Add a deterministic service that consumes an existing waveform-comparison report, a signal-source-map report, and a driver-trace report, and builds a bounded directed graph:
-  - root nodes are the diverging signals from the comparison (with their first divergence time, values, and divergence score attached);
-  - nodes carry attributes composed from prior artifacts only: divergence info (if any), mapping status/declaration location (if any), and driver-resolution status (resolved / unresolved);
-  - edges are the driver-trace dependency edges (`textual` / `inferred_textual`), each citing its prior-artifact evidence (file, line, statement kind).
-- Bound the graph by a configurable maximum depth from the roots and a maximum node count; record truncation explicitly.
-- Add a CLI command such as `divergence-graph`.
-- Reuse the existing comparison, signal-source-map, and driver-trace models; do not re-scan RTL, re-parse VCD, or recompute divergences or drivers.
-- Emit bounded, stably ordered output with deterministic serialization.
-- Fail or warn honestly: no diverging signals, missing cross-references between artifacts, and unresolved identifiers are reported explicitly; ambiguity is preserved.
-- Add compact fixtures and tests covering root selection from divergences, edge composition from driver evidence, unresolved/leaf nodes, depth/node bounding, empty input, and deterministic output.
-- Add one concise runnable README example.
+- Add evidence artifact kinds for the relevant-signal reduction report, waveform comparison report, signal-source-map report, driver-trace report, and failure-divergence-graph report to `src/rtl_agent/evidence_bundle_models.py` (`EvidenceArtifactKind`).
+- Teach `src/rtl_agent/evidence_bundle.py` to classify these artifacts by distinctive top-level JSON keys, reusing the existing hashing, schema-version detection, run-relative provenance, and omitted-content handling rather than adding a parallel path (matching the existing review/triage/verification-strength/waveform-slice/assertion-link detection style).
+- Preserve deterministic ordering, run-relative provenance references, and existing warning/failure semantics.
+- Add compact tests covering classification of each new artifact within a run directory, plus deterministic bundle output.
+- Update the README evidence-bundle section with one concise mention of the newly recognized artifact kinds.
 
 ## Acceptance Criteria
 
-- The graph is deterministic, bounded, and composed strictly from prior-artifact evidence; every edge cites its source artifact location.
-- Divergence roots, node attributes, and edges are derived from the input reports without new RTL scanning or semantic inference.
-- Nodes and edges are stably ordered and serialization is stable across repeated runs.
+- Relevant-signal reduction, waveform comparison, signal-source-map, driver-trace, and failure-divergence-graph artifacts under a run directory are indexed with correct kinds, SHA-256 hashes, sizes, and schema versions.
+- Unknown JSON and non-JSON artifacts are still hashed and referenced as before.
+- Evidence-bundle output remains deterministic for identical inputs.
 - No existing artifact schema, CLI behavior, provider behavior, or product workflow changes.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
@@ -35,10 +28,9 @@ Deterministically compose existing waveform-comparison divergences and static dr
 
 ## Exclusions
 
-- Do not make causal or root-cause claims, rank nodes as causes, or infer semantic dataflow.
-- Do not re-scan RTL, re-parse VCD, elaborate, preprocess, or recompute comparison/driver evidence; compose only.
-- Do not add source rewriting, patch generation, FST/FSDB support, model-based analysis, or stimulus minimization.
+- Do not redesign the evidence-bundle exporter or its manifest/report schema shape.
 - Do not add real model-provider integration, external repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
+- Do not add semantic waveform interpretation, dependency tracing, model-based analysis, source localization, stimulus minimization, patch generation, or causal claims.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 
 ## Completion State
