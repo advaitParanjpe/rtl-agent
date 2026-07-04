@@ -634,3 +634,24 @@ Known limitations:
 - Root bridging relies on the signal-source map's leaf; hierarchical signals sharing a leaf are collapsed to one graph root (with a warning), since the driver-trace edge space is leaf-identifier keyed.
 - The graph reflects only edges the driver-trace already extracted; it neither deepens nor re-scans beyond that evidence, and inherits the driver-trace's textual approximations.
 - Node divergence attributes are attached only to identifiers that are diverging-signal leaves; upstream nodes carry mapping/driver attributes but no divergence unless they are themselves diverging leaves.
+
+## 2026-07-03 - Failure Intelligence Evidence Bundle Integration
+
+Extended the deterministic evidence-bundle exporter so the remaining failure-intelligence artifacts under a run directory are recognized alongside the other typed reports. Added five `EvidenceArtifactKind` values (`relevant_signal_reduction_report`, `waveform_comparison_report`, `signal_source_map_report`, `rtl_driver_trace_report`, `failure_divergence_graph_report`) and five content-based classifiers in `_json_artifact_kind`, reusing the existing hashing, schema-version detection, run-relative provenance, and omitted-content rules with no changes to export flow, manifest/report schema shape, or any other artifact schema.
+
+Validation evidence:
+
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 192 pytest tests, agent portability check, compact end-to-end/failure/tool-failure/no-change example checks, and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Classification uses distinctive top-level JSON key-sets (reduction: `retained_signals`/`reduced_slice_path`/`total_candidate_signals`; comparison: `diverging_signals`/`time_basis`/`shared_signal_count`; signal-source map: `mappings`/`exact_count`/`ambiguous_count`; driver trace: `traced_signals`/`dependency_nodes`/`dependency_edges`; divergence graph: `root_identifiers`/`nodes`/`edges`), matching the existing review/triage/verification-strength/waveform-slice/assertion-link detection style rather than inventing fixed run-relative paths these user-specified outputs do not have.
+- The five key-sets are mutually disjoint and disjoint from the existing detectors (e.g. driver-trace `dependency_nodes`/`dependency_edges` vs divergence-graph `nodes`/`edges`), so ordering is irrelevant and there is no cross-classification.
+- Tests construct the five reports from their real model classes and dump them under a run directory, so a future field rename surfaces as a classification-test failure.
+
+Known limitations:
+
+- Detection is content-based on stable top-level keys; deeply restructured future report schemas would need the key-sets updated.
+- The waveform-comparison classifier keys on `time_basis`/`diverging_signals`/`shared_signal_count`; a comparison-report schema that renamed those would fall back to `other_json`.

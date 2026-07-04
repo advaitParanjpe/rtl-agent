@@ -402,7 +402,7 @@ The export writes:
 └── bundle.json
 ```
 
-The bundle preserves artifact provenance, relative paths, SHA-256 hashes, byte sizes, and JSON schema versions where present. It recognizes the typed reports found under a run directory — including waveform-slice and assertion-to-waveform linkage artifacts — and records their kinds, while unknown JSON and non-JSON artifacts are still hashed and referenced. It references command logs and waveform-like files as omitted local artifacts instead of copying their contents. Missing optional artifacts are warnings; missing required `run.json` produces a failed export result. The exporter does not execute commands, mutate source files, call providers, upload artifacts, sign bundles, add cloud storage, or include large logs and waveforms.
+The bundle preserves artifact provenance, relative paths, SHA-256 hashes, byte sizes, and JSON schema versions where present. It recognizes the typed reports found under a run directory — including the failure-intelligence artifacts (waveform slice, assertion-to-waveform linkage, relevant-signal reduction, waveform comparison, signal-source map, driver trace, and failure divergence graph) — and records their kinds, while unknown JSON and non-JSON artifacts are still hashed and referenced. It references command logs and waveform-like files as omitted local artifacts instead of copying their contents. Missing optional artifacts are warnings; missing required `run.json` produces a failed export result. The exporter does not execute commands, mutate source files, call providers, upload artifacts, sign bundles, add cloud storage, or include large logs and waveforms.
 
 ## Schema Examples
 

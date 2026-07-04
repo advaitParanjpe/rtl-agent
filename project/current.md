@@ -1,22 +1,30 @@
-# Failure Intelligence Evidence Bundle Integration
+# Compact Failure Intelligence Example Check
 
 ## Objective
 
-Extend the existing deterministic evidence-bundle exporter so the remaining failure-intelligence artifacts produced under a run directory are recognized, classified, hashed, and recorded with their schema versions and provenance, exactly like the other typed reports. Do not redesign export or change any existing artifact schema.
+Add a compact, deterministic local scripted example check that exercises the full failure-intelligence pipeline over checked-in fixtures, validating that the commands compose end-to-end and emit stable, schema-backed artifacts. Assert only stable fields; introduce no new product behavior.
 
 ## Scope
 
-- Add evidence artifact kinds for the relevant-signal reduction report, waveform comparison report, signal-source-map report, driver-trace report, and failure-divergence-graph report to `src/rtl_agent/evidence_bundle_models.py` (`EvidenceArtifactKind`).
-- Teach `src/rtl_agent/evidence_bundle.py` to classify these artifacts by distinctive top-level JSON keys, reusing the existing hashing, schema-version detection, run-relative provenance, and omitted-content handling rather than adding a parallel path (matching the existing review/triage/verification-strength/waveform-slice/assertion-link detection style).
-- Preserve deterministic ordering, run-relative provenance references, and existing warning/failure semantics.
-- Add compact tests covering classification of each new artifact within a run directory, plus deterministic bundle output.
-- Update the README evidence-bundle section with one concise mention of the newly recognized artifact kinds.
+- Add `scripts/failure_intelligence_example_check.py` that, in a temporary workspace, chains the real CLI:
+  - `extract-waveform-window` for a failing slice (the checked-in `examples/waveforms/failure.vcd`) and a passing/reference slice (a checked-in or generated variant);
+  - `compare-waveforms` over the two slices;
+  - `inspect-repo` on `examples/simple-rtl`;
+  - `map-signals` for the diverging signals (from the comparison);
+  - `trace-drivers` from the signal-source map;
+  - `divergence-graph` composing comparison + signal-source map + driver trace;
+  - `reduce-signals` on the failing slice.
+- Reuse the shared `scripts/_example_check.py` helper for repository root, interpreter selection, and `run_cli`.
+- Validate emitted artifacts through the existing typed models, asserting stable schema versions, statuses, and structural fields (not volatile timestamps, hashes, durations, UUIDs, or absolute paths).
+- Register the new check in `scripts/check.py` and mention it in the README's example-check summary where the other example checks are described.
+- Add a compact checked-in passing-waveform fixture under `examples/waveforms/` if one is needed for a deterministic comparison.
+- Keep generated outputs in temporary or ignored artifact directories.
 
 ## Acceptance Criteria
 
-- Relevant-signal reduction, waveform comparison, signal-source-map, driver-trace, and failure-divergence-graph artifacts under a run directory are indexed with correct kinds, SHA-256 hashes, sizes, and schema versions.
-- Unknown JSON and non-JSON artifacts are still hashed and referenced as before.
-- Evidence-bundle output remains deterministic for identical inputs.
+- The example check is local, deterministic, compact, and independently runnable.
+- It reuses the shared helper without adding new dependencies or a framework.
+- It asserts on stable schema versions, statuses, identifiers, and structural fields rather than volatile values.
 - No existing artifact schema, CLI behavior, provider behavior, or product workflow changes.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
@@ -28,9 +36,9 @@ Extend the existing deterministic evidence-bundle exporter so the remaining fail
 
 ## Exclusions
 
-- Do not redesign the evidence-bundle exporter or its manifest/report schema shape.
 - Do not add real model-provider integration, external repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
-- Do not add semantic waveform interpretation, dependency tracing, model-based analysis, source localization, stimulus minimization, patch generation, or causal claims.
+- Do not change generated artifact schemas, CLI behavior, provider behavior, or product workflow features.
+- Do not add semantic waveform interpretation, dependency-tracing beyond existing textual evidence, model-based analysis, causal claims, or large generated artifacts under tracked paths.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 
 ## Completion State
