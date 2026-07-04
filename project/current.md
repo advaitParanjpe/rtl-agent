@@ -1,23 +1,24 @@
-# Cross-Module Ambiguity and Multi-Instance Robustness Pilot
+# Simulator-Generated AXI Failure Pilot
 
 ## Objective
 
-Validate that the existing failure-intelligence pipeline handles genuinely ambiguous hierarchical RTL honestly — reporting ambiguous signal-source mappings and preserved multi-candidate evidence rather than a false-confident single answer — while still localizing a seeded divergence. This milestone stresses the current architecture on ambiguity; it introduces no new analysis behaviour.
+Strengthen one AXI-router pilot by replacing its hand-authored VCD fixtures with waveforms produced by an actual open-source simulator run over the checked-in RTL and a small testbench, so the failing-vs-passing pair is genuinely simulator-generated rather than authored. Drive the existing failure-intelligence pipeline over the generated VCDs and assert the seeded divergence is still localized. The simulator is a fixture-generation/dev dependency only; its use must be gated so the default validation suite stays hermetic. No new analysis behaviour and no model providers.
 
 ## Scope
 
-- Extend the checked-in multi-file RTL fixtures with a case that legitimately creates ambiguity, such as: the same child module instantiated more than once, and/or a leaf signal name that appears in more than one module across separate files.
-- Add a passing and a seeded-failing VCD pair over that hierarchy with a deterministic divergence on a signal whose source-mapping is genuinely ambiguous (matches more than one declaration/module) or whose leaf name is non-unique.
-- Add a scripted check (for example `scripts/axi_router_ambiguity_pilot_check.py`) that drives the existing pipeline (the `run-failure-intelligence` orchestrator plus `inspect-run` and `export-failure-package`, reusing `scripts/_example_check.py`) over the fixtures in a temporary workspace, and register it in `scripts/check.py`.
-- Assert, against the typed schemas, that the pipeline: identifies the expected earliest divergence; reports the ambiguous signal with an `ambiguous` (or multi-candidate) mapping status and preserves all candidate declarations/locations rather than collapsing to one; keeps the corresponding driver/dependency evidence multi-valued or explicitly unresolved where the RTL is genuinely ambiguous; still surfaces the divergence and its cited candidate locations in the failure report; exports and validates a portable failure package; and makes no causal or root-cause claim — using stable, schema-backed assertions only.
-- Add one concise README mention of the ambiguity/multi-instance pilot.
+- Add a small synthesizable/simulatable RTL design plus a compact testbench (under `examples/`) that produces a passing run and a seeded-failing run of the same design (for example a parameter/define or a `+arg` that injects the seeded fault), each dumping a VCD over the observed signal hierarchy.
+- Add a deterministic, checked-in generation script that runs an open-source simulator (for example Icarus Verilog `iverilog`/`vvp`, or Verilator) to compile the testbench and emit the passing and failing VCDs into a temporary or ignored location. The simulator is a fixture-generation/dev dependency, not a product runtime dependency.
+- Gate the simulator use: detect whether the simulator binary is available and, when it is not, skip that generation/validation step cleanly (clearly reported as skipped) so `scripts/check.py` remains hermetic and green on machines without the tool. Do not add the simulator to the product's install/runtime dependencies.
+- Add a scripted check (for example `scripts/axi_router_simulated_failure_check.py`) that — when the simulator is available — generates the VCD pair, drives the existing pipeline (`run-failure-intelligence` plus `inspect-run` and `export-failure-package`, reusing `scripts/_example_check.py`) over the generated VCDs in a temporary workspace, and asserts the seeded divergence is localized (earliest divergent signal/time, source mapping, driver/dependency evidence, failure report, portable package) using stable, schema-backed assertions only.
+- Register the check in `scripts/check.py` such that it runs when the simulator is present and is skipped-with-notice otherwise.
+- Add one concise README mention of the simulator-generated pilot and how it is gated.
 
 ## Acceptance Criteria
 
-- The fixture creates real ambiguity (duplicate module instantiation and/or a non-unique leaf signal name across files), and the pipeline reports it honestly (ambiguous status and preserved multiple candidates), not a single false-confident mapping.
-- The seeded divergence is still localized and its candidate source locations are cited; ambiguity is preserved end-to-end into the failure report.
-- The check is local, deterministic, compact, independently runnable, and reuses the shared helper and existing services (no new product behavior, no simulator, no providers).
-- No existing artifact schema, CLI behavior, provider behavior, or product workflow changes.
+- When the simulator is available, the passing and failing VCDs are produced by the simulator (not hand-authored) from the checked-in RTL + testbench, and the existing pipeline localizes the seeded divergence over them.
+- When the simulator is unavailable, the check is skipped cleanly and the default validation suite still passes hermetically; the simulator is never added as a product runtime dependency.
+- The generation is deterministic and reproducible (fixed seed/inputs), and assertions are stable and schema-backed (no timestamps, hashes, durations, UUIDs, or absolute paths).
+- No existing artifact schema, CLI behavior, provider behavior, or product workflow changes; no new analysis behaviour.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
 ## Required Validation Commands
@@ -28,8 +29,9 @@ Validate that the existing failure-intelligence pipeline handles genuinely ambig
 
 ## Exclusions
 
-- Do not add a simulator, waveform generation from RTL, real model-provider integration, external/remote repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
-- Do not add new analysis behavior, disambiguation heuristics, dependency-graph algorithms, semantic elaboration, causal claims, or root-cause conclusions beyond what the existing services already produce.
+- Do not integrate a simulator into the product runtime, the CLI, or the install dependencies; it is a gated fixture-generation/dev tool only.
+- Do not add real model-provider integration, external/remote repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
+- Do not add new analysis behavior, dependency-graph algorithms, semantic elaboration, causal claims, or root-cause conclusions beyond what the existing services already produce.
 - Do not hard-code expected answers into product services or create a parallel analysis path; keep fixtures compact.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 
