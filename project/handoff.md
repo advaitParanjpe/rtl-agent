@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Failure Intelligence Run Orchestration
+Failure Intelligence Run Resume and Replay
 
 ## Completed Work
 

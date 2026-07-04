@@ -48,6 +48,38 @@ def test_cli_run_writes_run_directory(tmp_path: Path) -> None:
     assert (run_dir / "run-manifest.json").exists()
 
 
+def test_cli_resume_reuses_existing_run(tmp_path: Path) -> None:
+    runner = CliRunner()
+    base_args = [
+        "run-failure-intelligence",
+        "--failing-vcd",
+        FAILING_VCD,
+        "--passing-vcd",
+        PASSING_VCD,
+        "--repo",
+        SIMPLE_RTL,
+        "--failure-time",
+        "40",
+        "--before",
+        "15",
+        "--after",
+        "15",
+        "--run-root",
+        str(tmp_path / "runs"),
+        "--run-id",
+        "cli-resume",
+    ]
+    first = runner.invoke(app, base_args)
+    assert first.exit_code == 0, first.stdout + first.stderr
+
+    second = runner.invoke(app, [*base_args, "--resume"])
+
+    assert second.exit_code == 0, second.stdout + second.stderr
+    summary = json.loads(second.stdout)
+    assert summary["resumed"] is True
+    assert all(stage["disposition"] == "reused" for stage in summary["stages"])
+
+
 def test_cli_run_reports_stage_failure_with_exit_1(tmp_path: Path) -> None:
     bad = tmp_path / "bad.vcd"
     bad.write_text("not a vcd", encoding="utf-8")

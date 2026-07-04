@@ -739,13 +739,23 @@ def run_failure_intelligence_command(
         Path | None,
         typer.Option("--review", help="Optional review report JSON."),
     ] = None,
+    resume: Annotated[
+        bool,
+        typer.Option("--resume/--no-resume", help="Reuse valid existing stage artifacts."),
+    ] = False,
+    replay_from: Annotated[
+        str | None,
+        typer.Option("--replay-from", help="Regenerate from this stage onward."),
+    ] = None,
 ) -> None:
     """Orchestrate the failure-intelligence stages into one run directory."""
     try:
         loaded = load_config(config) if config else None
         discovery_config = loaded.discovery if loaded else None
         run_store = RunStore(run_root, run_id=run_id)
-        run_store.create()
+        # Resume/replay operate on an existing run directory; only create a fresh one otherwise.
+        if not ((resume or replay_from is not None) and run_store.run_dir.exists()):
+            run_store.create()
         manifest = run_failure_intelligence(
             run_store,
             failing_vcd=failing_vcd,
@@ -757,6 +767,8 @@ def run_failure_intelligence_command(
             discovery_config=discovery_config,
             verification_strength_path=verification_strength,
             review_path=review,
+            resume=resume,
+            replay_from=replay_from,
         )
     except (FailureIntelligenceRunError, ValueError) as exc:
         typer.echo(f"error: {exc}", err=True)
@@ -1021,7 +1033,11 @@ def _print_run_manifest_summary(manifest: object) -> None:
             "run_id": manifest.run_id,
             "run_dir": str(manifest.run_dir),
             "status": manifest.status,
-            "stages": [{"name": stage.name, "status": stage.status} for stage in manifest.stages],
+            "resumed": manifest.resumed,
+            "replay_from": manifest.replay_from,
+            "stages": [
+                {"name": stage.name, "disposition": stage.disposition} for stage in manifest.stages
+            ],
             "artifacts": len(manifest.artifacts),
             "failure_report_path": manifest.failure_report_path,
             "failure_report_markdown_path": manifest.failure_report_markdown_path,
