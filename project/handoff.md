@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Failure Intelligence Run Inspection and Validation
+Portable Failure Package Export
 
 ## Completed Work
 

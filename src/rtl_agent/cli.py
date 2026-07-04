@@ -36,6 +36,7 @@ from rtl_agent.failure_intelligence_run import (
     FailureIntelligenceRunError,
     run_failure_intelligence,
 )
+from rtl_agent.failure_package import FailurePackageError, export_failure_package
 from rtl_agent.failure_report import (
     FailureReportError,
     synthesize_failure_report,
@@ -809,6 +810,34 @@ def inspect_run_command(
         raise typer.Exit(1)
 
 
+@app.command("export-failure-package")
+def export_failure_package_command(
+    run_dir: Annotated[
+        Path,
+        typer.Option("--run-dir", help="Existing failure-intelligence run directory."),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="Directory to write the portable failure package into."),
+    ],
+    allow_failed: Annotated[
+        bool,
+        typer.Option(
+            "--allow-failed/--no-allow-failed",
+            help="Allow exporting a failed-but-internally-consistent run.",
+        ),
+    ] = False,
+) -> None:
+    """Export a validated run directory into a portable failure package (read-only)."""
+    try:
+        manifest = export_failure_package(run_dir, output, allow_failed=allow_failed)
+    except FailurePackageError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_failure_package_summary(manifest, output)
+
+
 @app.command("assess-verification")
 def assess_verification(
     task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
@@ -1049,6 +1078,24 @@ def _print_waveform_slice_summary(report: object, output: Path) -> None:
             "selected_signals": len(report.selected_signals),
             "value_changes": len(report.value_changes),
             "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_failure_package_summary(manifest: object, output: Path) -> None:
+    from rtl_agent.failure_package_models import FailurePackageManifest
+
+    assert isinstance(manifest, FailurePackageManifest)
+    _print_json(
+        {
+            "schema_version": manifest.schema_version,
+            "package_dir": str(output),
+            "package_status": manifest.package_status,
+            "run_id": manifest.run_id,
+            "verified": manifest.verified,
+            "file_count": manifest.file_count,
+            "total_bytes": manifest.total_bytes,
+            "warnings": len(manifest.warnings),
         }
     )
 
