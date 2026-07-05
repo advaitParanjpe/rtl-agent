@@ -62,6 +62,7 @@ def test_readme_documented_commands_have_help() -> None:
     }
     expected = {
         "assess-verification",
+        "cluster-failures",
         "compare-waveforms",
         "compare-fingerprints",
         "discover",
