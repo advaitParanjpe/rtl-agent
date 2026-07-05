@@ -18,6 +18,7 @@ from rtl_agent.benchmark import (
     run_benchmark_manifest,
 )
 from rtl_agent.config import load_config
+from rtl_agent.counterfactual import CounterfactualError, run_counterfactual
 from rtl_agent.discovery import DiscoveryError, discover_repository, write_repository_map
 from rtl_agent.evidence_bundle import (
     EvidenceBundleError,
@@ -838,6 +839,71 @@ def export_failure_package_command(
     _print_failure_package_summary(manifest, output)
 
 
+@app.command("run-counterfactual")
+def run_counterfactual_command(
+    baseline_run: Annotated[
+        Path,
+        typer.Option("--baseline-run", help="Existing validated failure-intelligence run dir."),
+    ],
+    repo: Annotated[Path, typer.Option("--repo", help="Target Git RTL repository root.")],
+    config: Annotated[Path, typer.Option("--config", "-c", help="rtl-agent YAML config.")],
+    command: Annotated[str, typer.Option("--command", help="Named configured command to rerun.")],
+    output_run: Annotated[
+        Path,
+        typer.Option("--output-run", help="Directory to write the experiment into."),
+    ],
+    allowed_file: Annotated[
+        list[str] | None,
+        typer.Option("--allowed-file", help="Repository-relative file the intervention may edit."),
+    ] = None,
+    patch: Annotated[
+        Path | None,
+        typer.Option("--patch", help="Unified diff to apply as the intervention."),
+    ] = None,
+    replace_file: Annotated[
+        str | None,
+        typer.Option("--replace-file", help="Structured replace_text target file."),
+    ] = None,
+    replace_old: Annotated[
+        str | None,
+        typer.Option("--replace-old", help="Structured replace_text exact old text."),
+    ] = None,
+    replace_new: Annotated[
+        str | None,
+        typer.Option("--replace-new", help="Structured replace_text new text."),
+    ] = None,
+    baseline_commit: Annotated[
+        str | None,
+        typer.Option("--baseline-commit", help="Commit/ref for the worktree (default HEAD)."),
+    ] = None,
+    description: Annotated[
+        str | None,
+        typer.Option("--description", help="Human-readable intervention description."),
+    ] = None,
+) -> None:
+    """Run one manual counterfactual intervention experiment against a baseline run."""
+    try:
+        report = run_counterfactual(
+            baseline_run=baseline_run,
+            repo=repo,
+            config_path=config,
+            command=command,
+            output_run=output_run,
+            allowed_files=allowed_file or [],
+            patch=patch,
+            replace_file=replace_file,
+            replace_old=replace_old,
+            replace_new=replace_new,
+            baseline_commit=baseline_commit,
+            description=description,
+        )
+    except CounterfactualError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_counterfactual_summary(report, output_run)
+
+
 @app.command("assess-verification")
 def assess_verification(
     task_contract: Annotated[Path, typer.Option("--task-contract", help="Task-contract JSON.")],
@@ -1077,6 +1143,26 @@ def _print_waveform_slice_summary(report: object, output: Path) -> None:
             "observed_end": report.window.observed_end,
             "selected_signals": len(report.selected_signals),
             "value_changes": len(report.value_changes),
+            "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_counterfactual_summary(report: object, output_run: Path) -> None:
+    from rtl_agent.counterfactual_models import CounterfactualExperimentReport
+
+    assert isinstance(report, CounterfactualExperimentReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "experiment_id": report.experiment_id,
+            "experiment_dir": str(output_run),
+            "outcome": report.outcome,
+            "intervention_applied": report.intervention.applied,
+            "command_status": report.execution.status if report.execution else None,
+            "baseline_failure_time": report.baseline_failure.failure_time,
+            "intervention_failure_time": report.intervention_failure.failure_time,
+            "observable_differences": len(report.observable_differences),
             "warnings": len(report.warnings),
         }
     )

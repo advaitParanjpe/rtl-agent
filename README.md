@@ -397,6 +397,21 @@ rtl-agent export-failure-package --run-dir .rtl-agent/runs/my-run --output .rtl-
 
 Export is inspection-gated: it runs the same validation and refuses an invalid run by default. A failed-but-internally-consistent run (a run that ended in an honest terminal failure but whose recorded artifacts are all valid) can be exported only with `--allow-failed`, and the package is clearly marked `failed`. The package contains the run manifest, the freshly written inspection report, the JSON and Markdown failure report, and every validated, manifest-referenced evidence artifact at its run-relative path under `run/`; external inputs, run event logs, caches, and unrelated files are never included, and unsafe or missing artifacts are never packaged. It emits a typed, versioned `package-manifest.json` recording each file's package-relative path, source role, size, SHA-256, schema version (where applicable), and original run-relative provenance, and verifies every packaged file's hash before reporting success. All package paths are relative and traversal-safe, and the source run directory is never modified.
 
+`run-counterfactual` runs the first experimental counterfactual-RTL-debugging capability: given a validated baseline failure-intelligence run and one user-supplied manual intervention, it applies the intervention in an isolated Git worktree, reruns a named configured command, analyzes the result with the existing pipeline, compares against the baseline, and emits a typed, versioned experiment report (plus Markdown):
+
+```bash
+rtl-agent run-counterfactual \
+  --baseline-run .rtl-agent/runs/failure-001 \
+  --repo ../axi-router \
+  --config rtl-agent.yaml \
+  --command seeded-failure \
+  --patch intervention.diff \
+  --allowed-file rtl/axi_pipe.sv \
+  --output-run .rtl-agent/experiments/experiment-001
+```
+
+The intervention is one unified diff (`--patch`) or one structured `replace_text` edit (`--replace-file/--replace-old/--replace-new`), restricted to explicitly allowed files (`--allowed-file`), applied only inside the worktree — the baseline repository is never modified and nothing is committed, pushed, or altered on any remote; an unclean apply or a disallowed file fails honestly. The runner inspects and refuses an invalid baseline, enforces the command timeout, captures stdout/stderr/exit-code/duration/logs and the generated waveform, reuses the existing command runner, worktree, triage, waveform, comparison, failure-intelligence, and inspection services, and deterministically classifies the outcome as one of `failure_removed`, `failure_delayed`, `failure_advanced`, `failure_changed`, `no_observable_effect`, `new_failure_introduced`, `experiment_failed`, or `insufficient_evidence` — based only on explicit evidence (the original divergent signals and timestamp, command status, and artifact validity). The report preserves all intermediate evidence and states explicitly that it records an intervention outcome, not proven causality. `scripts/counterfactual_pilot_check.py` is a gated Icarus-backed pilot that removes a seeded backpressure fault via a patch and asserts the failure is removed while the source repository stays byte-for-byte unchanged; it skips cleanly when the simulator is absent.
+
 ## Verification Strength Assessment
 
 `assess-verification` reads existing task-contract, repository-map, implementation-report, optional review-report, and optional triage-report artifacts, then writes a versioned verification-strength JSON report:
