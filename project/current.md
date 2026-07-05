@@ -1,24 +1,23 @@
-# External AXI Router Repository Integration
+# External RTL Mapping Accuracy Follow-up
 
 ## Objective
 
-Validate that the existing discovery, signal-source mapping, and driver-tracing services scale to real-world, non-synthetic RTL by running them over an external, open-source AXI-router-style repository vendored into the fixtures at a pinned commit. This is a robustness/validation milestone against genuine hierarchical code; it introduces no new analysis behaviour, requires no network access during the default run, and adds no model providers.
+Fix the real-code accuracy gaps exposed by the external verilog-axis repository pilot while preserving existing schemas and honest ambiguity reporting.
 
 ## Scope
 
-- Vendor a compact subset of a real, license-compatible open-source AXI-router-style RTL repository under `examples/` (or a clearly-labelled `third_party/`/`external/` location), pinned to a specific upstream commit and carrying its upstream license and provenance (source URL + commit) in a short NOTICE/README. Keep only the RTL needed for the pilot; do not vendor build systems, large testbenches, or unrelated files.
-- Add a gated check (for example `scripts/external_axi_router_repo_check.py`) that, when the vendored source is present, drives the existing services over the real hierarchy: `inspect-repo` (discovery), then `map-signals` and `trace-drivers` against a set of real hierarchical signal names taken from the actual modules, reusing `scripts/_example_check.py`.
-- Assert, against the typed schemas, that discovery indexes the real modules across their files; that signal-source mapping resolves representative real signals to their declaring modules/files (honestly reporting exact/probable/ambiguous, not a false-confident answer); and that driver tracing recovers real continuous/procedural driver evidence and dependency edges from the actual RTL — using stable, schema-backed assertions robust to reasonable upstream formatting.
-- Gate on availability: when the vendored source is absent, skip cleanly (reported, returning success) so `scripts/check.py` stays hermetic; the default run must not perform any network access (no clone/fetch at check time — vendoring happens once, out of band).
-- Register the check in `scripts/check.py`; add one concise README mention with the upstream attribution.
+- Correct declaration line reporting so module/interface/package declaration locations use the keyword/name line rather than leading blank or masked comment lines.
+- Improve signal-source mapping primary candidate selection for nested instance paths such as `tb.axis_arb_mux.arbiter.grant_reg`, so the declaring inner module is preferred when evidence supports it while ambiguity is still preserved.
+- Prevent driver-trace dependency expansion from conflating same-named identifiers across unrelated files/modules.
+- Add focused tests using existing fixtures and the vendored external snapshot where useful.
+- Keep artifact schemas, CLI command names, provider behavior, and workflow features unchanged unless a tiny internal model field is strictly required and remains backward compatible.
 
 ## Acceptance Criteria
 
-- The existing services run unmodified over a real external RTL hierarchy and produce honest, schema-valid discovery, mapping, and driver-trace artifacts (ambiguity preserved where the real code is genuinely ambiguous).
-- The vendored source is pinned (commit recorded), license-compatible, attributed, and minimal; no network access occurs during `scripts/check.py`.
-- When the vendored source is unavailable, the check skips cleanly and the default suite still passes hermetically.
-- No existing artifact schema, CLI behavior, provider behavior, or product workflow changes; no new analysis behaviour.
-- All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
+- Existing synthetic ambiguity behavior remains honest; no false-confident single answer is introduced.
+- The external verilog-axis check can assert the corrected declaration line and nested primary mapping behavior without fixture-specific special cases.
+- Dependency edges for same-named identifiers remain scoped to the relevant declaring file/module where the available textual evidence supports that scope.
+- Existing discovery, signal-source mapping, driver-tracing, failure-intelligence, external-repository, example, packaging, and workflow-portability checks continue to pass.
 
 ## Required Validation Commands
 
@@ -29,10 +28,9 @@ Validate that the existing discovery, signal-source mapping, and driver-tracing 
 ## Exclusions
 
 - Do not fetch/clone/download anything during the default validation run; no network access at check time.
-- Do not add new analysis behavior, disambiguation heuristics, dependency-graph algorithms, semantic elaboration, causal claims, or root-cause conclusions.
+- Do not add semantic elaboration, simulator requirements, causal claims, root-cause conclusions, model-provider integration, or a broad dependency-graph redesign.
 - Do not add a simulator requirement for this milestone, real model-provider integration, CI automation, containers, dashboards, databases, queues, or a web UI.
-- Do not vendor license-incompatible code or large/unrelated upstream files; keep the subset minimal and attributed.
-- Do not hard-code expected answers into product services or create a parallel analysis path.
+- Do not hard-code external-repository expected answers into product services or create a parallel analysis path.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 
 ## Completion State
