@@ -867,3 +867,26 @@ Known limitations:
 - The hierarchy is two levels deep with two children; deeper or wider trees and same-named signals across unrelated modules are not exercised here.
 - Cross-file dependency reconstruction relies on both endpoints being among the traced signals' declaring files (the union scanned by the existing driver trace); a dependency whose driver lives in a file no observed signal maps to is still left unresolved, by design.
 - Waveforms are hand-authored VCDs, not simulator output, consistent with the no-simulator exclusion.
+
+## 2026-07-04 - Cross-Module Ambiguity and Multi-Instance Robustness Pilot
+
+Validated that the existing pipeline handles genuinely ambiguous hierarchical RTL honestly — preserving multiple candidates and explicitly reporting ambiguity rather than a false-confident single answer — with no new analysis behaviour, heuristics, or disambiguation logic. Added a compact ambiguity fixture (`examples/axi-router-ambiguity/` with `rtl/lane_rtl.sv`, `rtl/lane_shadow.sv`, `rtl/top.sv`, a passing VCD, a seeded failing VCD, and `examples/axi-router-ambiguity-agent.yaml`): the child module `lane` is defined in two separate files and instantiated more than once by `top`, so the internal signal names (`data_out`, `data_hold`) are non-unique across files. The seeded fault drives both signals to `x` at t=40 under an instance scope (`tb.dut.lane`) whose source therefore matches two declarations. A new scripted check (`scripts/axi_router_ambiguity_pilot_check.py`, registered in `scripts/check.py`) drives the real orchestrator plus `inspect-run` and `export-failure-package` and asserts, against the typed schemas, that the pipeline: records `lane` as a duplicate declaration across both files and as an instantiated type; identifies the earliest divergence at t=40; reports the divergent signal's source mapping as `ambiguous` with both candidate files preserved; keeps driver evidence and dependency edges from both files (not collapsed to one); carries `mapping_status = ambiguous` with both declarations onto the divergence-graph root node; cites both candidate source locations and records explicit `ambiguous_evidence` in the synthesized JSON and Markdown failure report; exports and validates a portable failure package; and makes no root-cause claim.
+
+Validation evidence:
+
+- Confirmed the behaviour by running the real pipeline and reading its actual outputs before codifying assertions: signal map `ambiguous_count = 2` with `data_out`/`data_hold` each carrying both `rtl/lane_rtl.sv` and `rtl/lane_shadow.sv` candidates; driver trace with drivers and dependency edges in both files; failure report `candidate_source_locations` listing both files and `ambiguous_evidence` naming both signals.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 258 pytest tests, agent portability check, all eight example checks (including the new ambiguity pilot), and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- No product code changed and no disambiguation heuristic was added: the ambiguity is an emergent, correct property of the existing services. The signal-source map classifies a mapping as `ambiguous` when the top-scoring path component matches multiple distinct declarations (here, the duplicated `module lane`), and the driver trace scans all candidate/declaring files, so evidence from both files is naturally preserved rather than collapsed.
+- The genuine ambiguity is produced by a duplicate module declaration (`module lane` in two files), which is what the existing declaration-based mapping can legitimately detect; repeated instantiation in `top.sv` and the non-unique internal signal names reinforce the scenario. Instance-only ambiguity (two instances of one module) maps unambiguously to that one module's source, which is correct, so it is not what drives the reported ambiguity.
+- The observed instance scope is named `lane` under a non-module `dut` scope so the ambiguous child match is the top-scoring component; a matching top-level scope would otherwise resolve to a single shallower module.
+
+Known limitations:
+
+- The ambiguity demonstrated is duplicate-module-declaration ambiguity; case-insensitive/probable near-matches and cross-scope collisions are not separately exercised here.
+- Both `lane` definitions share identical port and internal signal names by design; a partial overlap (some names shared, some not) is not exercised.
+- Waveforms are hand-authored VCDs, not simulator output, consistent with the no-simulator exclusion.
