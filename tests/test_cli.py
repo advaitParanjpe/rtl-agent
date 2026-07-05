@@ -63,10 +63,12 @@ def test_readme_documented_commands_have_help() -> None:
     expected = {
         "assess-verification",
         "compare-waveforms",
+        "compare-fingerprints",
         "discover",
         "divergence-graph",
         "export-evidence",
         "export-failure-package",
+        "fingerprint-run",
         "extract-waveform-window",
         "implement-task",
         "inspect-config",

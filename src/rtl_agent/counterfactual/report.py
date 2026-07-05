@@ -42,6 +42,11 @@ def _markdown(report: CounterfactualExperimentReport) -> str:
         f"- signals: {', '.join(report.baseline_failure.signals) or '(none)'}; "
         f"time: {report.baseline_failure.failure_time}"
     )
+    if report.baseline_failure.fingerprint_exact_digest:
+        lines.append(
+            f"- fingerprint: `{report.baseline_failure.fingerprint_exact_digest}` "
+            f"(family `{report.baseline_failure.fingerprint_family_digest}`)"
+        )
     lines.append("")
     lines.append("## Intervention-run failure")
     lines.append(
@@ -52,6 +57,11 @@ def _markdown(report: CounterfactualExperimentReport) -> str:
         lines.append(
             f"- assertion: {report.intervention_failure.assertion_label} "
             f"@ {report.intervention_failure.assertion_time}"
+        )
+    if report.intervention_failure.fingerprint_exact_digest:
+        lines.append(
+            f"- fingerprint: `{report.intervention_failure.fingerprint_exact_digest}` "
+            f"(family `{report.intervention_failure.fingerprint_family_digest}`)"
         )
     lines.append("")
 

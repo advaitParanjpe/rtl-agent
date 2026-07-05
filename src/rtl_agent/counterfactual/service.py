@@ -23,6 +23,7 @@ from rtl_agent.counterfactual_models import (
     WorktreeProvenance,
 )
 from rtl_agent.execution.command_runner import CommandRunner
+from rtl_agent.failure_fingerprint import FailureFingerprintError, fingerprint_run
 from rtl_agent.failure_intelligence_run import (
     FailureIntelligenceRunError,
     run_failure_intelligence,
@@ -300,6 +301,7 @@ def _load_baseline(
         signals=list(report.earliest_divergence_signals),
         divergence_present=bool(report.earliest_divergence_signals),
     )
+    _attach_fingerprint_identity(identity, resolved)
     return baseline_ref, identity, manifest
 
 
@@ -504,6 +506,7 @@ def _analyze_intervention(
         assertion_time=assertion_time,
         divergence_present=bool(report.earliest_divergence_signals),
     )
+    _attach_fingerprint_identity(identity, run_store.run_dir)
     return identity, True
 
 
@@ -617,7 +620,33 @@ def _observable_differences(
                 intervention=str(intervention.divergence_present),
             )
         )
+    if baseline.fingerprint_exact_digest != intervention.fingerprint_exact_digest:
+        differences.append(
+            ObservableDifference(
+                field="failure_fingerprint_exact_digest",
+                baseline=baseline.fingerprint_exact_digest,
+                intervention=intervention.fingerprint_exact_digest,
+            )
+        )
+    if baseline.fingerprint_family_digest != intervention.fingerprint_family_digest:
+        differences.append(
+            ObservableDifference(
+                field="failure_fingerprint_family_digest",
+                baseline=baseline.fingerprint_family_digest,
+                intervention=intervention.fingerprint_family_digest,
+            )
+        )
     return differences
+
+
+def _attach_fingerprint_identity(identity: FailureIdentity, run_dir: Path) -> None:
+    try:
+        fingerprint = fingerprint_run(run_dir)
+    except FailureFingerprintError:
+        return
+    identity.fingerprint_exact_digest = fingerprint.exact_digest
+    identity.fingerprint_family_digest = fingerprint.family_digest
+    identity.fingerprint_insufficient_evidence = list(fingerprint.insufficient_evidence)
 
 
 def _artifact(role: str, path: Path, experiment_dir: Path) -> GeneratedArtifact:

@@ -82,6 +82,9 @@ class FailureIdentity(BaseModel):
     assertion_label: str | None = None
     assertion_time: str | None = None
     divergence_present: bool = False
+    fingerprint_exact_digest: str | None = None
+    fingerprint_family_digest: str | None = None
+    fingerprint_insufficient_evidence: list[str] = Field(default_factory=list)
 
 
 class ObservableDifference(BaseModel):
