@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Simulator-Generated AXI Failure Pilot
+Simulator-Generated Multi-Module Failure Pilot
 
 ## Completed Work
 

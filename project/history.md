@@ -915,3 +915,28 @@ Known limitations:
 - Only Icarus Verilog is wired as the generator; Verilator (also installed on some machines) is not used here, and the VCD timescale reflects the simulator default (`1s`) since the fixture omits an explicit `timescale.
 - The generated pilot is single-module; combining simulator generation with the multi-file/ambiguity fixtures is left to a future milestone.
 - The check compiles and runs a real toolchain, so it is slower than the hand-authored checks and depends on the locally installed simulator version behaving as Icarus Verilog 13 does.
+
+## 2026-07-04 - Simulator-Generated Multi-Module Failure Pilot
+
+Combined the two validated threads — simulator-generated waveforms and hierarchical multi-file RTL — into one pilot, proving the existing pipeline localizes a real, cross-module, simulator-generated failure without any new analysis behaviour. Added a hierarchical simulatable design (`examples/axi-router-sim-hier/` with `rtl/ingress.sv`, `rtl/route.sv`, `rtl/top.sv`, `tb/top_tb.sv`, and `examples/axi-router-sim-hier-agent.yaml`): the top module instantiates the `ingress` and `route` child modules from separate files and wires a staged payload across the boundary. The compile-time seeded fault (`INJECT_FAULT`, in the ingress child) corrupts the staged payload to `x` under backpressure; the route child registers that cross-module signal one cycle later, so the fault originates in one child and propagates into another child's observable output. A new gated check (`scripts/axi_router_simulated_multimodule_check.py`, registered in `scripts/check.py`) detects Icarus Verilog and, when present, compiles the three RTL files + testbench twice from the same stimulus (clean and `-DINJECT_FAULT`), runs each to emit a real passing-vs-failing VCD pair, and drives the existing pipeline (`run-failure-intelligence` plus `inspect-run` and `export-failure-package`) over the generated VCDs. It asserts, against the typed schemas: the earliest divergence is `payload_staged` at t=45 and the routed `payload_out` follows at t=55, both x/z; `payload_staged` maps exactly to `ingress.sv` and `payload_out` exactly to `route.sv`; both continuous and procedural driver forms are recovered; the routed output's `payload_out <= payload_staged;` register driver is cited in `route.sv`; the cross-module dependency chain `payload_out → payload_staged → data_in` is cited across `route.sv` and `ingress.sv`; the divergence graph roots localize across the two files with cited source edges; the synthesized JSON and Markdown report cite both child files; run inspection is valid; the portable package export is verified; and no root cause is claimed. When the simulator is not on `PATH` the check skips cleanly and returns success.
+
+Validation evidence:
+
+- Generated both VCDs with `iverilog -g2012` (+ `-DINJECT_FAULT`) and `vvp`, read the pipeline outputs, then codified stable assertions: comparison earliest 45 (`payload_staged`) with `payload_out` at 55; mapping `payload_staged`→`ingress.sv`, `payload_out`→`route.sv`; dependency edges `payload_out→payload_staged @ route.sv` and `payload_staged→data_in @ ingress.sv`.
+- Verified the skip path with an empty `PATH`: "skipped (iverilog/vvp not available)", rc=0.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 258 pytest tests, agent portability check, all ten example checks (both simulator checks ran because Icarus Verilog is installed), and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- No product code changed; the check drives only the existing orchestrator and CLI, and all assertions are on stable schema values (times, signal names, file paths, statement text).
+- The testbench dumps only the two child scopes (`$dumpvars(1, dut.ingress)` and `$dumpvars(1, dut.route)`) rather than the whole testbench, so each observed signal resolves to exactly one child module; dumping the full hierarchy had also emitted redundant top/testbench-level copies of `payload_out` that pulled its aggregated graph-node mapping status to `unresolved`.
+- The child instances are named after their modules (`ingress`, `route`) and the top instance is named `dut` (a non-module scope), with the testbench kept out of the inspected repo (`--repo` → `.../rtl`), so cross-file mapping resolves each signal to its child file rather than to a shallower ancestor or the testbench.
+- The route child registers the cross-module staged payload (procedural) so the fault propagates across a cycle boundary, giving a genuine one-cycle-later divergence on `payload_out` rather than a same-timestep continuous copy.
+
+Known limitations:
+
+- `payload_staged` is the boundary net and is dumped under both the ingress (output) and route (input) scopes, so its aggregated graph node carries declarations from both files; this is faithful to the wiring but means the boundary signal is not single-file.
+- Only Icarus Verilog is wired; Verilator is not used, and the VCD timescale is the iverilog default (`1s`) since the fixtures omit an explicit `timescale.
+- The check compiles and runs a real toolchain, so it is slower than the hand-authored checks and depends on the locally installed simulator version.
