@@ -966,3 +966,32 @@ Known limitations:
 - Terminal-failure capture relies on `$fatal` yielding a non-zero `vvp` exit; a simulator that reported failures differently (e.g. only via a log string) would need a different marker convention, though triage would still recover the textual assertion.
 - The pilot is single-module; it exercises the triage/assertion/link integration rather than cross-module localization (covered by the prior multi-module pilot).
 - Only Icarus Verilog is wired, and the check compiles and runs a real toolchain, so it is slower than the hand-authored checks and depends on the locally installed simulator version.
+
+## 2026-07-04 - External AXI Router Repository Integration
+
+Validated the existing repository-discovery, signal-source-mapping, and static driver-tracing services against real, unmodified third-party RTL. Vendored a minimal, pinned snapshot of alexforencich/verilog-axis (MIT, Copyright (c) 2014-2018 Alex Forencich) under `examples/external/verilog-axis/upstream/` — the arbitrated AXI-stream mux router path (`axis_arb_mux.v` → `arbiter.v` → `priority_encoder.v`) plus `axis_demux.v` and the upstream `COPYING` — pinned to commit `48ff7a7e2ef782cf778d47910cf85835c64b1bce` with per-file sha256 digests, URL, license, and attribution recorded in the project-owned `PROVENANCE.json` and `README.md` (upstream files clearly separated from project-owned material and vendored verbatim, never modified to make rtl-agent succeed). A new gated check (`scripts/external_axi_router_repo_check.py`, registered in `scripts/check.py`) first enforces provenance — pinned 40-hex commit, upstream URL, MIT license text and attribution present, every vendored file's sha256 matching the record, and no unlisted files under `upstream/` — then drives the existing services over the real hierarchy and asserts, against the typed schemas: all four real modules discovered in their files with `rtl_source` classification; the real instantiation hierarchy (`arbiter` and `priority_encoder` instantiated; `axis_arb_mux` and `axis_demux` uninstantiated top candidates); exact single-file mapping where the waveform scope names the module (`tb.axis_arb_mux.m_axis_tdata_reg`, `tb.axis_demux.m_axis_tvalid_reg`); preserved multi-candidate evidence on the nested instance path `tb.axis_arb_mux.arbiter.grant_reg` (both `arbiter.v` and `axis_arb_mux.v` kept); honest `unresolved` for a scope matching no declaration; real continuous driver evidence (`assign m_axis_tdata = m_axis_tdata_reg;` at `axis_arb_mux.v:231`) and real procedural evidence (`grant_reg <= grant_next;` at `arbiter.v:144`, found in the true declaring file because tracing searches every preserved candidate); non-empty unresolved identifiers; no truncation; and bounded artifact sizes (each JSON ≤ 256 KiB). No waveform fixture was needed: `map-signals --signal` takes real hierarchical names directly, so no project-authored VCD pretends to be upstream simulation output. The check skips cleanly when the snapshot is absent, and canonical validation performs no network access; `scripts/vendor_verilog_axis.py` is a manual, network-using re-vendoring helper kept out of `scripts/check.py`.
+
+Validation evidence:
+
+- Ran discovery/mapping/tracing over the vendored hierarchy and read actual outputs before codifying assertions; verified the drift gate by tampering one vendored byte (check fails with "vendored file drifted") and the skip path by hiding `PROVENANCE.json` (clean skip, rc 0).
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 258 pytest tests, agent portability check, all twelve example checks (including the new external repo check), and packaging smoke verification. No network access during the run.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Concrete limitations discovered against the real codebase (recorded, not papered over; no fixture-specific heuristics added):
+
+- Declaration line numbers are skewed early on real files: the discovery declaration regex begins `(?m)^\s*` and `\s` also matches newlines, so on `arbiter.v` the match start swallows the blank/masked lines above the keyword and `_line_for_offset` reports line 30 for a `module arbiter` that is truly at line 34 (`match.start("name")` would be correct). The check therefore does not assert exact declaration lines.
+- Nested instance paths pick the wrong primary: scope scoring gives shallower components a larger depth bonus, so `tb.axis_arb_mux.arbiter.grant_reg` is classified `exact` with primary `axis_arb_mux` (`axis_arb_mux.v`) even though `grant_reg` is declared and driven in `arbiter.v`; the true declaring file survives only as a secondary candidate (and driver tracing still finds the real drivers because it searches all candidates).
+- Dependency expansion conflates same-named identifiers across files: expansion scans the union of all relevant files, so `m_axis_tdata_int` (a name that exists independently in both `axis_arb_mux.v` and `axis_demux.v`) becomes one node with edges cited from both unrelated modules.
+
+Architectural decisions:
+
+- Provenance is enforced in the check itself (commit format, URL, license text, attribution, per-file sha256, and a no-unlisted-files sweep), so the pinned snapshot cannot silently drift and upstream separation is mechanically guarded.
+- Signals are supplied to `map-signals` via the existing `--signal` option using real hierarchical names from the upstream modules, avoiding a synthetic waveform that would masquerade as upstream simulation output.
+- The optional fetch helper performs network access only when run manually with an explicit invocation; it rewrites `PROVENANCE.json` digests so a deliberate re-pin remains consistent with the drift gate.
+
+Known limitations:
+
+- The snapshot is four files; larger upstream trees (includes, packages, interfaces, generate-heavy code) remain unexercised.
+- Waveform-driven stages (extract/compare/divergence graph) are not exercised against the external RTL in this pilot since no simulator run of upstream code is vendored.
+- The three discovered accuracy limitations above are real product gaps in discovery line reporting, mapping primary selection, and dependency-node identity; they motivate the next milestone.

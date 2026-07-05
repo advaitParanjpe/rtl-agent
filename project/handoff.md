@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Simulator Failure Triage Integration Pilot
+External AXI Router Repository Integration
 
 ## Completed Work
 
