@@ -1,0 +1,13 @@
+diff --git a/rtl/axi_pipe.sv b/rtl/axi_pipe.sv
+index e756ac6..f37eba3 100644
+--- a/rtl/axi_pipe.sv
++++ b/rtl/axi_pipe.sv
+@@ -31,7 +31,7 @@ module axi_pipe #(
+             locked      <= 1'b1;
+         end else if (locked && !ready_downstream) begin
+ `ifdef INJECT_FAULT
+-            payload_reg <= 'x;
++            payload_reg <= payload_reg;
+ `else
+             payload_reg <= payload_reg;
+ `endif

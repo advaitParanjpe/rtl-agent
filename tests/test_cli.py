@@ -79,6 +79,7 @@ def test_readme_documented_commands_have_help() -> None:
         "review-task",
         "run-benchmark",
         "run-command",
+        "run-counterfactual",
         "run-failure-intelligence",
         "synthesize-failure-report",
         "trace-drivers",

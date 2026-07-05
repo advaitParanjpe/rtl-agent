@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-External RTL Mapping Accuracy Follow-up
+Manual Counterfactual Intervention Runner
 
 ## Completed Work
 

@@ -1019,3 +1019,33 @@ Known limitations:
 - The fixes do not elaborate hierarchy or prove semantic connectivity; port connections remain textual evidence only.
 - The external pilot still validates a small pinned subset and does not exercise a simulator-generated waveform from upstream RTL.
 - Real instance port-connection evidence across the vendored hierarchy is the next external-RTL limitation to validate.
+
+## 2026-07-05 - Manual Counterfactual Intervention Runner
+
+Built the first experimental counterfactual-RTL-debugging capability, overriding the incremental External RTL Port-Connection Evidence follow-up (stage 43) per a deliberate product-direction decision recorded in the roadmap. Added a `run-counterfactual` CLI command and a `counterfactual` service (`src/rtl_agent/counterfactual/`, `counterfactual_models.py`) that, given a validated baseline failure-intelligence run and one user-supplied manual intervention, applies the intervention in an isolated Git worktree, reruns a named configured command, analyzes the resulting evidence with the existing pipeline, compares against the baseline, and emits a typed versioned counterfactual experiment report (JSON + Markdown). The runner reuses the existing command runner, `GitWorktreeManager`, triage, waveform/comparison, failure-intelligence orchestration, and run inspection — no parallel analysis path and no new analysis algorithm.
+
+Intervention support (exactly one per experiment): a unified diff `--patch` (validated and applied with `git apply --check`/`git apply`, target files parsed via `git apply --numstat`) or a structured `replace_text` edit (`--replace-file/--replace-old/--replace-new`, reusing the existing exactly-one-match semantics), both restricted to explicitly allowed files (`--allowed-file`) and applied only inside the worktree. The intervention is preserved as an experiment artifact; an unclean apply, a disallowed file, or a missing baseline fails honestly.
+
+Baseline handling: the runner inspects and validates the baseline run (refuses invalid), reads its manifest and failure report to identify the baseline failure signals/timestamp and the passing reference, records baseline provenance (run id, manifest and failure-report SHA-256), and never regenerates or alters it. Execution uses the named configured command only with an explicit timeout, capturing stdout/stderr/exit-code/duration/logs and the generated waveform reference (via triage of the command result); artifacts are preserved on failure and the worktree is removed afterward. The baseline repository is never modified and nothing is committed, pushed, or altered on any remote.
+
+Outcome classification (`counterfactual/classify.py`) is deterministic and evidence-based — command status, whether valid intervention comparison evidence exists, and the baseline vs intervention divergent-signal sets and timestamps — yielding exactly one of `failure_removed`, `failure_delayed`, `failure_advanced`, `failure_changed`, `no_observable_effect`, `new_failure_introduced`, `experiment_failed`, or `insufficient_evidence`. The report records observable differences, generated-artifact references with hashes, warnings, insufficient-evidence reasons, and an explicit non-causality disclaimer; it never asserts root cause or causality.
+
+Validation evidence:
+
+- Real Icarus-backed pilot (`scripts/counterfactual_pilot_check.py`, registered in `scripts/check.py`): builds a target Git repo from the project-owned `examples/counterfactual-axi/` fixture (seeded backpressure fault), generates a genuine baseline failure run, then applies `interventions/remove-fault.diff` through `run-counterfactual`; asserts `failure_removed`, the source repo stays byte-for-byte unchanged (same commit, identical file hashes, no remotes), all intermediate evidence is preserved, the worktree is cleaned, and the report makes no causal claim. Skips cleanly when Icarus is absent.
+- Deterministic hermetic tests (`tests/test_counterfactual.py`, 16): classifier unit tests for every outcome; service tests over a fake configured command for failure-removal, no-observable-effect, patch-application failure, command timeout, exec-error, invalid baseline refusal, disallowed-file refusal, dirty-target-repo safety, worktree cleanup, and stable report serialization (excluding volatile fields).
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 277 pytest tests, agent portability check, all example checks (including the new counterfactual pilot), and packaging smoke verification (which now exercises `run-counterfactual --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The experiment runs the intervention command through a worktree-scoped `AgentConfig` (a `model_copy` of the user config re-pointed at the worktree with allowed paths restricted to it), so the existing command runner executes inside the isolated worktree with no changes to the command runner itself.
+- The intervention failure-intelligence run reuses `run_failure_intelligence` with the intervention's generated VCD as the failing input and the baseline's recorded passing reference as the golden input, so classification compares two failure reports produced by the same pipeline.
+- Patch application, target-file extraction, commit resolution, and dirty detection use Git directly (`git apply`, `--numstat`, `rev-parse`, `status --porcelain`); `git worktree add --detach` isolates the intervention from the working tree, so uncommitted changes in the target repo are excluded (recorded as a warning) rather than blocking the experiment.
+
+Known limitations:
+
+- Exactly one manual intervention per experiment; no automatic/LLM intervention generation, patch search/optimization, or stimulus minimization (out of scope by design).
+- `new_failure_introduced` vs `failure_changed` is decided by divergent-signal-set overlap; assertion-identity change is recorded as evidence but is not itself a classifier input because a baseline failure-intelligence run does not necessarily carry an assertion.
+- The pilot depends on a locally installed Icarus Verilog; the hermetic tests use a fake command and cover the machinery and classification rather than real simulation.
