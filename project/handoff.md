@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Simulator-Generated Multi-Module Failure Pilot
+Simulator Failure Triage Integration Pilot
 
 ## Completed Work
 

@@ -1,0 +1,17 @@
+schema_version: 1
+repository_path: axi-router-sim-triage/rtl
+run_artifact_dir: ../.rtl-agent/runs
+allowed_working_paths:
+  - axi-router-sim-triage
+protected_paths: []
+execution:
+  timeout_seconds: 30
+  max_output_bytes: 1048576
+commands:
+  smoke:
+    argv:
+      - python3
+      - -c
+      - "print('axi router sim triage smoke ok')"
+    cwd: axi-router-sim-triage
+    timeout_seconds: 10
