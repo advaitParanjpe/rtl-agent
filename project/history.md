@@ -1079,3 +1079,29 @@ Known limitations:
 - Fingerprints summarize available textual artifacts only; they do not add elaboration, preprocessing, semantic connectivity, new waveform analysis, stimulus minimization, or causal inference.
 - Sparse evidence yields an explicit insufficient-evidence comparison rather than a confident family assignment.
 - The new commands compare one run or two fingerprints at a time; batch clustering across regression runs is the next active milestone.
+
+## 2026-07-05 - Failure Family Clustering Across Regression Runs
+
+Added a deterministic, read-only workflow that groups many existing failure fingerprints from a regression run into a small set of recurring observed failure families and emits an engineer-facing regression summary. New `cluster-failures` CLI command plus a `failure_family` service (`src/rtl_agent/failure_family/`, `failure_family_models.py`) turn a repeated `--fingerprint` list and/or a `--fingerprint-dir` into a typed, versioned JSON report, a concise Markdown report, and a terminal summary — without rerunning simulations or performing new waveform/RTL analysis. Inputs preserve their source path as provenance while absolute paths never enter semantic identity; `--strict` fails the whole operation on any invalid/incompatible input, while permissive (default) excludes invalid inputs and records warnings.
+
+Grouping reuses the existing fingerprint comparison semantics with no duplicated logic: the path-based `compare_fingerprints` was refactored to delegate to a new public model-level `compare_fingerprint_reports`, which the clustering service reuses for related-family links. Primary family membership is equal `family_digest` (a stable, transitive rule documented in the parser notes); exact duplicates are equal `exact_digest` within a family; insufficient-evidence fingerprints (non-empty `insufficient_evidence`) are reported separately and never forced into a confident family; single-member families are unique outliers; distinct families that still share ≥1 fingerprint component are recorded as related-family links (bounded pairwise over representatives). Each family carries one deterministic representative (most complete evidence; ties broken by canonical fields then digest, with the reason recorded), a concise evidence-grounded description that is never a root-cause claim, an observed time range, assertion identities, earliest-divergence signals, relevant-signal union/intersection, mapped sources, and ambiguity/insufficient markers. Every ordering is canonical, so the result is independent of input order. Counterfactual experiment reports may be supplied directly — their baseline and intervention runs are fingerprinted via the existing `fingerprint_run` service, with no separate manual conversion.
+
+Validation evidence:
+
+- Deterministic tests (`tests/test_failure_family.py`, 17): multiple exact duplicates; time-shifted members of one family; multiple distinct families; changed assertion identity; changed earliest-divergence mechanism; insufficient-evidence handling; related but nonidentical families (a `related_but_materially_different` link with shared/differing components); duplicate input files; malformed and incompatible input; strict vs permissive; input-order independence; deterministic representative selection; stable JSON and Markdown output; empty input; directory input; a larger synthetic regression set (20 runs → 3 families); and counterfactual baseline/intervention fingerprints participating.
+- Hermetic example check (`scripts/failure_family_cluster_check.py`, registered in `scripts/check.py`): generates real fingerprints for three distinct mechanisms from the checked-in fixtures, replays each three times, and asserts nine regression seeds collapse into three families (each with three exact-duplicate members), plus order-independence — with no simulator.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 306 pytest tests, agent portability check, all example checks (including the new family-cluster check), and packaging smoke verification (which now exercises `cluster-failures --help`).
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Family membership is defined by equality of the existing `family_digest` (transitive by construction), so grouping needs no non-transitive pairwise clustering; the existing comparison semantics are used only for related-family links and representative-level component differences.
+- To avoid duplicating fingerprint logic, comparison was made reusable at the model level (`compare_fingerprint_reports`) rather than re-implemented in the clustering service; the public path-based API is unchanged.
+- Counterfactual integration derives fingerprints from a counterfactual report's baseline run directory and its `intervention-run` subdirectory via `fingerprint_run`, so a `failure_removed` intervention naturally lands in the insufficient-evidence bucket while the baseline forms a family.
+
+Known limitations:
+
+- Related-family link computation is bounded (skipped with a warning above 48 families) to keep the pairwise pass small and deterministic.
+- Within a single `family_digest`, all family-defining fields are identical, so representative completeness ties are common and resolved by exact digest then source path; the recorded reason states this.
+- Counterfactual participation fingerprints the baseline and intervention runs referenced by one report; it does not recursively expand nested experiment references.

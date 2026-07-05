@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Failure Fingerprinting and Experiment Comparison
+Failure Family Clustering Across Regression Runs
 
 ## Completed Work
 
@@ -36,4 +36,4 @@ Failure Fingerprinting and Experiment Comparison
 
 ## Resume Instructions
 
-- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Failure Family Clustering Across Regression Runs`.
+- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Counterexample Stimulus Minimization Foundation`.
