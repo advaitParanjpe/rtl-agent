@@ -940,3 +940,29 @@ Known limitations:
 - `payload_staged` is the boundary net and is dumped under both the ingress (output) and route (input) scopes, so its aggregated graph node carries declarations from both files; this is faithful to the wiring but means the boundary signal is not single-file.
 - Only Icarus Verilog is wired; Verilator is not used, and the VCD timescale is the iverilog default (`1s`) since the fixtures omit an explicit `timescale.
 - The check compiles and runs a real toolchain, so it is slower than the hand-authored checks and depends on the locally installed simulator version.
+
+## 2026-07-04 - Simulator Failure Triage Integration Pilot
+
+Wired real simulator logs and assertion evidence into the existing failure-intelligence orchestration end to end, reusing the command runner, triage, assertion-to-waveform linking, waveform extraction, and run services rather than adding a parallel pipeline. Added a simulatable fixture (`examples/axi-router-sim-triage/rtl/axi_pipe.sv`, `tb/axi_pipe_tb.sv`, and `examples/axi-router-sim-triage-agent.yaml`) with an explicit `` `timescale 1ns/1ns `` so log timestamps and VCD ticks share ns units: the testbench dumps a VCD, and on the compile-time-seeded fault (`INJECT_FAULT`) it emits a stable marker `assertion payload_stable failed at time=45 ns` when the observable payload goes unknown, then terminates the run with a non-zero status (`$fatal`) after the full waveform is written. A new gated check (`scripts/axi_router_simulated_triage_check.py`, registered in `scripts/check.py`) detects Icarus Verilog and, when present: compiles the clean and faulted builds and generates the passing reference VCD directly; runs the failing simulation through the existing command runner (`run-command`, which records it as `failed` with exit code 1 and captures its stdout/stderr and the dumped VCD); triages the captured result with `triage-command` (recovering the `payload_stable` assertion at `45 ns` and the referenced `cmd_failure.vcd`); links the finding with `link-assertion-waveform`, which derives the failure timestamp (`45 ns` → tick 45, exact, using the VCD timescale) and selects the failing VCD — the user provides neither the failure time nor the waveform path; and drives the existing `run-failure-intelligence` orchestration over the derived failing VCD and timestamp plus the passing reference. It asserts the divergence is localized to `axi_pipe.sv` at t=45, that the triaged failure and the localized divergence describe one run (the linked VCD is the one the run consumed and the comparison's earliest divergence equals the derived assertion tick), and that run inspection is valid and the portable-package export is verified. When the simulator is absent the check skips cleanly and returns success.
+
+Validation evidence:
+
+- Confirmed the whole chain manually before codifying assertions: `run-command` → status `failed`, exit 1; `triage-command` → assertion `payload_stable` / `45 ns`, waveform `cmd_failure.vcd` (exists); `link-assertion-waveform` → `failure_timestamp_ticks=45`, `exact=true`, selected `cmd_failure.vcd`; `run-failure-intelligence` → earliest divergence 45 on `payload_out`/`payload_reg`, exact mapping and report citing `axi_pipe.sv`, no root-cause claim; inspection valid; package verified.
+- Verified the skip path with an empty `PATH`: "skipped (iverilog/vvp not available)", rc=0.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 258 pytest tests, agent portability check, all eleven example checks (all three simulator checks ran because Icarus Verilog is installed), and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- No product code changed and no simulator-specific logic was added to any general analysis service; the check composes existing CLI commands only (`run-command`, `triage-command`, `link-assertion-waveform`, `run-failure-intelligence`, `inspect-run`, `export-failure-package`).
+- The failure timestamp and failing-waveform path are derived from the triaged assertion and its waveform reference through the existing linker, satisfying the "no manual timestamp/path" requirement; only the assertion *finding index* (`--assertion-index 0`) is selected, which chooses which finding, not the time or path.
+- The testbench emits the assertion marker on the value-change of the observable payload (so the timestamp is the divergence time, t=45, not a clock-sample cycle later) and defers `$fatal` to the end of the stimulus so the full VCD is written before the terminal failure; the passing build never trips the marker and exits zero.
+- An explicit `` `timescale 1ns/1ns `` makes the assertion's `ns` units convert exactly against the VCD timescale (the linker requires an explicit unit and fails rather than guessing), so the derived tick is exact.
+- The failing run is executed through the command runner via a workspace-local config whose command invokes `vvp` on the pre-compiled binary; compilation and the passing reference are fixture prep, consistent with the earlier simulator pilots.
+
+Known limitations:
+
+- Terminal-failure capture relies on `$fatal` yielding a non-zero `vvp` exit; a simulator that reported failures differently (e.g. only via a log string) would need a different marker convention, though triage would still recover the textual assertion.
+- The pilot is single-module; it exercises the triage/assertion/link integration rather than cross-module localization (covered by the prior multi-module pilot).
+- Only Icarus Verilog is wired, and the check compiles and runs a real toolchain, so it is slower than the hand-authored checks and depends on the locally installed simulator version.
