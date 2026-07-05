@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Manual Counterfactual Intervention Runner
+Failure Fingerprinting and Experiment Comparison
 
 ## Completed Work
 
@@ -36,4 +36,4 @@ Manual Counterfactual Intervention Runner
 
 ## Resume Instructions
 
-- Read `AGENTS.md` and `project/current.md`.
+- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Failure Family Clustering Across Regression Runs`.

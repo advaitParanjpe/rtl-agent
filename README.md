@@ -389,6 +389,23 @@ rtl-agent inspect-run --run-dir .rtl-agent/runs/my-run --output .rtl-agent/inspe
 
 For each recorded artifact it resolves the run-relative path against the actual directory (rejecting traversal) and reports one of `valid`, `missing`, `hash_mismatch`, `schema_malformed`, `schema_unsupported`, or `unsafe_path`; each stage is reported as `valid`, `incomplete`, `stale` (own outputs valid but an upstream stage is invalid), or `invalid`. It also re-checks whether the recorded external inputs still exist. The command prints a concise summary and, with `--output`, writes a typed, versioned JSON inspection report; it exits non-zero when the run is invalid (still writing the report), and never modifies, regenerates, deletes, migrates, resumes, or replays anything.
 
+`fingerprint-run` reads an existing run directory and writes a stable, typed failure fingerprint without re-running analysis:
+
+```bash
+rtl-agent fingerprint-run --run-dir .rtl-agent/runs/my-run --output .rtl-agent/fingerprints/my-run.json
+```
+
+`compare-fingerprints` compares two fingerprint JSON files and reports exact matches, same likely observed failure family, related-but-different failures, or insufficient evidence:
+
+```bash
+rtl-agent compare-fingerprints \
+  --left .rtl-agent/fingerprints/baseline.json \
+  --right .rtl-agent/fingerprints/intervention.json \
+  --output .rtl-agent/fingerprints/comparison.json
+```
+
+Fingerprints are deterministic summaries of existing evidence: assertion identity, normalized failure-time characteristics, earliest divergent signals, ranked divergent/relevant signals, transition and `x`/`z` characteristics, mapped source/dependency shape, ambiguity/unresolved markers, divergence-graph shape, and terminal outcome. The digest excludes volatile metadata such as run IDs, execution timestamps, absolute paths, durations, UUID-like command IDs, and artifact hashes. It is a grouping/comparison aid, not a causal or root-cause claim.
+
 `export-failure-package` packages a validated run directory into a single self-contained, portable failure package (read-only):
 
 ```bash

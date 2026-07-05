@@ -1049,3 +1049,33 @@ Known limitations:
 - Exactly one manual intervention per experiment; no automatic/LLM intervention generation, patch search/optimization, or stimulus minimization (out of scope by design).
 - `new_failure_introduced` vs `failure_changed` is decided by divergent-signal-set overlap; assertion-identity change is recorded as evidence but is not itself a classifier input because a baseline failure-intelligence run does not necessarily carry an assertion.
 - The pilot depends on a locally installed Icarus Verilog; the hermetic tests use a fake command and cover the machinery and classification rather than real simulation.
+
+## 2026-07-05 - Failure Fingerprinting and Experiment Comparison
+
+Added a deterministic, read-only failure-fingerprinting capability for existing failure-intelligence runs. The new `failure_fingerprint` service and typed models build exact and family digests from stable observed-evidence components: assertion identity, terminal simulator/command outcome, normalized failure-time characteristics, earliest divergent signals, ranked divergent and relevant signal sets, transition and `x`/`z` characteristics, mapped RTL source/dependency shape, unresolved and ambiguous markers, and failure-divergence graph shape. The digest construction excludes volatile metadata such as run IDs, execution timestamps, durations, absolute paths, UUID-like command IDs, artifact hashes, and raw path-bearing command errors. Shifted-time failures remain distinguishable by exact digest while sharing the same likely observed failure family when the signal/source/dependency mechanism is otherwise unchanged.
+
+Added `rtl-agent fingerprint-run` and `rtl-agent compare-fingerprints` as bounded read-only commands. `fingerprint-run` consumes an existing run directory and writes a typed JSON fingerprint without re-running analysis. `compare-fingerprints` consumes two fingerprint JSON files and emits a typed comparison report distinguishing exact identity, same likely observed failure family, related but materially different failures, and insufficient evidence; the CLI also prints a concise component-level summary. README command documentation and command-help coverage were updated.
+
+Integrated fingerprints into counterfactual experiment reports where available: baseline and intervention failure identities now carry exact/family digest fields, Markdown reports display them, and observable differences record digest changes for failure-removed and failure-changed scenarios. Missing or malformed fingerprint evidence does not block counterfactual analysis; it remains an optional comparison-strength improvement over the existing evidence path.
+
+Validation evidence:
+
+- `python3 -m pytest tests/test_failure_fingerprint.py tests/test_counterfactual.py tests/test_cli.py` - passed, 31 tests.
+- `python3 -m ruff format --check .` - passed.
+- `python3 -m ruff check .` - passed.
+- `python3 -m mypy` - passed, 151 source files.
+- `python3 scripts/check.py` - passed.
+- `git diff --check` - passed.
+- `git status --short --branch` - reviewed before commit.
+
+Architectural decisions:
+
+- The fingerprint service only reads manifest-linked artifacts from an existing run and stores input provenance as run-relative paths; it does not trust or hash absolute run locations into semantic identity.
+- Exact digests include normalized timing evidence; family digests intentionally exclude time-only shifts so repeated observations of the same mechanism can group together while still preserving exact distinctions.
+- Comparison remains local and pairwise in this milestone. Multi-run clustering is the next milestone rather than being hidden inside fingerprint comparison.
+
+Known limitations:
+
+- Fingerprints summarize available textual artifacts only; they do not add elaboration, preprocessing, semantic connectivity, new waveform analysis, stimulus minimization, or causal inference.
+- Sparse evidence yields an explicit insufficient-evidence comparison rather than a confident family assignment.
+- The new commands compare one run or two fingerprints at a time; batch clustering across regression runs is the next active milestone.

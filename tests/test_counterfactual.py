@@ -9,6 +9,7 @@ import pytest
 
 from rtl_agent.artifacts import RunStore
 from rtl_agent.counterfactual import CounterfactualError, classify_outcome, run_counterfactual
+from rtl_agent.counterfactual.service import _observable_differences
 from rtl_agent.counterfactual_models import CounterfactualOutcome, FailureIdentity
 from rtl_agent.failure_intelligence_run import run_failure_intelligence
 
@@ -99,6 +100,40 @@ def test_classify_insufficient_evidence() -> None:
     assert _classify("passed", True, _identity([], None), _identity(["x"], 5)) == (
         CounterfactualOutcome.INSUFFICIENT_EVIDENCE
     )
+
+
+def test_counterfactual_fingerprint_differences_for_removed_and_changed() -> None:
+    baseline = FailureIdentity(
+        signals=["sig_a"],
+        failure_time=40,
+        divergence_present=True,
+        fingerprint_exact_digest="exact-a",
+        fingerprint_family_digest="family-a",
+    )
+    removed = FailureIdentity(
+        signals=[],
+        failure_time=None,
+        divergence_present=False,
+        fingerprint_exact_digest=None,
+        fingerprint_family_digest=None,
+    )
+    changed = FailureIdentity(
+        signals=["sig_a", "sig_b"],
+        failure_time=40,
+        divergence_present=True,
+        fingerprint_exact_digest="exact-b",
+        fingerprint_family_digest="family-b",
+    )
+
+    assert _classify("passed", True, baseline, removed) == CounterfactualOutcome.FAILURE_REMOVED
+    assert _classify("passed", True, baseline, changed) == CounterfactualOutcome.FAILURE_CHANGED
+    removed_fields = {item.field for item in _observable_differences(baseline, removed)}
+    changed_fields = {item.field for item in _observable_differences(baseline, changed)}
+
+    assert "failure_fingerprint_exact_digest" in removed_fields
+    assert "failure_fingerprint_family_digest" in removed_fields
+    assert "failure_fingerprint_exact_digest" in changed_fields
+    assert "failure_fingerprint_family_digest" in changed_fields
 
 
 # --------------------------------------------------------------------------- #

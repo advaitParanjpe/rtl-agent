@@ -33,6 +33,13 @@ from rtl_agent.failure_divergence_graph import (
     build_failure_divergence_graph,
     write_divergence_graph,
 )
+from rtl_agent.failure_fingerprint import (
+    FailureFingerprintError,
+    compare_fingerprints,
+    fingerprint_run,
+    write_fingerprint_comparison,
+    write_fingerprint_report,
+)
 from rtl_agent.failure_intelligence_run import (
     FailureIntelligenceRunError,
     run_failure_intelligence,
@@ -811,6 +818,48 @@ def inspect_run_command(
         raise typer.Exit(1)
 
 
+@app.command("fingerprint-run")
+def fingerprint_run_command(
+    run_dir: Annotated[
+        Path,
+        typer.Option("--run-dir", help="Existing failure-intelligence run directory."),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="Path for the failure-fingerprint JSON."),
+    ],
+) -> None:
+    """Build a stable read-only failure fingerprint from existing run artifacts."""
+    try:
+        report = fingerprint_run(run_dir)
+        write_fingerprint_report(report, output)
+    except FailureFingerprintError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_fingerprint_summary(report, output)
+
+
+@app.command("compare-fingerprints")
+def compare_fingerprints_command(
+    left: Annotated[Path, typer.Option("--left", help="Left failure-fingerprint JSON.")],
+    right: Annotated[Path, typer.Option("--right", help="Right failure-fingerprint JSON.")],
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="Path for the fingerprint-comparison JSON."),
+    ],
+) -> None:
+    """Compare two stable failure fingerprints without re-running analysis."""
+    try:
+        report = compare_fingerprints(left, right)
+        write_fingerprint_comparison(report, output)
+    except FailureFingerprintError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_fingerprint_comparison_summary(report, output)
+
+
 @app.command("export-failure-package")
 def export_failure_package_command(
     run_dir: Annotated[
@@ -1202,6 +1251,44 @@ def _print_inspection_summary(report: object, output: Path | None) -> None:
             "invalid_artifacts": report.invalid_artifacts,
             "external_inputs_present": report.external_inputs_present,
             "stages": [{"name": stage.name, "validity": stage.validity} for stage in report.stages],
+            "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_fingerprint_summary(report: object, output: Path) -> None:
+    from rtl_agent.failure_fingerprint_models import FailureFingerprintReport
+
+    assert isinstance(report, FailureFingerprintReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "exact_digest": report.exact_digest,
+            "family_digest": report.family_digest,
+            "earliest_divergent_signals": report.earliest_divergent_signals,
+            "assertion_identity": report.assertion_identity,
+            "insufficient_evidence": report.insufficient_evidence,
+            "warnings": len(report.warnings),
+        }
+    )
+
+
+def _print_fingerprint_comparison_summary(report: object, output: Path) -> None:
+    from rtl_agent.failure_fingerprint_models import FingerprintComparisonReport
+
+    assert isinstance(report, FingerprintComparisonReport)
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "match_kind": report.match_kind,
+            "exact_match": report.exact_match,
+            "family_match": report.family_match,
+            "differing_components": [
+                item.component for item in report.component_matches if not item.match
+            ],
+            "summary": report.summary,
             "warnings": len(report.warnings),
         }
     )
