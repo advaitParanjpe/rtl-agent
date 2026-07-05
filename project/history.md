@@ -995,3 +995,27 @@ Known limitations:
 - The snapshot is four files; larger upstream trees (includes, packages, interfaces, generate-heavy code) remain unexercised.
 - Waveform-driven stages (extract/compare/divergence graph) are not exercised against the external RTL in this pilot since no simulator run of upstream code is vendored.
 - The three discovered accuracy limitations above are real product gaps in discovery line reporting, mapping primary selection, and dependency-node identity; they motivate the next milestone.
+
+## 2026-07-04 - External RTL Mapping Accuracy Follow-up
+
+Fixed the three concrete real-code accuracy gaps exposed by the external verilog-axis pilot without changing public artifact schemas or adding fixture-specific/AXI-specific heuristics. Discovery declaration locations now report the declaration keyword/name line instead of leading blank or masked comment lines. Signal-source mapping now prefers a deeper unique scope component as the primary candidate for nested hierarchy paths while preserving ambiguity when a deeper component maps to multiple declarations. Driver dependency expansion now carries an evidence-file scope through the bounded textual BFS so same-named identifiers in unrelated files/modules are not conflated into one dependency expansion.
+
+Validation evidence:
+
+- `python3 -m pytest tests/test_discovery.py tests/test_signal_source_map.py tests/test_rtl_driver_trace.py` - passed, 32 tests.
+- `python3 scripts/external_axi_router_repo_check.py` - passed, now asserting real verilog-axis declaration lines, nested `arbiter` primary mapping for `tb.axis_arb_mux.arbiter.grant_reg`, and file-scoped `m_axis_tdata_int` dependency edges.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 261 pytest tests, agent portability check, all external/example/simulator checks, and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short --branch` - reviewed before commit.
+
+Architectural decisions:
+
+- Declaration line accuracy uses the existing regex match's `kind` group offset; it does not add preprocessing or a new parser.
+- Mapping scoring still uses deterministic declaration-name evidence only; unique deeper scope evidence outranks a shallower scope, while duplicated deeper scope evidence is penalized so honest ambiguity does not override a clean outer match.
+- Driver dependency expansion remains textual and bounded; dependency identifiers discovered from a driver are followed only in that driver's evidence file, while direct ambiguous/multi-candidate signal tracing still searches all preserved candidate files.
+
+Known limitations:
+
+- The fixes do not elaborate hierarchy or prove semantic connectivity; port connections remain textual evidence only.
+- The external pilot still validates a small pinned subset and does not exercise a simulator-generated waveform from upstream RTL.
+- Real instance port-connection evidence across the vendored hierarchy is the next external-RTL limitation to validate.

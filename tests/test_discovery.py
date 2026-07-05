@@ -117,6 +117,22 @@ endmodule
     assert "ignored" not in mask_comments_and_strings("// ignored\n")
 
 
+def test_parser_reports_declaration_keyword_line_after_comments() -> None:
+    parsed = parse_systemverilog(
+        """
+/*
+ * Header comment
+ */
+
+module aligned;
+endmodule
+"""
+    ).info
+
+    assert parsed.declarations[0].name == "aligned"
+    assert parsed.declarations[0].line == 6
+
+
 def test_scanner_respects_exclusions_limits_binary_oversized_and_symlinks(tmp_path: Path) -> None:
     repo = tmp_path / "repo"
     write(repo / "rtl" / "top.sv", "module top; endmodule\n")

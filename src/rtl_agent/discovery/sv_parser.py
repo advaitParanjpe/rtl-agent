@@ -77,7 +77,7 @@ def parse_systemverilog(text: str) -> ParsedSource:
         SourceDeclaration(
             kind=DeclarationKind(match.group("kind")),
             name=match.group("name"),
-            line=_line_for_offset(masked, match.start()),
+            line=_line_for_offset(masked, match.start("kind")),
         )
         for match in DECLARATION_RE.finditer(masked)
     ]

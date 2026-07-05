@@ -11,13 +11,11 @@ commit, license, attribution, and per-file sha256 digests from
 ``PROVENANCE.json``) so the vendored snapshot cannot silently drift.
 
 Assertions target honest behaviour on real code: real module discovery and
-hierarchy, exact mapping where the scope names the module, preserved
-multi-candidate evidence on nested instance paths, honest unresolved results,
-real procedural and continuous driver statements at their actual source lines,
-and bounded artifact sizes. Known limitations discovered here (declaration
-line-number skew from leading blank lines, shallow-scope primary preference on
-nested paths, cross-file conflation of same-named identifiers) are recorded in
-project history rather than papered over with fixture-specific assertions.
+hierarchy, declaration source-line accuracy, exact mapping where the scope names
+the module, corrected primary selection on nested instance paths while
+preserving candidate evidence, honest unresolved results, real procedural and
+continuous driver statements at their actual source lines, scoped dependency
+expansion for same-named identifiers, and bounded artifact sizes.
 
 If the vendored snapshot is absent the check skips cleanly, keeping the default
 suite hermetic. No new analysis behaviour is added.
@@ -44,10 +42,10 @@ RTL_DIR = UPSTREAM / "rtl"
 PROVENANCE = FIXTURE / "PROVENANCE.json"
 
 EXPECTED_MODULES = {
-    "arbiter.v": "arbiter",
-    "axis_arb_mux.v": "axis_arb_mux",
-    "axis_demux.v": "axis_demux",
-    "priority_encoder.v": "priority_encoder",
+    "arbiter.v": ("arbiter", 34),
+    "axis_arb_mux.v": ("axis_arb_mux", 34),
+    "axis_demux.v": ("axis_demux", 34),
+    "priority_encoder.v": ("priority_encoder", 34),
 }
 MAX_ARTIFACT_BYTES = 256 * 1024
 
@@ -137,19 +135,19 @@ def _check_provenance() -> None:
 
 def _check_discovery(repo_map_path: Path) -> None:
     repository_map = RepositoryMap.model_validate_json(repo_map_path.read_text(encoding="utf-8"))
-    modules_by_file: dict[str, list[str]] = {}
+    modules_by_file: dict[str, list[tuple[str, int]]] = {}
     for record in repository_map.files:
         assert "rtl_source" in [str(c) for c in record.categories], record.path
         if record.source is not None:
-            modules_by_file[record.path] = [d.name for d in record.source.declarations]
+            modules_by_file[record.path] = [
+                (declaration.name, declaration.line) for declaration in record.source.declarations
+            ]
             for declaration in record.source.declarations:
                 assert str(declaration.kind) == "module"
-                # NOTE: exact line numbers are deliberately not asserted; on this
-                # real code discovery currently reports the declaration a few
-                # lines early (recorded limitation: leading blank lines are
-                # swallowed by the declaration regex).
                 assert declaration.line >= 1
-    assert {path: names[0] for path, names in modules_by_file.items()} == EXPECTED_MODULES
+    assert {path: declarations[0] for path, declarations in modules_by_file.items()} == (
+        EXPECTED_MODULES
+    )
 
     hierarchy = repository_map.hierarchy
     # The real instantiation hierarchy: axis_arb_mux instantiates arbiter, which
@@ -173,11 +171,14 @@ def _check_mapping(signal_map_path: Path) -> None:
     assert demux.status == "exact"
     assert {c.file_path for c in demux.candidates} == {"axis_demux.v"}
 
-    # Nested instance path: both the outer and inner module files are preserved
-    # as candidates. (Recorded limitation: the primary candidate is currently
-    # the shallower scope component, axis_arb_mux, not the declaring arbiter.)
+    # Nested instance path: both the outer and inner module files are preserved,
+    # but the deeper unique child scope is now the primary candidate.
     nested = mappings["tb.axis_arb_mux.arbiter.grant_reg"]
     assert {c.file_path for c in nested.candidates} == {"arbiter.v", "axis_arb_mux.v"}
+    nested_primary = [candidate for candidate in nested.candidates if candidate.primary]
+    assert len(nested_primary) == 1
+    assert nested_primary[0].declaration_name == "arbiter"
+    assert nested_primary[0].file_path == "arbiter.v"
 
     # A path with no matching declaration stays honestly unresolved.
     assert mappings["tb.monitor.debug_count"].status == "unresolved"
@@ -227,6 +228,13 @@ def _check_driver_trace(trace_path: Path) -> None:
         if edge.source_signal == "grant_reg" or edge.depends_on == "grant_reg"
     }
     assert "arbiter.v" in edge_files
+    tdata_int_edges = {
+        (edge.source_signal, edge.depends_on, edge.evidence_file)
+        for edge in trace.dependency_edges
+        if edge.source_signal == "m_axis_tdata_int"
+    }
+    assert tdata_int_edges
+    assert {file for _, _, file in tdata_int_edges} == {"axis_arb_mux.v"}
 
     # Unmapped input stays honestly untraced, and expansion stays bounded.
     assert traced["tb.monitor.debug_count"].status == "unmapped"

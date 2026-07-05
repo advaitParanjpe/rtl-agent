@@ -137,6 +137,25 @@ def test_scope_based_disambiguation_prefers_outer_scope(tmp_path: Path) -> None:
     assert inner == ["rtl/a/inner.sv", "rtl/b/inner.sv"]
 
 
+def test_unique_deeper_scope_becomes_primary(tmp_path: Path) -> None:
+    repo = make_repo_map(
+        tmp_path,
+        [
+            ("rtl/top.sv", "top", DeclarationKind.MODULE, 1),
+            ("rtl/child.sv", "child", DeclarationKind.MODULE, 5),
+        ],
+    )
+
+    report = map_signals_to_source(repo, signal_names=["tb.top.child.state"])
+
+    mapping = report.mappings[0]
+    assert mapping.status == "exact"
+    primary = [c for c in mapping.candidates if c.primary]
+    assert len(primary) == 1
+    assert primary[0].declaration_name == "child"
+    assert primary[0].file_path == "rtl/child.sv"
+
+
 def test_case_insensitive_match_is_probable(tmp_path: Path) -> None:
     repo = make_repo_map(tmp_path, [("rtl/top.sv", "Top", DeclarationKind.MODULE, 1)])
 
