@@ -19,8 +19,10 @@ from rtl_agent.waveform_slice_models import WaveformSliceReport
 # Score tiers. Scope (non-leaf) exact-name matches to a declaration are the
 # strongest evidence; leaf and case-insensitive matches are weaker.
 _SCOPE_EXACT = 100
+_AMBIGUOUS_SCOPE_EXACT = 90
 _LEAF_EXACT = 60
 _SCOPE_CI = 40
+_AMBIGUOUS_SCOPE_CI = 30
 _LEAF_CI = 20
 _MAX_CANDIDATES_PER_SIGNAL = 64
 
@@ -167,10 +169,15 @@ def _map_signal(
     for index, element in enumerate(elements):
         is_leaf = index == len(elements) - 1
         role = "leaf" if is_leaf else "scope"
-        depth_bonus = len(elements) - index
+        depth_bonus = index
         exact_matches = index_exact.get(element, [])
         if exact_matches:
-            base = _LEAF_EXACT if is_leaf else _SCOPE_EXACT + depth_bonus
+            if is_leaf:
+                base = _LEAF_EXACT
+            elif len(exact_matches) == 1:
+                base = _SCOPE_EXACT + depth_bonus
+            else:
+                base = _AMBIGUOUS_SCOPE_EXACT + depth_bonus
             for declaration in exact_matches:
                 candidates.append(_candidate(element, role, declaration, base, "exact name match"))
             continue
@@ -180,7 +187,12 @@ def _map_signal(
             if declaration.name != element
         ]
         if ci_matches:
-            base = _LEAF_CI if is_leaf else _SCOPE_CI + depth_bonus
+            if is_leaf:
+                base = _LEAF_CI
+            elif len(ci_matches) == 1:
+                base = _SCOPE_CI + depth_bonus
+            else:
+                base = _AMBIGUOUS_SCOPE_CI + depth_bonus
             for declaration in ci_matches:
                 candidates.append(
                     _candidate(element, role, declaration, base, "case-insensitive name match")

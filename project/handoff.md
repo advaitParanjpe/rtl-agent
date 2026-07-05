@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-External AXI Router Repository Integration
+External RTL Mapping Accuracy Follow-up
 
 ## Completed Work
 

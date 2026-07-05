@@ -145,6 +145,19 @@ class _ScannedFile:
     declarations: list[tuple[int, str]]  # (line, name) ascending
 
 
+@dataclass(frozen=True)
+class _DependencySeed:
+    identifier: str
+    files: tuple[str, ...]
+
+
+@dataclass
+class _NodeState:
+    depth: int
+    resolved: bool = False
+    driver_count: int = 0
+
+
 def trace_drivers(
     signal_source_map_path: Path,
     repository_map_path: Path,
@@ -166,18 +179,20 @@ def trace_drivers(
     cache: dict[str, _ScannedFile | None] = {}
 
     traced_signals: list[TracedSignal] = []
-    relevant_files: set[str] = set()
-    seed_leaves: list[str] = []
+    dependency_seeds: list[_DependencySeed] = []
     for mapping in signal_map.mappings:
         traced = _trace_signal(mapping, repository_root, declarations_by_file, cache, warnings)
         traced_signals.append(traced)
         if traced.status != TraceStatus.UNMAPPED:
-            relevant_files.update(traced.searched_files)
-            seed_leaves.append(mapping.leaf)
+            dependency_seeds.append(
+                _DependencySeed(mapping.leaf, tuple(sorted(traced.searched_files)))
+            )
 
     nodes, edges, unresolved, truncated = _expand_dependencies(
-        sorted(dict.fromkeys(seed_leaves)),
-        sorted(relevant_files),
+        sorted(
+            dict.fromkeys(dependency_seeds),
+            key=lambda item: (item.identifier, item.files),
+        ),
         repository_root,
         declarations_by_file,
         cache,
@@ -388,48 +403,50 @@ def _classify_line(
 
 
 def _expand_dependencies(
-    seeds: list[str],
-    relevant_files: list[str],
+    seeds: list[_DependencySeed],
     repository_root: Path,
     declarations_by_file: dict[str, list[tuple[int, str]]],
     cache: dict[str, _ScannedFile | None],
     max_depth: int,
     max_nodes: int,
 ) -> tuple[list[TraceNode], list[DependencyEdge], list[str], bool]:
-    visited: dict[str, int] = {}
-    nodes: list[TraceNode] = []
+    visited: set[tuple[str, tuple[str, ...]]] = set()
+    node_states: dict[str, _NodeState] = {}
     edges: list[DependencyEdge] = []
-    unresolved: set[str] = set()
     truncated = False
-    queue: deque[tuple[str, int]] = deque((seed, 0) for seed in seeds)
+    queue: deque[tuple[str, int, tuple[str, ...]]] = deque(
+        (seed.identifier, 0, seed.files) for seed in seeds
+    )
 
     while queue:
-        identifier, depth = queue.popleft()
-        if identifier in visited:
+        identifier, depth, file_scope = queue.popleft()
+        visit_key = (identifier, file_scope)
+        if visit_key in visited:
             continue
         if len(visited) >= max_nodes:
             truncated = True
             break
-        visited[identifier] = depth
+        visited.add(visit_key)
 
         drivers = _drivers_for(
-            identifier, relevant_files, repository_root, declarations_by_file, cache
+            identifier, list(file_scope), repository_root, declarations_by_file, cache
         )
         assign_drivers = [
             driver
             for driver in drivers
             if driver.kind in (StatementKind.CONTINUOUS_ASSIGN, StatementKind.PROCEDURAL_ASSIGN)
         ]
-        nodes.append(
-            TraceNode(
-                identifier=identifier,
+        state = node_states.get(identifier)
+        if state is None:
+            node_states[identifier] = _NodeState(
                 depth=depth,
                 resolved=bool(assign_drivers),
                 driver_count=len(assign_drivers),
             )
-        )
-        if not assign_drivers:
-            unresolved.add(identifier)
+        else:
+            state.depth = min(state.depth, depth)
+            state.resolved = state.resolved or bool(assign_drivers)
+            state.driver_count += len(assign_drivers)
         if depth >= max_depth:
             continue
         for driver in drivers:
@@ -446,8 +463,18 @@ def _expand_dependencies(
                         evidence_line=driver.line,
                     )
                 )
-                queue.append((dependency, depth + 1))
+                queue.append((dependency, depth + 1, (driver.file_path,)))
 
+    nodes = [
+        TraceNode(
+            identifier=identifier,
+            depth=state.depth,
+            resolved=state.resolved,
+            driver_count=state.driver_count,
+        )
+        for identifier, state in node_states.items()
+    ]
+    unresolved = {identifier for identifier, state in node_states.items() if not state.resolved}
     nodes.sort(key=lambda item: (item.depth, item.identifier))
     edges.sort(
         key=lambda item: (

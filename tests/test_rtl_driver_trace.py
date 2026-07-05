@@ -145,6 +145,37 @@ def test_dependency_expansion_edges_and_unresolved(tmp_path: Path) -> None:
     assert nodes["b"].resolved is False
 
 
+def test_dependency_expansion_keeps_same_identifier_scoped_to_driver_file(
+    tmp_path: Path,
+) -> None:
+    a = (
+        "module a;\n"
+        "    logic out, shared, local_a;\n"
+        "    assign out = shared;\n"
+        "    assign shared = local_a;\n"
+        "endmodule\n"
+    )
+    b = "module b;\n    logic shared, local_b;\n    assign shared = local_b;\nendmodule\n"
+    sig_map, repo_map = build(
+        tmp_path,
+        {
+            "rtl/a.sv": (a, [("a", 1)]),
+            "rtl/b.sv": (b, [("b", 1)]),
+        },
+        ["a.out"],
+    )
+
+    report = trace_drivers(sig_map, repo_map, max_depth=3, max_nodes=32)
+
+    edges = {
+        (edge.source_signal, edge.depends_on, edge.evidence_file)
+        for edge in report.dependency_edges
+    }
+    assert ("out", "shared", "rtl/a.sv") in edges
+    assert ("shared", "local_a", "rtl/a.sv") in edges
+    assert ("shared", "local_b", "rtl/b.sv") not in edges
+
+
 def test_depth_zero_records_no_edges(tmp_path: Path) -> None:
     sig_map, repo_map = build(tmp_path, {"rtl/dut.sv": (DUT, [("dut", 1)])}, ["dut.valid"])
 
