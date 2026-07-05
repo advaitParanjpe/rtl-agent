@@ -33,6 +33,12 @@ from rtl_agent.failure_divergence_graph import (
     build_failure_divergence_graph,
     write_divergence_graph,
 )
+from rtl_agent.failure_family import (
+    FailureFamilyError,
+    cluster_fingerprints,
+    render_cluster_markdown,
+    write_cluster_report,
+)
 from rtl_agent.failure_fingerprint import (
     FailureFingerprintError,
     compare_fingerprints,
@@ -860,6 +866,45 @@ def compare_fingerprints_command(
     _print_fingerprint_comparison_summary(report, output)
 
 
+@app.command("cluster-failures")
+def cluster_failures_command(
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="Directory or path prefix for the regression report."),
+    ],
+    fingerprint: Annotated[
+        list[Path] | None,
+        typer.Option("--fingerprint", help="Failure-fingerprint JSON file; may be repeated."),
+    ] = None,
+    fingerprint_dir: Annotated[
+        Path | None,
+        typer.Option("--fingerprint-dir", help="Directory of failure-fingerprint JSON files."),
+    ] = None,
+    strict: Annotated[
+        bool,
+        typer.Option(
+            "--strict/--permissive",
+            help="Fail on any invalid input (strict) or exclude and warn (permissive).",
+        ),
+    ] = False,
+) -> None:
+    """Group existing failure fingerprints into observed failure families (read-only)."""
+    try:
+        report = cluster_fingerprints(
+            fingerprint_paths=list(fingerprint or []),
+            fingerprint_dir=fingerprint_dir,
+            strict=strict,
+        )
+        json_path, markdown_path = _cluster_output_paths(output)
+        write_cluster_report(report, json_path)
+        render_cluster_markdown(report, markdown_path)
+    except FailureFamilyError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_cluster_summary(report, json_path, markdown_path)
+
+
 @app.command("export-failure-package")
 def export_failure_package_command(
     run_dir: Annotated[
@@ -1252,6 +1297,35 @@ def _print_inspection_summary(report: object, output: Path | None) -> None:
             "external_inputs_present": report.external_inputs_present,
             "stages": [{"name": stage.name, "validity": stage.validity} for stage in report.stages],
             "warnings": len(report.warnings),
+        }
+    )
+
+
+def _cluster_output_paths(output: Path) -> tuple[Path, Path]:
+    # A directory (or dir-like path) receives named report files; otherwise the
+    # given path is the JSON report and the Markdown sibling gets a .md suffix.
+    if output.is_dir() or output.suffix == "":
+        return output / "regression-families.json", output / "regression-families.md"
+    return output, output.with_suffix(".md")
+
+
+def _print_cluster_summary(report: object, json_path: Path, markdown_path: Path) -> None:
+    from rtl_agent.failure_family_models import FailureFamilyClusterReport
+
+    assert isinstance(report, FailureFamilyClusterReport)
+    summary = report.input_summary
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "json_report": str(json_path),
+            "markdown_report": str(markdown_path),
+            "total_inputs": summary.total_inputs,
+            "valid_fingerprints": summary.valid_fingerprints,
+            "family_count": summary.family_count,
+            "exact_duplicates": summary.exact_duplicate_count,
+            "outliers": summary.outlier_count,
+            "insufficient_evidence": summary.insufficient_evidence_count,
+            "excluded_inputs": summary.excluded_invalid,
         }
     )
 

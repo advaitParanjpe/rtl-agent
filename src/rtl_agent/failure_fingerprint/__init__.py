@@ -1,5 +1,6 @@
 from rtl_agent.failure_fingerprint.service import (
     FailureFingerprintError,
+    compare_fingerprint_reports,
     compare_fingerprints,
     fingerprint_run,
     write_fingerprint_comparison,
@@ -8,6 +9,7 @@ from rtl_agent.failure_fingerprint.service import (
 
 __all__ = [
     "FailureFingerprintError",
+    "compare_fingerprint_reports",
     "compare_fingerprints",
     "fingerprint_run",
     "write_fingerprint_comparison",

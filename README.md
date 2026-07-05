@@ -406,6 +406,20 @@ rtl-agent compare-fingerprints \
 
 Fingerprints are deterministic summaries of existing evidence: assertion identity, normalized failure-time characteristics, earliest divergent signals, ranked divergent/relevant signals, transition and `x`/`z` characteristics, mapped source/dependency shape, ambiguity/unresolved markers, divergence-graph shape, and terminal outcome. The digest excludes volatile metadata such as run IDs, execution timestamps, absolute paths, durations, UUID-like command IDs, and artifact hashes. It is a grouping/comparison aid, not a causal or root-cause claim.
 
+`cluster-failures` groups many existing fingerprints from a regression run into a small set of recurring observed failure families, read-only and deterministically, without rerunning anything:
+
+```bash
+rtl-agent cluster-failures \
+  --fingerprint run-001/fingerprint.json \
+  --fingerprint run-002/fingerprint.json \
+  --fingerprint run-003/fingerprint.json \
+  --output regression-families
+
+rtl-agent cluster-failures --fingerprint-dir collected-fingerprints --output regression-families
+```
+
+It reuses the existing fingerprint comparison semantics: primary family membership is equal `family_digest` (a stable, transitive rule), exact duplicates are equal `exact_digest` within a family, insufficient-evidence fingerprints are reported separately (never forced into a confident family), single-member families are unique outliers, and distinct families that still share evidence are recorded as related-family links. Each family gets one deterministic representative (most complete evidence; ties broken by canonical fields then digest, with the reason recorded) plus a concise evidence-grounded description, observed time range, assertion identities, earliest-divergence signals, relevant-signal union/intersection, mapped sources, and ambiguity markers. `--strict` fails on any invalid input; the default permissive mode excludes invalid inputs and records warnings. Counterfactual experiment reports may be supplied directly — their baseline and intervention runs are fingerprinted via the existing service. The command emits a typed JSON report, a concise Markdown report, and a terminal summary (total inputs, valid fingerprints, family count, exact duplicates, outliers, insufficient-evidence cases, excluded inputs). Grouping is order-independent and never labels a family a root cause. `scripts/failure_family_cluster_check.py` demonstrates nine regression seeds across three mechanisms collapsing into three families.
+
 `export-failure-package` packages a validated run directory into a single self-contained, portable failure package (read-only):
 
 ```bash

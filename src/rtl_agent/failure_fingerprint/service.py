@@ -194,6 +194,20 @@ def fingerprint_run(run_dir: Path) -> FailureFingerprintReport:
 def compare_fingerprints(left_path: Path, right_path: Path) -> FingerprintComparisonReport:
     left = _load_fingerprint(left_path)
     right = _load_fingerprint(right_path)
+    return compare_fingerprint_reports(
+        left, right, left_path=left_path.resolve(), right_path=right_path.resolve()
+    )
+
+
+def compare_fingerprint_reports(
+    left: FailureFingerprintReport,
+    right: FailureFingerprintReport,
+    *,
+    left_path: Path,
+    right_path: Path,
+) -> FingerprintComparisonReport:
+    """Compare two already-loaded fingerprints, reusing the shared comparison semantics."""
+
     component_matches = [
         FingerprintComponentComparison(
             component=name,
@@ -219,8 +233,8 @@ def compare_fingerprints(left_path: Path, right_path: Path) -> FingerprintCompar
             else FingerprintMatchKind.INSUFFICIENT
         )
     return FingerprintComparisonReport(
-        left_path=left_path.resolve(),
-        right_path=right_path.resolve(),
+        left_path=left_path,
+        right_path=right_path,
         match_kind=kind,
         exact_match=exact_match,
         family_match=family_match,
