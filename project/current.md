@@ -1,23 +1,22 @@
-# Simulator-Generated AXI Failure Pilot
+# Simulator-Generated Multi-Module Failure Pilot
 
 ## Objective
 
-Strengthen one AXI-router pilot by replacing its hand-authored VCD fixtures with waveforms produced by an actual open-source simulator run over the checked-in RTL and a small testbench, so the failing-vs-passing pair is genuinely simulator-generated rather than authored. Drive the existing failure-intelligence pipeline over the generated VCDs and assert the seeded divergence is still localized. The simulator is a fixture-generation/dev dependency only; its use must be gated so the default validation suite stays hermetic. No new analysis behaviour and no model providers.
+Combine the two validated threads — simulator-generated waveforms and hierarchical multi-file RTL — into one pilot: use a real open-source simulator to produce the passing-vs-failing VCD pair over a top module that instantiates child modules across separate files, and prove the existing pipeline resolves cross-file source mapping and reconstructs the cross-module driver/dependency chain to localize the seeded divergence. The simulator stays a gated fixture-generation/dev dependency; no new analysis behaviour and no model providers.
 
 ## Scope
 
-- Add a small synthesizable/simulatable RTL design plus a compact testbench (under `examples/`) that produces a passing run and a seeded-failing run of the same design (for example a parameter/define or a `+arg` that injects the seeded fault), each dumping a VCD over the observed signal hierarchy.
-- Add a deterministic, checked-in generation script that runs an open-source simulator (for example Icarus Verilog `iverilog`/`vvp`, or Verilator) to compile the testbench and emit the passing and failing VCDs into a temporary or ignored location. The simulator is a fixture-generation/dev dependency, not a product runtime dependency.
-- Gate the simulator use: detect whether the simulator binary is available and, when it is not, skip that generation/validation step cleanly (clearly reported as skipped) so `scripts/check.py` remains hermetic and green on machines without the tool. Do not add the simulator to the product's install/runtime dependencies.
-- Add a scripted check (for example `scripts/axi_router_simulated_failure_check.py`) that — when the simulator is available — generates the VCD pair, drives the existing pipeline (`run-failure-intelligence` plus `inspect-run` and `export-failure-package`, reusing `scripts/_example_check.py`) over the generated VCDs in a temporary workspace, and asserts the seeded divergence is localized (earliest divergent signal/time, source mapping, driver/dependency evidence, failure report, portable package) using stable, schema-backed assertions only.
-- Register the check in `scripts/check.py` such that it runs when the simulator is present and is skipped-with-notice otherwise.
-- Add one concise README mention of the simulator-generated pilot and how it is gated.
+- Add a small, simulatable hierarchical RTL design under `examples/` (a top module instantiating at least two child modules from separate `.sv` files, with real drivers and a signal that propagates across a module boundary) plus a compact testbench that dumps a VCD over the observed hierarchy.
+- Select the seeded fault with a compile-time define (or equivalent) so the same deterministic stimulus yields a passing run and a failing run in which a child-module-driven signal diverges and propagates across the boundary.
+- Add a gated check (for example `scripts/axi_router_simulated_multimodule_check.py`) that detects the simulator (Icarus Verilog `iverilog`/`vvp`), and when present compiles + runs the two builds to generate the VCD pair, drives the existing pipeline (`run-failure-intelligence` plus `inspect-run` and `export-failure-package`, reusing `scripts/_example_check.py`) over the generated VCDs, and asserts: the seeded divergence's earliest signal/time; cross-file source mapping to the correct child module/file; cross-module driver/dependency edges cited to more than one file; a connected divergence graph; failure-report source locations; and portable-package export — using stable, schema-backed assertions only.
+- When the simulator is unavailable, skip cleanly (reported as skipped, returning success) so `scripts/check.py` stays hermetic; never add the simulator to product install/runtime dependencies.
+- Register the check in `scripts/check.py` and add one concise README mention.
 
 ## Acceptance Criteria
 
-- When the simulator is available, the passing and failing VCDs are produced by the simulator (not hand-authored) from the checked-in RTL + testbench, and the existing pipeline localizes the seeded divergence over them.
-- When the simulator is unavailable, the check is skipped cleanly and the default validation suite still passes hermetically; the simulator is never added as a product runtime dependency.
-- The generation is deterministic and reproducible (fixed seed/inputs), and assertions are stable and schema-backed (no timestamps, hashes, durations, UUIDs, or absolute paths).
+- When the simulator is available, the passing and failing VCDs are simulator-generated from the checked-in hierarchical RTL + testbench, and the pipeline localizes the seeded divergence to the correct child file with cross-module driver/dependency evidence cited across more than one file.
+- When the simulator is unavailable, the check is skipped cleanly and the default suite still passes hermetically; the simulator is never a product runtime dependency.
+- The generation is deterministic; assertions are stable and schema-backed (no timestamps, hashes, durations, UUIDs, or absolute paths).
 - No existing artifact schema, CLI behavior, provider behavior, or product workflow changes; no new analysis behaviour.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
@@ -29,7 +28,7 @@ Strengthen one AXI-router pilot by replacing its hand-authored VCD fixtures with
 
 ## Exclusions
 
-- Do not integrate a simulator into the product runtime, the CLI, or the install dependencies; it is a gated fixture-generation/dev tool only.
+- Do not integrate a simulator into the product runtime, the CLI, or install dependencies; it is a gated fixture-generation/dev tool only.
 - Do not add real model-provider integration, external/remote repositories, CI automation, containers, dashboards, databases, queues, or a web UI.
 - Do not add new analysis behavior, dependency-graph algorithms, semantic elaboration, causal claims, or root-cause conclusions beyond what the existing services already produce.
 - Do not hard-code expected answers into product services or create a parallel analysis path; keep fixtures compact.

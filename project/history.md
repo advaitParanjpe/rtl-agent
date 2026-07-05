@@ -890,3 +890,28 @@ Known limitations:
 - The ambiguity demonstrated is duplicate-module-declaration ambiguity; case-insensitive/probable near-matches and cross-scope collisions are not separately exercised here.
 - Both `lane` definitions share identical port and internal signal names by design; a partial overlap (some names shared, some not) is not exercised.
 - Waveforms are hand-authored VCDs, not simulator output, consistent with the no-simulator exclusion.
+
+## 2026-07-04 - Simulator-Generated AXI Failure Pilot
+
+Replaced hand-authored waveforms, for one pilot, with genuinely simulator-generated ones, proving the existing pipeline works on real tool output without adding any new analysis behaviour or a product runtime dependency. Added a compact simulatable design and testbench (`examples/axi-router-sim/rtl/axi_pipe.sv`, `examples/axi-router-sim/tb/axi_pipe_tb.sv`, and `examples/axi-router-sim-agent.yaml`): `axi_pipe` captures a payload under a lock and must hold it stable under backpressure; the seeded fault is a compile-time define (`INJECT_FAULT`) that corrupts the held payload to `x` under backpressure. A new gated check (`scripts/axi_router_simulated_failure_check.py`, registered in `scripts/check.py`) detects Icarus Verilog (`iverilog`/`vvp`); when present it compiles the design + testbench twice from the same stimulus (clean and `-DINJECT_FAULT`), runs each with `vvp +vcd=<path>` to emit a real passing-vs-failing VCD pair, and drives the existing pipeline (`run-failure-intelligence` plus `inspect-run` and `export-failure-package`) over the generated VCDs. It asserts, against the typed schemas, that the two runs differ; the earliest divergence is `payload_reg`/`payload_out` at t=45 with an x/z difference; those signals map exactly to `axi_pipe.sv` (module `axi_pipe`); the driver trace recovers the real `assign payload_out = payload_reg;` and `payload_reg <= payload_in;` statements and the `payload_out → payload_reg` dependency edge; the failure report localizes to `axi_pipe.sv` and claims no root cause; and inspection and portable-package export succeed. When the simulator is not on `PATH` the check prints a skip notice and returns success, so `scripts/check.py` stays hermetic and green.
+
+Validation evidence:
+
+- Confirmed the simulator path by generating both VCDs with `iverilog -g2012` (+ `-DINJECT_FAULT`) and `vvp`, then reading the pipeline outputs before codifying assertions: the failing VCD adds `bx` value changes on `payload_reg`/`payload_out` at t=45; the comparison, mapping, driver trace, and failure report localize to `axi_pipe.sv`.
+- Confirmed the skip path by running the check with an empty `PATH`: it printed "skipped (iverilog/vvp not available)" and returned 0.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict type checking, 258 pytest tests, agent portability check, all nine example checks (the simulator check ran because Icarus Verilog is installed locally), and packaging smoke verification.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The simulator is a gated fixture-generation/dev tool, detected with `shutil.which` and skipped cleanly when absent; it is never added to the product's install or runtime dependencies, and the gating lives inside the check script so `scripts/check.py` needs no conditional wiring and stays hermetic.
+- The seeded fault is a compile-time define rather than a testbench force, so the same deterministic stimulus produces a genuine passing-vs-failing pair that differs only where the bug manifests; no randomness is used.
+- The testbench module is kept out of the inspected RTL repository (the pipeline's `--repo` points at `examples/axi-router-sim/rtl`), so signal-source mapping resolves the DUT scope to the `axi_pipe` module rather than to the testbench top; the DUT instance is named `axi_pipe` so the dump hierarchy exposes a matching scope.
+- No product code changed; the check drives only the existing orchestrator and CLI, and all assertions are on stable schema values (times, signal names, file paths, statement text), not timestamps or hashes from the VCD header.
+
+Known limitations:
+
+- Only Icarus Verilog is wired as the generator; Verilator (also installed on some machines) is not used here, and the VCD timescale reflects the simulator default (`1s`) since the fixture omits an explicit `timescale.
+- The generated pilot is single-module; combining simulator generation with the multi-file/ambiguity fixtures is left to a future milestone.
+- The check compiles and runs a real toolchain, so it is slower than the hand-authored checks and depends on the locally installed simulator version behaving as Icarus Verilog 13 does.

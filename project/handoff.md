@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Cross-Module Ambiguity and Multi-Instance Robustness Pilot
+Simulator-Generated AXI Failure Pilot
 
 ## Completed Work
 

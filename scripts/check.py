@@ -22,6 +22,7 @@ COMMANDS = (
     [str(PYTHON), "scripts/axi_router_seeded_failure_check.py"],
     [str(PYTHON), "scripts/axi_router_repository_pilot_check.py"],
     [str(PYTHON), "scripts/axi_router_ambiguity_pilot_check.py"],
+    [str(PYTHON), "scripts/axi_router_simulated_failure_check.py"],
     [str(PYTHON), "scripts/packaging_smoke.py"],
 )
 
