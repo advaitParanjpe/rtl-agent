@@ -28,6 +28,7 @@ from rtl_agent.evidence_bundle import (
     report_summary_payload as evidence_bundle_summary_payload,
 )
 from rtl_agent.execution import CommandRunner
+from rtl_agent.experiment_matrix import ExperimentMatrixError, run_experiment_matrix
 from rtl_agent.failure_divergence_graph import (
     FailureDivergenceGraphError,
     build_failure_divergence_graph,
@@ -947,6 +948,53 @@ def minimize_stimulus_command(
     _print_minimize_summary(report, output)
 
 
+@app.command("run-experiment-matrix")
+def run_experiment_matrix_command(
+    baseline_run: Annotated[
+        Path, typer.Option("--baseline-run", help="Validated failure-intelligence run dir.")
+    ],
+    reduction_report: Annotated[
+        Path, typer.Option("--reduction-report", help="Stimulus reduction report JSON.")
+    ],
+    repo: Annotated[Path, typer.Option("--repo", help="Target Git RTL repository root.")],
+    config: Annotated[Path, typer.Option("--config", "-c", help="rtl-agent YAML config.")],
+    command: Annotated[str, typer.Option("--command", help="Named configured simulator command.")],
+    interventions: Annotated[
+        Path, typer.Option("--interventions", help="Intervention manifest JSON.")
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Experiment matrix output directory.")],
+    max_experiments: Annotated[
+        int, typer.Option("--max-experiments", min=1, help="Maximum executed experiments.")
+    ] = 12,
+    timeout: Annotated[
+        int | None, typer.Option("--timeout", min=1, help="Timeout (s) per experiment.")
+    ] = None,
+    baseline_commit: Annotated[
+        str | None,
+        typer.Option("--baseline-commit", help="Commit/ref for the worktrees (default HEAD)."),
+    ] = None,
+) -> None:
+    """Run a bounded set of manual interventions against one minimized counterexample."""
+    try:
+        report = run_experiment_matrix(
+            baseline_run=baseline_run,
+            reduction_report=reduction_report,
+            repo=repo,
+            config_path=config,
+            command=command,
+            interventions=interventions,
+            output=output,
+            max_experiments=max_experiments,
+            timeout=timeout,
+            baseline_commit=baseline_commit,
+        )
+    except ExperimentMatrixError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_experiment_matrix_summary(report, output)
+
+
 @app.command("export-failure-package")
 def export_failure_package_command(
     run_dir: Annotated[
@@ -1369,6 +1417,39 @@ def _print_minimize_summary(report: object, output: Path) -> None:
             "cache_hits": report.cache_hits,
             "final_classification": report.final_classification,
             "termination_reason": report.termination_reason,
+        }
+    )
+
+
+def _print_experiment_matrix_summary(report: object, output: Path) -> None:
+    from rtl_agent.experiment_matrix_models import ExperimentMatrixReport
+
+    assert isinstance(report, ExperimentMatrixReport)
+    rows = []
+    for row in report.rows:
+        delta = None
+        if row.result_failure_time is not None and row.baseline_failure_time is not None:
+            delta = row.result_failure_time - row.baseline_failure_time
+        rows.append(
+            {
+                "intervention_id": row.intervention_id,
+                "execution_status": row.execution_status,
+                "counterfactual_outcome": row.counterfactual_outcome,
+                "fingerprint_relation": row.fingerprint_relation,
+                "result_family_digest": (
+                    row.result_family_digest[:12] if row.result_family_digest else None
+                ),
+                "failure_time_shift": delta,
+                "from_cache": row.from_cache,
+                "artifact_dir": row.artifact_dir,
+            }
+        )
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "matrix": rows,
+            "summary": report.summary.model_dump(mode="json"),
         }
     )
 
