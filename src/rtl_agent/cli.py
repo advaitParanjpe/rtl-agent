@@ -63,6 +63,7 @@ from rtl_agent.implementation import (
     write_implementation_report,
 )
 from rtl_agent.issues import IssueParsingError, parse_issue_file, write_task_contract
+from rtl_agent.reduction import StimulusReductionError, minimize_stimulus
 from rtl_agent.review import ReviewError, review_implementation, write_review_report
 from rtl_agent.rtl_driver_trace import (
     RtlDriverTraceError,
@@ -905,6 +906,47 @@ def cluster_failures_command(
     _print_cluster_summary(report, json_path, markdown_path)
 
 
+@app.command("minimize-stimulus")
+def minimize_stimulus_command(
+    baseline_run: Annotated[
+        Path, typer.Option("--baseline-run", help="Validated failure-intelligence run dir.")
+    ],
+    repo: Annotated[Path, typer.Option("--repo", help="Target Git RTL repository root.")],
+    config: Annotated[Path, typer.Option("--config", "-c", help="rtl-agent YAML config.")],
+    command: Annotated[str, typer.Option("--command", help="Named configured simulator command.")],
+    stimulus: Annotated[Path, typer.Option("--stimulus", help="Structured failing stimulus JSON.")],
+    output: Annotated[Path, typer.Option("--output", help="Experiment output directory.")],
+    max_evaluations: Annotated[
+        int, typer.Option("--max-evaluations", min=1, help="Maximum candidate evaluations.")
+    ] = 32,
+    timeout: Annotated[
+        int | None, typer.Option("--timeout", min=1, help="Timeout (s) per evaluation.")
+    ] = None,
+    baseline_commit: Annotated[
+        str | None,
+        typer.Option("--baseline-commit", help="Commit/ref for the worktree (default HEAD)."),
+    ] = None,
+) -> None:
+    """Minimize a structured failing stimulus while preserving the failure family."""
+    try:
+        report = minimize_stimulus(
+            baseline_run=baseline_run,
+            repo=repo,
+            config_path=config,
+            command=command,
+            stimulus_path=stimulus,
+            output=output,
+            max_evaluations=max_evaluations,
+            timeout=timeout,
+            baseline_commit=baseline_commit,
+        )
+    except StimulusReductionError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_minimize_summary(report, output)
+
+
 @app.command("export-failure-package")
 def export_failure_package_command(
     run_dir: Annotated[
@@ -1307,6 +1349,28 @@ def _cluster_output_paths(output: Path) -> tuple[Path, Path]:
     if output.is_dir() or output.suffix == "":
         return output / "regression-families.json", output / "regression-families.md"
     return output, output.with_suffix(".md")
+
+
+def _print_minimize_summary(report: object, output: Path) -> None:
+    from rtl_agent.reduction_models import StimulusReductionReport
+
+    assert isinstance(report, StimulusReductionReport)
+    original = report.original_item_count
+    minimized = report.minimized_item_count
+    percent = round(100 * (original - minimized) / original) if original else 0
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "original_item_count": original,
+            "minimized_item_count": minimized,
+            "percent_reduced": percent,
+            "evaluations": report.total_evaluations,
+            "cache_hits": report.cache_hits,
+            "final_classification": report.final_classification,
+            "termination_reason": report.termination_reason,
+        }
+    )
 
 
 def _print_cluster_summary(report: object, json_path: Path, markdown_path: Path) -> None:
