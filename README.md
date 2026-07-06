@@ -420,6 +420,22 @@ rtl-agent cluster-failures --fingerprint-dir collected-fingerprints --output reg
 
 It reuses the existing fingerprint comparison semantics: primary family membership is equal `family_digest` (a stable, transitive rule), exact duplicates are equal `exact_digest` within a family, insufficient-evidence fingerprints are reported separately (never forced into a confident family), single-member families are unique outliers, and distinct families that still share evidence are recorded as related-family links. Each family gets one deterministic representative (most complete evidence; ties broken by canonical fields then digest, with the reason recorded) plus a concise evidence-grounded description, observed time range, assertion identities, earliest-divergence signals, relevant-signal union/intersection, mapped sources, and ambiguity markers. `--strict` fails on any invalid input; the default permissive mode excludes invalid inputs and records warnings. Counterfactual experiment reports may be supplied directly — their baseline and intervention runs are fingerprinted via the existing service. The command emits a typed JSON report, a concise Markdown report, and a terminal summary (total inputs, valid fingerprints, family count, exact duplicates, outliers, insufficient-evidence cases, excluded inputs). Grouping is order-independent and never labels a family a root cause. `scripts/failure_family_cluster_check.py` demonstrates nine regression seeds across three mechanisms collapsing into three families.
 
+`minimize-stimulus` reduces a structured failing stimulus while preserving the observed failure family, using the fingerprint family digest as the equivalence oracle and reusing the command runner, worktree isolation, triage, failure-intelligence, and fingerprint services:
+
+```bash
+rtl-agent minimize-stimulus \
+  --baseline-run .rtl-agent/runs/failure-001 \
+  --repo ../axi-router \
+  --config rtl-agent.yaml \
+  --command structured-failure \
+  --stimulus failing-stimulus.json \
+  --output .rtl-agent/minimizations/min-001 \
+  --max-evaluations 32 \
+  --timeout 30
+```
+
+The stimulus is one compact JSON of ordered, independent actions (each with a stable id, index, kind, and payload; metadata is excluded from identity). A deterministic ddmin reduction removes whole items (never mutating item contents and preserving the relative order of retained items); each candidate is materialized only inside an isolated Git worktree, rerun via the named configured command, analyzed with the existing pipeline, and fingerprinted, and its result is classified as `same_failure_exact`, `same_failure_family`, `different_failure`, `failure_removed`, `insufficient_evidence`, `candidate_invalid`, `execution_failed`, or `timed_out` (only the first two preserve the counterexample). Evaluations are cached by a semantic digest of the candidate so identical candidates are never re-simulated, the evaluation budget and per-evaluation timeout are configurable, and the source repository is never modified. The typed versioned report records the baseline and candidate digests, the ordered evaluation history, cache hits, termination reason, retained/removed items, reproducibility instructions, and an explicit disclaimer that preserving a failure family does not prove identical root cause. `scripts/counterexample_pilot_check.py` is a gated Icarus-backed pilot that removes irrelevant idle actions from a seeded `send`/`stall` stimulus while preserving the failure family and leaving the repository byte-for-byte unchanged; it skips cleanly when the simulator is absent.
+
 `export-failure-package` packages a validated run directory into a single self-contained, portable failure package (read-only):
 
 ```bash

@@ -77,6 +77,7 @@ def test_readme_documented_commands_have_help() -> None:
         "inspect-run",
         "link-assertion-waveform",
         "map-signals",
+        "minimize-stimulus",
         "parse-issue",
         "reduce-signals",
         "review-task",

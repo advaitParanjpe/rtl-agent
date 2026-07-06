@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "items": [
+    {"id": "warmup-0", "index": 0, "kind": "idle", "payload": {}},
+    {"id": "warmup-1", "index": 1, "kind": "idle", "payload": {}},
+    {"id": "warmup-2", "index": 2, "kind": "idle", "payload": {}},
+    {"id": "load-packet", "index": 3, "kind": "send", "payload": {"data": "AA"}},
+    {"id": "backpressure", "index": 4, "kind": "stall", "payload": {}},
+    {"id": "cooldown-0", "index": 5, "kind": "idle", "payload": {}},
+    {"id": "cooldown-1", "index": 6, "kind": "idle", "payload": {}}
+  ]
+}
