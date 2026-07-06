@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Failure Family Clustering Across Regression Runs
+Counterexample Stimulus Minimization Foundation
 
 ## Completed Work
 
@@ -36,4 +36,4 @@ Failure Family Clustering Across Regression Runs
 
 ## Resume Instructions
 
-- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Counterexample Stimulus Minimization Foundation`.
+- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Counterfactual Experiment Matrix`.
