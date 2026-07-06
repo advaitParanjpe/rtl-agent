@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Counterexample Stimulus Minimization Foundation
+Counterfactual Experiment Matrix
 
 ## Completed Work
 
@@ -36,4 +36,4 @@ Counterexample Stimulus Minimization Foundation
 
 ## Resume Instructions
 
-- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Counterfactual Experiment Matrix`.
+- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Hypothesis-Driven Intervention Templates`.
