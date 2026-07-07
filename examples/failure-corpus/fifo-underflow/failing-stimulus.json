@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "items": [
+    {"id": "warmup-0", "index": 0, "kind": "idle", "payload": {}},
+    {"id": "push", "index": 1, "kind": "send", "payload": {"data": "11"}},
+    {"id": "pop-0", "index": 2, "kind": "stall", "payload": {}},
+    {"id": "pop-empty", "index": 3, "kind": "stall", "payload": {}},
+    {"id": "cooldown-0", "index": 4, "kind": "idle", "payload": {}}
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "description": "Realistic failure corpus: compact RTL designs with distinct failure mechanisms, each driven through the existing rtl-agent pipeline unchanged.",
+  "examples": [
+    {
+      "name": "fsm-sequencer",
+      "failure_class": "fsm_transition_bug",
+      "module": "fsm_sequencer",
+      "rtl_file": "fsm_sequencer.sv",
+      "tb_file": "fsm_sequencer_tb.sv",
+      "command": "structured-failure",
+      "allowed_file": "rtl/fsm_sequencer.sv",
+      "stimulus": "failing-stimulus.json",
+      "description": "An arm/drain sequencer where a premature second send while ARMED (a protocol violation) drives an illegal FSM transition that corrupts the held payload."
+    },
+    {
+      "name": "fifo-underflow",
+      "failure_class": "fifo_underflow_bug",
+      "module": "fifo_underflow",
+      "rtl_file": "fifo_underflow.sv",
+      "tb_file": "fifo_underflow_tb.sv",
+      "command": "structured-failure",
+      "allowed_file": "rtl/fifo_underflow.sv",
+      "stimulus": "failing-stimulus.json",
+      "description": "A small synchronous FIFO where popping (stall) while empty is an underflow that returns undefined read data instead of a safe zero."
+    },
+    {
+      "name": "counter-overflow",
+      "failure_class": "counter_update_bug",
+      "module": "counter_overflow",
+      "rtl_file": "counter_overflow.sv",
+      "tb_file": "counter_overflow_tb.sv",
+      "command": "structured-failure",
+      "allowed_file": "rtl/counter_overflow.sv",
+      "stimulus": "failing-stimulus.json",
+      "description": "A saturating event counter where the boundary update corrupts the count instead of saturating, so exactly the four increments to the boundary are the irreducible failing core."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "items": [
+    {"id": "warmup-0", "index": 0, "kind": "idle", "payload": {}},
+    {"id": "inc-0", "index": 1, "kind": "send", "payload": {"data": "01"}},
+    {"id": "inc-1", "index": 2, "kind": "send", "payload": {"data": "01"}},
+    {"id": "inc-2", "index": 3, "kind": "send", "payload": {"data": "01"}},
+    {"id": "inc-boundary", "index": 4, "kind": "send", "payload": {"data": "01"}},
+    {"id": "cooldown-0", "index": 5, "kind": "idle", "payload": {}}
+  ]
+}
