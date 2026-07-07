@@ -1534,3 +1534,13 @@ The supervisor prompt explicitly restricts reasoning to supplied structured evid
 Validation added focused supervisor unit tests for fake-provider output, disabled/no-provider behavior, prompt guardrails, citation preservation, and deterministic evidence projection. The corpus-backed HKG check now demonstrates a fake-provider plan from HKG memory evidence; the example recommends comparing the failure against prior cluster `cluster-2dc5e4134bbdb3dc`.
 
 Deferred capabilities remain explicit: no default LLM dependency, no API-key requirement for normal use, no automatic tool orchestration, no patch generation, no raw RTL analysis, no provider-specific integration, no UI/server/database, and no causal/root-cause claims.
+
+## 2026-07-07 - Evidence-Guided Repair Suggestions v0
+
+Added deterministic repair-direction suggestions in `rtl_agent.repair_suggestions`. The generator consumes existing structured evidence only: original failure metadata, generated intervention candidates, experiment outcomes, result comparisons, intervention rankings, and optional HKG historical memory. It emits typed `RepairSuggestion` objects containing a suggested area to inspect, evidence basis, related source locations/signals, supporting interventions/outcomes, an evidence-completeness confidence label, and an explicit non-causality disclaimer.
+
+Suggestion rules are deterministic and auditable. Ranked interventions with altering observed effects (`failure_removed`, `failure_changed`, `new_failure`, `failure_delayed`, `failure_advanced`) are preferred; if rankings are unavailable, altering outcomes are used directly; no suggestions are produced from empty evidence or only no-observable/invalid/unknown results. Confidence is based only on evidence completeness: candidate confidence, altering observed effect, comparison summary, ranking availability, and optional HKG memory. Suggested language uses inspect/review/check direction and never generates code edits.
+
+MVP demo summaries now include additive `repair_suggestions` in JSON and render a "Repair-direction suggestions" Markdown section. The existing failure-corpus integration check asserts every corpus demo emits evidence-backed, non-causal suggestions. Focused unit tests cover ranked suggestions, fallback suggestions, insufficient-evidence/no-suggestion cases, determinism, and Markdown surfacing.
+
+Deferred capabilities remain explicit: no automatic patching, no generated code edits, no new intervention templates, no new fingerprint algorithms, no LLM/API-key requirement, no global repair ranking, and no causal/root-cause claims.

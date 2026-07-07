@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from rtl_agent.experiment_comparison_models import ExperimentComparison
 from rtl_agent.intervention_ranking_models import InterventionRanking
+from rtl_agent.repair_suggestions import RepairSuggestion
 
 MVP_DEMO_SCHEMA_VERSION = 1
 
@@ -116,6 +117,7 @@ class MvpDemoSummary(BaseModel):
     experiment_outcomes: list[ExperimentOutcome] = Field(default_factory=list)
     experiment_comparisons: list[ExperimentComparison] = Field(default_factory=list)
     intervention_rankings: list[InterventionRanking] = Field(default_factory=list)
+    repair_suggestions: list[RepairSuggestion] = Field(default_factory=list)
     outcome_counts: dict[str, int] = Field(default_factory=dict)
     observed_effect_counts: dict[str, int] = Field(default_factory=dict)
     observations: list[Observation] = Field(default_factory=list)

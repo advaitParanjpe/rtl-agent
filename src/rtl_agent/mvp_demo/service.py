@@ -34,6 +34,7 @@ from rtl_agent.mvp_demo_models import (
 )
 from rtl_agent.reduction import minimize_stimulus
 from rtl_agent.reduction_models import StimulusReductionReport
+from rtl_agent.repair_suggestions import RepairSuggestion, generate_repair_suggestions
 from rtl_agent.run_inspection import inspect_run
 
 _PARSER_NOTES = [
@@ -153,6 +154,7 @@ def run_mvp_demo(
     outcomes: list[ExperimentOutcome] = []
     comparisons: list[ExperimentComparison] = []
     rankings: list[InterventionRanking] = []
+    repair_suggestions: list[RepairSuggestion] = []
     if candidates:
         matrix = run_experiment_matrix(
             baseline_run=failure_run,
@@ -169,6 +171,13 @@ def run_mvp_demo(
         outcomes = _outcomes(matrix, generated)
         comparisons = _comparisons(matrix, generated, minimization.minimized_stimulus_digest)
         rankings = rank_interventions(comparisons)
+        repair_suggestions = generate_repair_suggestions(
+            original_failure=original,
+            intervention_candidates=candidates,
+            experiment_outcomes=outcomes,
+            experiment_comparisons=comparisons,
+            intervention_rankings=rankings,
+        )
         stages.append(
             StageRef(
                 stage="run-experiment-matrix",
@@ -201,6 +210,7 @@ def run_mvp_demo(
         experiment_outcomes=outcomes,
         experiment_comparisons=comparisons,
         intervention_rankings=rankings,
+        repair_suggestions=repair_suggestions,
         outcome_counts=_outcome_counts(matrix),
         observed_effect_counts=_observed_effect_counts(outcomes),
         observations=_observations(original, minimization, candidates, outcomes),

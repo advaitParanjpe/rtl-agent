@@ -171,6 +171,14 @@ def _check_summary(summary: object, example: dict[str, str]) -> None:
     for outcome in summary.experiment_outcomes:
         assert outcome.observed_effect in valid, (name, outcome.observed_effect)
     assert summary.next_debug_checks, f"{name}: no synthesized next-debug checks"
+    assert summary.repair_suggestions, f"{name}: no repair-direction suggestions"
+    for suggestion in summary.repair_suggestions:
+        assert suggestion.supporting_interventions, (name, suggestion.suggestion_id)
+        assert suggestion.supporting_outcomes, (name, suggestion.suggestion_id)
+        assert suggestion.evidence_basis, (name, suggestion.suggestion_id)
+        text = suggestion.suggested_area.lower()
+        assert text.startswith(("inspect", "review", "check")), (name, suggestion.suggested_area)
+        assert "fix" not in text and "root cause" not in text, (name, suggestion.suggested_area)
 
     # Interventions are ranked deterministically by informativeness.
     assert summary.intervention_rankings, f"{name}: no intervention rankings"

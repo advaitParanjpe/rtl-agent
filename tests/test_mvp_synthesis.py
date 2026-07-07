@@ -16,6 +16,7 @@ from rtl_agent.mvp_demo_models import (
     OriginalFailure,
     StageRef,
 )
+from rtl_agent.repair_suggestions import RepairSuggestion
 
 _MINIMIZATION = MinimizationSummary(
     reduction_report="/out/minimization/reduction-report.json",
@@ -191,6 +192,31 @@ def test_render_is_deterministic() -> None:
     candidates = [_candidate("a-removed", "hold_register", 34)]
     summary = _summary(outcomes, candidates)
     assert render_debug_summary(summary) == render_debug_summary(summary)
+
+
+def test_render_debug_summary_surfaces_repair_suggestions() -> None:
+    outcomes = [_outcome("a-removed", "hold_register", "failure_removed")]
+    candidates = [_candidate("a-removed", "hold_register", 34)]
+    summary = _summary(outcomes, candidates)
+    summary.repair_suggestions = [
+        RepairSuggestion(
+            suggestion_id="repair-suggestion:a-removed",
+            suggested_area="Inspect `rtl/core.sv:34` and related signal `hold`.",
+            evidence_basis=["intervention `a-removed` observed `failure_removed`"],
+            related_source_locations=["rtl/core.sv:34"],
+            related_signals=["hold"],
+            supporting_interventions=["a-removed"],
+            supporting_outcomes=["failure_removed"],
+            confidence="high_evidence",
+        )
+    ]
+
+    markdown = render_debug_summary(summary)
+
+    assert "## Repair-direction suggestions" in markdown
+    assert "`repair-suggestion:a-removed`" in markdown
+    assert "not patches or root-cause claims" in markdown
+    assert "intervention `a-removed` observed `failure_removed`" in markdown
 
 
 def test_unknown_and_invalid_labels_are_surfaced() -> None:

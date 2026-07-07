@@ -279,6 +279,42 @@ def render_debug_summary(summary: MvpDemoSummary) -> str:
     else:
         lines += ["_No experiments to compare._", ""]
 
+    lines += ["## Repair-direction suggestions", ""]
+    if summary.repair_suggestions:
+        lines += [
+            "Deterministic areas to inspect from observed counterfactual evidence only; these are "
+            "not patches or root-cause claims.",
+            "",
+        ]
+        for suggestion in summary.repair_suggestions:
+            lines.append(f"### `{suggestion.suggestion_id}` — {suggestion.confidence}")
+            lines.append(f"- Suggested area: {suggestion.suggested_area}")
+            if suggestion.related_source_locations:
+                lines.append(
+                    "- Related source locations: "
+                    + ", ".join(f"`{loc}`" for loc in suggestion.related_source_locations)
+                )
+            if suggestion.related_signals:
+                lines.append(
+                    "- Related signals: "
+                    + ", ".join(f"`{signal}`" for signal in suggestion.related_signals)
+                )
+            lines.append(
+                "- Supporting interventions/outcomes: "
+                + ", ".join(f"`{i}`" for i in suggestion.supporting_interventions)
+                + " / "
+                + ", ".join(f"`{o}`" for o in suggestion.supporting_outcomes)
+            )
+            for basis in suggestion.evidence_basis:
+                lines.append(f"- Evidence: {basis}")
+            lines.append(f"- Disclaimer: {suggestion.disclaimer}")
+            lines.append("")
+    else:
+        lines += [
+            "_No repair-direction suggestions were generated from the available evidence._",
+            "",
+        ]
+
     lines += ["## Evidence references", ""]
     for ref in summary.evidence_references:
         lines.append(f"- {ref.name}: `{ref.path}`")

@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-LLM Supervisor v0 - Evidence-Only Planning Interface
+Evidence-Guided Repair Suggestions v0
 
 ## Completed Work
 
