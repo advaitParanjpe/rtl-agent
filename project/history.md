@@ -1245,3 +1245,33 @@ Known limitations:
 
 - The command surfaces the existing demonstration unchanged; it inherits the service's requirement of an already-built, validated failure-intelligence run and a structured reducible stimulus, and its dependence on a configured simulator command for the live pipeline.
 - The terminal summary is a concise projection of the full typed summary; the complete evidence and per-candidate detail remain in the written JSON/Markdown artifacts.
+
+## 2026-07-06 - Counterfactual Outcome Classification
+
+Added a deterministic outcome-classification layer so counterfactual experiment results are easier to compare and summarize. This is a classification-only addition over existing evidence: no new intervention templates, no new analysis algorithms beyond the labeling, no automatic patching, no LLM, and no causal/root-cause claims.
+
+Classifier (`src/rtl_agent/outcome_classification.py`): a pure `classify_observed_effect` over an `OutcomeEvidence` struct returns exactly one of eight labels and an auditable rationale. It compares each experiment against the original failure using only already-computed evidence — execution status, command pass/fail status, whether a comparable result fingerprint exists, the original vs result failure family digest, the earliest failure time, and the failing signals. Rules, in deterministic priority: a non-executed experiment, a command that did not run to completion (timeout / exec_error), or one that produced no comparable fingerprint is `experiment_invalid`; no reproduced divergence is `failure_removed`; a divergence whose failing signals are disjoint from the original is `new_failure`; the same failing signal with a materially different family is `failure_changed`; the same signal and family is `failure_delayed` or `failure_advanced` by earliest-time comparison, or `no_observable_effect` when unchanged; a divergence without comparable baseline evidence is `unknown`. The rationale string cites the compared digests/times/signals so each label is auditable against the preserved per-experiment artifacts.
+
+Exposure (minimal fields only, no schema churn beyond the labels): `MatrixRow` gained `observed_effect` + `observed_effect_rationale`, computed deterministically for every row (executed, skipped, and invalid) at finalize time and copied for cached rows, and `ExperimentMatrixReport` gained `observed_effect_counts`; the matrix Markdown shows the label per row and the aggregate. The MVP demo `ExperimentOutcome` carries the label, rationale, and per-experiment `artifact_dir`; the MVP summary gained `observed_effect_counts`, drives its evidence-backed observations off the canonical labels, shows them in the outcomes table, and the `run-mvp-demo` terminal output surfaces the label per experiment plus the aggregate counts. Ordering stays deterministic and raw evidence references (family digests, times, signals, artifact directories) are preserved.
+
+Classification rules summary and example labels from the counterexample demo fixture (8 generated experiments): four `failure_removed` — the hold-register, override-condition, and block-state-transition edits that neutralize the fault produced no divergence — and four `failure_changed` — the suppress-assignment edits that force a defined value keep the same failing signal (`payload_out`) but shift the family digest. Genuinely ambiguous cases (a divergence with no comparable baseline evidence) are intentionally left `unknown`, and the pure same-family `failure_delayed` / `failure_advanced` transitions are exercised by the classifier unit tests (a same-family time shift is hard to fabricate in a hermetic waveform because the current family digest is window-sensitive).
+
+Validation evidence:
+
+- Focused classifier unit tests (`tests/test_outcome_classification.py`, 14) over small synthetic evidence covering all eight labels, the priority ordering, rationale content, and determinism.
+- Integration coverage extended in `tests/test_experiment_matrix.py` (labels emitted per row, correct for remove / no-effect / changed / disabled, aggregated in `observed_effect_counts`) and `tests/test_mvp_demo.py` (labels present, valid, rationale populated, and counted through the full hermetic demo workflow).
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict (190 source files), 378 pytest tests, agent portability check, all example checks (including the gated experiment-matrix and MVP-demo pilots), and packaging smoke.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Outcome labels are computed from the already-derived MatrixRow evidence at row-finalize time (the single chokepoint for all non-cached rows), so every row — including skipped and invalid ones — receives a label without a second analysis pass, and cached rows inherit the label with their copied evidence.
+- The new observed-effect taxonomy is kept as an additive field alongside the existing counterfactual outcome and fingerprint relation rather than replacing them, so no existing schema or downstream consumer changes and the raw evidence remains available for audit.
+- A different failing signal is classified `new_failure` before any family comparison, and a family mismatch is `failure_changed` before any time comparison, so the labels stay mutually exclusive and deterministic.
+
+Known limitations:
+
+- Same-family `failure_delayed` / `failure_advanced` labels require a time shift that preserves the family digest; because the current fingerprint family is window-sensitive, a fabricated waveform time-shift usually also changes the family (classified `failure_changed`), so those two labels are primarily validated by unit tests rather than the hermetic waveform fixtures.
+- The classifier consumes existing evidence only; it adds no new comparison beyond family/time/signal and does not attempt to disambiguate `unknown` cases further.
+- Labels describe observed experimental effects; they intentionally imply no ranking, prioritization, or causal inference.

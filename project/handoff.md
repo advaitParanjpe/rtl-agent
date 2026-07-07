@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-MVP Demonstration CLI and Documentation Surface
+Counterfactual Outcome Classification
 
 ## Completed Work
 
