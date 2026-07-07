@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Realistic Failure Corpus v0
+Failure Fingerprint Stability
 
 ## Completed Work
 

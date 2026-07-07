@@ -1348,3 +1348,33 @@ Known limitations / where the pipeline does not generalize well:
 - The FSM transition bug corrupts both the FSM `state` and the payload, so no single-site generated edit fully removes the failure (every experiment is classified `failure_changed` rather than `failure_removed`); the pipeline surfaces this honestly but does not correlate the two divergent signals.
 - The generator's confidence and candidate mix depend on how cleanly the fault maps to a single divergent register; multi-signal faults (fsm-sequencer) yield only `failure_changed` outcomes, while single-register faults (fifo-underflow, counter-overflow) also yield `failure_removed`. This is a property of the current single-site intervention templates, not of the corpus.
 - The examples remain compact single-module designs driven by one clock; multi-module or multi-clock failure scenarios are not yet represented.
+
+## 2026-07-07 - Failure Fingerprint Stability
+
+Improved fingerprint robustness so equivalent manifestations of the same underlying failure produce a stable canonical fingerprint suitable for future historical comparison and clustering. Canonicalization only: no new analysis algorithms beyond it, no LLM, no intervention changes, no clustering, and additive fingerprint metadata only.
+
+Canonicalization rules: a new `canonical_digest` is computed over the evidence that identifies *what* failed and *where*, deliberately excluding the length/timing-sensitive fields that make the family digest unstable across benign variation. Included (all deterministically sorted): assertion identity, terminal outcome, earliest divergent signals, a new length-invariant `canonical_divergence` (per signal, whether the divergence is x/z — keeping the x/z-vs-defined distinction without pinning exact values, counts, or timing), mapped RTL sources, structural driver-dependency shape, structural graph shape, and the unresolved/ambiguous evidence markers. Excluded: `failure_time_characteristics` (absolute timestamps and window durations), `transition_xz_characteristics` (failing/passing transition counts and divergence duration), `ranked_relevant_signals` (relevance scores and transition counts), and `ranked_divergent_signals` (score-ordered values). The result is stable across differing absolute timestamps, differing stimulus lengths after minimization, and equivalent reduced traces, while different failure loci, mapped sources, or corruption natures stay distinct.
+
+The change preserves all existing fingerprint information and is purely additive: `FingerprintDigest` gains a `canonical` field; `FailureFingerprintReport` gains `canonical_digest`, `canonical_divergence`, and `canonical_components`; and `FingerprintComparisonReport` gains `canonical_match`. The exact and family digests, and every prior component field, are unchanged, so all existing consumers (comparison, family clustering, counterexample minimization, experiment matrix, MVP demo) continue to work exactly as before.
+
+Demonstration of stable fingerprints across equivalent failures (real Icarus, on the failure corpus): for `fsm-sequencer` the full-stimulus and minimized-core reproductions produce *different* family digests (family is window-sensitive) but the *same* canonical digest; for `fifo-underflow` and `counter-overflow` both family and canonical are stable across reproductions. Across mechanisms the canonical digests are all distinct (fsm-sequencer, fifo-underflow, counter-overflow → three different canonical fingerprints). In the hermetic tests, two reproductions of the same `hold`-corruption at different absolute times produce the same canonical digest while the exact digest differs.
+
+Validation evidence:
+
+- Focused hermetic tests (`tests/test_fingerprint_stability.py`, 4): the canonical digest is stable across differing absolute timestamps/lengths while the exact digest differs (and the comparison reports `canonical_match`), a different failing signal produces a different canonical, an x/z corruption and a defined-value corruption on the same signal produce different canonicals, and canonicalization is deterministic — all from hand-authored VCDs without a simulator.
+- Gated Icarus check (`scripts/fingerprint_stability_check.py`, registered in `scripts/check.py`): for every corpus design it reproduces the same seeded failure from the full baseline stimulus and from a shorter equivalent trace (the failing core with warmup/cooldown idles removed) and asserts both produce the same canonical fingerprint, and that the three mechanisms produce three distinct canonical fingerprints. Skips cleanly without Icarus.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict (196 source files), 402 pytest tests, agent portability check, all example checks (including the new gated fingerprint-stability check and the corpus check), and packaging smoke.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The canonical fingerprint is a separate additive digest alongside the exact and family digests rather than a replacement, so historical comparison/clustering can opt into the more stable identifier while the finer-grained digests remain available for exact and family matching.
+- `canonical_divergence` derives only the x/z nature per signal (not values, counts, or timing), which is the minimal length-invariant identity distinction that still separates unknown-value corruptions from defined-value corruptions.
+- Structural fields (driver-dependency shape, graph shape, mapped sources) are retained in the canonical set because they are derived from the divergent signals and the RTL, not from the stimulus length, and so are stable across equivalent reproductions.
+
+Remaining situations intentionally left non-canonical:
+
+- Exact corruption values are not canonicalized: two different defined-value corruptions on the same signal (e.g. a register forced to 0x00 vs 0xFF) share a canonical fingerprint; the exact/family digests still distinguish them, and only the x/z-vs-defined distinction is preserved canonically.
+- Absolute timing, transition counts/durations, and relevance scores are intentionally excluded, so the canonical fingerprint does not distinguish a failure that reproduces earlier vs later in time or with more vs fewer surrounding transitions — those benign variations are exactly what canonicalization collapses (the exact digest still separates them).
+- Structurally identical failures in genuinely different modules are distinguished only insofar as the mapped sources / signal identities differ; canonicalization does not add any new cross-module or semantic equivalence reasoning, and it performs no clustering (deferred to a later milestone).
