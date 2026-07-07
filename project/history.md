@@ -1309,3 +1309,42 @@ Known limitations:
 - The synthesis reorganizes and summarizes existing evidence only; it does not rank interventions, estimate fix likelihood, or attempt any causal attribution.
 - Next-debug checks are template phrasings keyed on observed labels; they intentionally suggest what to inspect rather than what to change.
 - The report groups by observed-effect label and cites source locations from the generated candidates; it does not correlate across experiments beyond that grouping.
+
+## 2026-07-06 - Realistic Failure Corpus v0
+
+Demonstrated that rtl-agent generalizes across multiple realistic RTL failure scenarios by running the existing pipeline unchanged on a small corpus of designs with distinct failure mechanisms. No new analysis algorithms, no new intervention templates, no LLM, no automatic patching, no schema changes, and no changes to the MVP pipeline or report synthesis — only new self-contained example designs plus a corpus check.
+
+Corpus (`examples/failure-corpus/`): three compact, project-owned designs, each seeding a different failure class behind one shared program-driven testbench harness (each TB loads the structured stimulus from `sim/stimulus.mem` — `0x1`=send/payload, `0x2`=stall, else idle — monitors `payload_out` for the seeded corruption, and terminates non-zero; the fault is a compile-time `` `ifdef INJECT_FAULT ``; `sim/run.sh` builds the clean passing reference and the faulted design and runs both):
+
+- **fsm-sequencer (FSM transition bug):** an arm/drain sequencer where a premature second `send` while ARMED (a protocol violation) drives an illegal FSM transition that corrupts the held payload; the FSM `state` and `payload_out` diverge.
+- **fifo-underflow (FIFO underflow bug):** a small synchronous FIFO where popping (`stall`) while empty underflows and returns undefined read data instead of a safe zero (the `stall`→pop mapping keeps the fault stimulus-triggered rather than auto-triggering at reset); `data_out` diverges.
+- **counter-overflow (counter/state-update bug):** a saturating event counter whose boundary update corrupts the count instead of saturating, so exactly the four increments to the boundary are the irreducible failing core; `count`/`payload_out` diverge.
+
+A machine-readable `examples/failure-corpus/corpus.json` manifest (name, module, rtl/tb files, command, allowed file, stimulus, failure class, description) drives everything, so the pipeline requires no example-specific logic — the same `run_mvp_demo` composition (inspect-run → export-failure-package → minimize-stimulus → generate-interventions → run-experiment-matrix → synthesized debug summary) runs each example.
+
+Observed pipeline results per example (real Icarus run through `run_mvp_demo`):
+
+- fsm-sequencer: earliest divergence on `state`/`payload_out`, stimulus minimized 5 → 3 items, 8 generated candidates, all classified `failure_changed` (the FSM state still diverges when the payload is held).
+- fifo-underflow: earliest divergence on `data_out`, minimized 5 → 3, 6 candidates, a mix of `failure_removed` / `failure_changed` / `experiment_invalid`.
+- counter-overflow: earliest divergence on `count`, minimized 6 → 4 (the irreducible four-increment core), 8 candidates, a `failure_removed` / `failure_changed` mix.
+
+Validation evidence:
+
+- Gated Icarus check (`scripts/failure_corpus_check.py`, registered in `scripts/check.py`): iterates `corpus.json`, builds a target repo and a genuine baseline failure-intelligence run for each example, runs the full existing pipeline, and asserts each completes (inspect valid, matrix executed), reduces the stimulus, generates candidates, classifies observed-effect outcomes, synthesizes next-debug checks, uses no causal language, and leaves the source repository byte-for-byte unchanged. Skips cleanly without Icarus.
+- Hermetic regression tests (`tests/test_failure_corpus.py`, 13): the corpus has at least three distinct failure classes, every example has the required files, each RTL seeds a compile-time `INJECT_FAULT` fault that corrupts a signal to x, each `failing-stimulus.json` parses and matches its committed `stimulus.mem` hex program, and each `rtl-agent.yaml` exposes the named command — all without a simulator.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict (194 source files), 398 pytest tests, agent portability check, all example checks (including the new gated failure-corpus check across three examples), and packaging smoke.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- All corpus examples share one port interface (clk, rst_n, payload_in, valid_in, ready_downstream, payload_out, valid_out) and one testbench structure, so the same harness and the same pipeline drive every failure class; only the DUT internals and the seeded fault differ.
+- The corpus is manifest-driven (`corpus.json`) and the check is generic, so adding a new example is a data change (a directory plus a manifest entry) with no code change to the pipeline or the check.
+- Each fault is a compile-time `INJECT_FAULT` corruption of a mapped register to x under a stimulus-triggered condition, so every example yields clean divergence-graph and driver-trace evidence for the generator to anchor candidates on.
+
+Known limitations / where the pipeline does not generalize well:
+
+- The corpus reuses the fixed structured-stimulus opcode vocabulary (idle/send/stall); designs whose failures need richer or multi-field stimuli cannot be expressed without extending the stimulus format, which is out of scope here.
+- The FSM transition bug corrupts both the FSM `state` and the payload, so no single-site generated edit fully removes the failure (every experiment is classified `failure_changed` rather than `failure_removed`); the pipeline surfaces this honestly but does not correlate the two divergent signals.
+- The generator's confidence and candidate mix depend on how cleanly the fault maps to a single divergent register; multi-signal faults (fsm-sequencer) yield only `failure_changed` outcomes, while single-register faults (fifo-underflow, counter-overflow) also yield `failure_removed`. This is a property of the current single-site intervention templates, not of the corpus.
+- The examples remain compact single-module designs driven by one clock; multi-module or multi-clock failure scenarios are not yet represented.

@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Evidence Report Synthesis v0
+Realistic Failure Corpus v0
 
 ## Completed Work
 
