@@ -31,6 +31,7 @@ COMMANDS = (
     [str(PYTHON), "scripts/counterexample_pilot_check.py"],
     [str(PYTHON), "scripts/experiment_matrix_pilot_check.py"],
     [str(PYTHON), "scripts/intervention_templates_pilot_check.py"],
+    [str(PYTHON), "scripts/mvp_demo_check.py"],
     [str(PYTHON), "scripts/packaging_smoke.py"],
 )
 
