@@ -32,6 +32,7 @@ from rtl_agent.hkg import (
     Provenance,
     build_hkg,
     load_failure_bundle,
+    query_graph,
     serialize_graph,
     write_graph,
 )
@@ -101,10 +102,32 @@ def main() -> int:
         assert graph.edge_type_counts.get("belongs_to_cluster") == len(manifest["examples"]) * 2
         assert cluster_report.canonical_cluster_count == len(manifest["examples"])
 
+        query = query_graph(graph)
+        first_cluster = cluster_report.clusters[0]
+        first_member = first_cluster.members[0]
+        first_canonical = first_cluster.canonical_digest
+        assert first_canonical is not None
+        cluster_members = query.find_cluster_members(first_cluster.cluster_id)
+        assert [node.label for node in cluster_members] == first_cluster.members
+        matching_failures = query.find_failures_by_canonical_fingerprint(first_canonical)
+        assert [node.label for node in matching_failures] == [first_member]
+        first_failure = query.get_node(f"failure:{first_member}")
+        assert first_failure is not None
+        assert query.get_provenance(first_failure.node_id)
+        assert query.find_interventions_for_failure(first_member) == []
+        assert query.find_experiments_for_intervention("missing") == []
+
         print(
             "HKG failure corpus check passed "
             f"({graph.node_count} nodes, {graph.edge_count} edges, "
             f"{cluster_report.canonical_cluster_count} clusters)"
+        )
+        print(
+            "  example queries: "
+            f"cluster {first_cluster.cluster_id} "
+            f"members={[node.label for node in cluster_members]}, "
+            f"canonical {first_canonical[:12]} "
+            f"failures={[node.label for node in matching_failures]}"
         )
     return 0
 

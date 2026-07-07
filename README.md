@@ -483,7 +483,7 @@ rtl-agent run-mvp-demo \
 
 It writes `mvp-demo-summary.json` and `mvp-demo-summary.md` (plus the per-stage `failure-package/`, `minimization/`, `generated/`, and `matrix/` directories) into the output directory. The summary is organized into four separated sections — original failure, generated intervention candidates, experiment outcomes, and evidence-backed observations. Every observation is an observed counterfactual effect of a bounded, reviewable experiment (an edit removed / materially changed / time-shifted / had no observable effect on the failure); it is not proof of a root cause or a fix, and no intervention is ever applied to the repository. `scripts/mvp_demo_check.py` is a gated Icarus-backed demonstration that skips cleanly when the simulator is absent.
 
-The Hardware Knowledge Graph v0 is a deterministic construction layer over existing structured, versioned evidence artifacts. It is a Python API, not a query engine or CLI: callers load validated failure-intelligence runs and optional typed counterfactual / clustering / ranking reports, call `build_hkg(...)`, and persist the versioned graph artifact with `write_graph(...)`.
+The Hardware Knowledge Graph v0 is a deterministic construction layer over existing structured, versioned evidence artifacts. It is a Python API, not a CLI: callers load validated failure-intelligence runs and optional typed counterfactual / clustering / ranking reports, call `build_hkg(...)`, and persist the versioned graph artifact with `write_graph(...)`.
 
 ```python
 from pathlib import Path
@@ -495,7 +495,19 @@ graph = build_hkg([bundle], graph_id="debug-session-001")
 write_graph(graph, Path(".rtl-agent/hkg/debug-session-001.json"))
 ```
 
-The v0 graph has typed nodes for `module`, `signal`, `source_location`, `failure`, `canonical_fingerprint`, `failure_cluster`, `intervention`, `experiment`, and `observed_effect`, and typed edges for `contains`, `drives`, `depends_on`, `originated_from`, `belongs_to_cluster`, `generated`, `produced`, and `references`. Every node and edge carries provenance back to its originating structured artifact (`artifact_id`, schema version, content SHA-256/path where available). Construction and JSON serialization are deterministic: stable ids, sorted attributes/provenance, and sorted node/edge lists. The HKG does not parse Markdown, query, infer, call an LLM, apply patches, run graph algorithms beyond construction, create a server/database/UI, or make causal/root-cause claims. `scripts/hkg_failure_corpus_check.py` is a gated Icarus-backed corpus check; on the current three-example failure corpus it builds a graph with 69 nodes, 167 edges, and 3 canonical failure clusters.
+The v0 graph has typed nodes for `module`, `signal`, `source_location`, `failure`, `canonical_fingerprint`, `failure_cluster`, `intervention`, `experiment`, and `observed_effect`, and typed edges for `contains`, `drives`, `depends_on`, `originated_from`, `belongs_to_cluster`, `generated`, `produced`, and `references`. Every node and edge carries provenance back to its originating structured artifact (`artifact_id`, schema version, content SHA-256/path where available). Construction and JSON serialization are deterministic: stable ids, sorted attributes/provenance, and sorted node/edge lists.
+
+The HKG query API is a small read-only Python layer over an already constructed or serialized graph:
+
+```python
+from rtl_agent.hkg import query_graph_file
+
+query = query_graph_file(Path(".rtl-agent/hkg/debug-session-001.json"))
+signals = query.find_signals(module="axi_pipe", name="payload_out")
+failures = query.find_failures_by_canonical_fingerprint("<canonical-digest>")
+```
+
+Supported query helpers include `get_node`, `list_nodes_by_type`, `outgoing_edges`, `incoming_edges`, `find_signals`, `find_failures_by_canonical_fingerprint`, `find_cluster_members`, `find_interventions_for_failure`, `find_experiments_for_intervention`, and `get_provenance`. Results are typed HKG model objects returned in deterministic order; missing queries return `None` or empty lists. The HKG does not parse Markdown, infer, call an LLM, apply patches, run graph algorithms beyond construction, create a server/database/UI, or make causal/root-cause claims. `scripts/hkg_failure_corpus_check.py` is a gated Icarus-backed corpus check; on the current three-example failure corpus it builds a graph with 69 nodes, 167 edges, and 3 canonical failure clusters, and demonstrates query results such as `cluster-2dc5e4134bbdb3dc -> ['fifo-underflow']` and canonical fingerprint prefix `2dc5e4134bbd -> ['fifo-underflow']`.
 
 `export-failure-package` packages a validated run directory into a single self-contained, portable failure package (read-only):
 

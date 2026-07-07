@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Hardware Knowledge Graph v0 - Graph Construction
+Hardware Knowledge Graph Query API v0
 
 ## Completed Work
 

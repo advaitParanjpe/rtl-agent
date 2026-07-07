@@ -15,19 +15,33 @@ from rtl_agent.hkg.models import (
     NodeType,
     Provenance,
 )
+from rtl_agent.hkg.query import (
+    ExperimentOutcomeResult,
+    HkgQuery,
+    HkgQueryError,
+    load_graph,
+    query_graph,
+    query_graph_file,
+)
 
 __all__ = [
     "HKG_SCHEMA_VERSION",
     "EdgeType",
+    "ExperimentOutcomeResult",
     "FailureBundle",
     "HkgBuildError",
     "HkgEdge",
     "HkgGraph",
     "HkgNode",
+    "HkgQuery",
+    "HkgQueryError",
     "NodeType",
     "Provenance",
     "build_hkg",
     "load_failure_bundle",
+    "load_graph",
+    "query_graph",
+    "query_graph_file",
     "serialize_graph",
     "write_graph",
 ]

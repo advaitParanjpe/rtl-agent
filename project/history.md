@@ -1502,3 +1502,13 @@ The graph vocabulary is intentionally bounded to the v0 construction scope. Node
 Validation added focused unit coverage in `tests/test_hkg.py` for structural graph construction, all required node/edge types, provenance retention, byte-identical repeated ingestion, persisted graph output, counterfactual/comparison/ranking edges, cluster membership, and missing-canonical warnings. Added `scripts/hkg_failure_corpus_check.py`, registered in `scripts/check.py`, which uses the existing failure corpus and existing failure-intelligence/fingerprint/clustering services to build a valid HKG graph. On the current three-example corpus it produced 69 nodes, 167 edges, and 3 canonical failure clusters.
 
 Deferred capabilities remain explicit: no graph querying, inference, LLM integration, automatic patching, Markdown/report ingestion, report generation, database/server/UI, semantic RTL elaboration, graph algorithms beyond construction, or causal/root-cause claims.
+
+## 2026-07-07 - Hardware Knowledge Graph Query API v0
+
+Added a small deterministic read-only query API over constructed or serialized HKG artifacts. `rtl_agent.hkg.query` exposes `HkgQuery`, `query_graph`, `query_graph_file`, and `load_graph`, returning typed `HkgNode`, `HkgEdge`, `Provenance`, and `ExperimentOutcomeResult` objects without mutating the graph or changing construction semantics.
+
+Supported focused queries: get node by id, list nodes by type, list outgoing/incoming edges with optional type filters, find signals by module and/or signal name (including hierarchical suffix matches), find failures by canonical fingerprint, find cluster members, find interventions generated for a failure, find experiments and observed-effect outcomes for an intervention, and get provenance for any node or edge id. Missing queries return deterministic `None` or empty-list results.
+
+Validation added focused unit tests for every query family, serialized-graph loading, deterministic ordering, provenance lookup, and missing-result behavior. The gated failure-corpus HKG check now exercises the query API on the existing corpus graph; on the current corpus it still builds 69 nodes, 167 edges, and 3 clusters, and example queries return `cluster-2dc5e4134bbdb3dc -> ['fifo-underflow']` and canonical prefix `2dc5e4134bbd -> ['fifo-underflow']`.
+
+Deferred capabilities remain explicit: no inference, LLM integration, automatic patching, database/server/UI, report generation, generic graph database abstraction, new graph construction semantics, or causal/root-cause claims.
