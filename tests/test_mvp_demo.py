@@ -182,6 +182,24 @@ def test_full_workflow_composes(fixture: _Fixture, tmp_path: Path) -> None:
     assert any(o.category == "experiment_result" for o in summary.observations)
     assert any(o.failure_removed for o in summary.experiment_outcomes)
 
+    # Deterministic observed-effect labels are emitted and auditable.
+    valid_labels = {
+        "failure_removed",
+        "failure_delayed",
+        "failure_advanced",
+        "failure_changed",
+        "no_observable_effect",
+        "new_failure",
+        "experiment_invalid",
+        "unknown",
+    }
+    for outcome in summary.experiment_outcomes:
+        assert outcome.observed_effect in valid_labels
+        assert outcome.observed_effect_rationale
+    assert any(o.observed_effect == "failure_removed" for o in summary.experiment_outcomes)
+    assert summary.observed_effect_counts
+    assert sum(summary.observed_effect_counts.values()) == len(summary.experiment_outcomes)
+
     # The source repository is never modified.
     assert _repo_state(fixture.repo) == before
 

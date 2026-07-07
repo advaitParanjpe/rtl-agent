@@ -273,6 +273,18 @@ def test_outcomes_and_ordering(tmp_path: Path, baseline: Path, waveforms: dict[s
     assert rows["late"].result_failure_signals == rows["benign"].result_failure_signals
     assert rows["different"].different_failure is True
     assert rows["disabled"].execution_status == "skipped"
+    # Deterministic observed-effect labels are emitted per row and aggregated.
+    # (The synthetic "late" waveform also shifts the family digest, so the
+    # same-signal/different-family result is classified failure_changed; the pure
+    # same-family delayed/advanced paths are covered by the classifier unit tests.)
+    assert rows["remove"].observed_effect == "failure_removed"
+    assert rows["benign"].observed_effect == "no_observable_effect"
+    assert rows["late"].observed_effect in {"failure_delayed", "failure_changed"}
+    assert rows["different"].observed_effect in {"failure_changed", "new_failure"}
+    assert rows["disabled"].observed_effect == "experiment_invalid"
+    assert all(r.observed_effect_rationale for r in report.rows)
+    assert report.observed_effect_counts
+    assert sum(report.observed_effect_counts.values()) == len(report.rows)
     # The source repository is unchanged.
     assert _repo_state(repo) == before
 

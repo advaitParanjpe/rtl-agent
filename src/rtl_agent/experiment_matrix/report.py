@@ -34,7 +34,7 @@ def _markdown(report: ExperimentMatrixReport) -> str:
         "",
         "## Outcome matrix",
         "",
-        "| Intervention | State | Counterfactual | Fingerprint | Family | Δtime | Artifacts |",
+        "| Intervention | State | Observed effect | Counterfactual | Fingerprint | Δt | Art |",
         "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in report.rows:
@@ -56,7 +56,17 @@ def _markdown(report: ExperimentMatrixReport) -> str:
         f"- Infrastructure failures: {summary.infrastructure_failures}",
         f"- Insufficient-evidence outcomes: {summary.insufficient_evidence}",
         "",
+        "### Observed-effect labels",
+        "",
     ]
+    if report.observed_effect_counts:
+        lines += [
+            f"- `{effect}`: {count}"
+            for effect, count in sorted(report.observed_effect_counts.items())
+        ]
+    else:
+        lines.append("- (none)")
+    lines.append("")
     if report.warnings:
         lines += ["## Warnings", ""]
         lines += [f"- {warning}" for warning in report.warnings]
@@ -66,7 +76,6 @@ def _markdown(report: ExperimentMatrixReport) -> str:
 
 
 def _row_line(row: MatrixRow) -> str:
-    family = row.result_family_digest[:12] if row.result_family_digest else "-"
     delta = "-"
     if row.result_failure_time is not None and row.baseline_failure_time is not None:
         delta = f"{row.result_failure_time - row.baseline_failure_time:+d}"
@@ -74,6 +83,6 @@ def _row_line(row: MatrixRow) -> str:
     cache = " (cache)" if row.from_cache else ""
     return (
         f"| `{row.intervention_id}`{cache} | {row.execution_status} "
-        f"| {row.counterfactual_outcome or '-'} | {row.fingerprint_relation or '-'} "
-        f"| `{family}` | {delta} | `{artifacts}` |"
+        f"| **{row.observed_effect}** | {row.counterfactual_outcome or '-'} "
+        f"| {row.fingerprint_relation or '-'} | {delta} | `{artifacts}` |"
     )

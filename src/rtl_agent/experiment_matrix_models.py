@@ -70,6 +70,8 @@ class MatrixRow(BaseModel):
     failure_removed: bool = False
     failure_time_shifted: bool = False
     different_failure: bool = False
+    observed_effect: str = "unknown"
+    observed_effect_rationale: str | None = None
     from_cache: bool = False
     warnings: list[str] = Field(default_factory=list)
     insufficient_evidence_reasons: list[str] = Field(default_factory=list)
@@ -115,6 +117,7 @@ class ExperimentMatrixReport(BaseModel):
     max_experiments: int = Field(ge=1)
     rows: list[MatrixRow] = Field(default_factory=list)
     summary: MatrixSummary
+    observed_effect_counts: dict[str, int] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
     disclaimer: str = MATRIX_DISCLAIMER
     parser_notes: list[str] = Field(default_factory=list)

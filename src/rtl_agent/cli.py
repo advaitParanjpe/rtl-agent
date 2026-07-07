@@ -1537,6 +1537,11 @@ def _print_mvp_demo_summary(summary: object, output: Path) -> None:
             ),
             "candidate_counts": summary.candidate_counts,
             "outcome_counts": summary.outcome_counts,
+            "observed_effect_counts": summary.observed_effect_counts,
+            "observed_effects": [
+                {"intervention_id": o.intervention_id, "observed_effect": o.observed_effect}
+                for o in summary.experiment_outcomes
+            ],
             "observations": [o.statement for o in summary.observations],
         }
     )

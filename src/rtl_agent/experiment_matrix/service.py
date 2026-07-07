@@ -35,6 +35,7 @@ from rtl_agent.failure_intelligence_run_models import FailureIntelligenceRunMani
 from rtl_agent.failure_report_models import FailureReport
 from rtl_agent.git.worktree import GitWorktreeError, GitWorktreeManager
 from rtl_agent.models import CommandResult, utc_now
+from rtl_agent.outcome_classification import OutcomeEvidence, classify_observed_effect
 from rtl_agent.reduction_models import STIMULUS_REDUCTION_SCHEMA_VERSION
 from rtl_agent.run_inspection import RunInspectionError, inspect_run
 from rtl_agent.stimulus import StimulusError, materialize_stimulus, parse_stimulus, stimulus_digest
@@ -200,6 +201,7 @@ def run_experiment_matrix(
         max_experiments=max_experiments,
         rows=rows,
         summary=_summary(rows),
+        observed_effect_counts=_observed_effect_counts(rows),
         warnings=sorted(dict.fromkeys(warnings)),
         parser_notes=_PARSER_NOTES,
     )
@@ -472,7 +474,26 @@ def _finalize(row: MatrixRow, status: str, *, detail: str | None = None) -> Matr
     row.execution_status = status
     if detail is not None:
         row.detail = detail
+    label = classify_observed_effect(_row_evidence(row))
+    row.observed_effect = str(label.effect)
+    row.observed_effect_rationale = label.rationale
     return row
+
+
+def _row_evidence(row: MatrixRow) -> OutcomeEvidence:
+    return OutcomeEvidence(
+        execution_status=row.execution_status,
+        command_status=row.command_status,
+        evidence_valid=row.result_family_digest is not None,
+        baseline_family_digest=row.baseline_family_digest,
+        baseline_signals=tuple(row.baseline_failure_signals),
+        baseline_time=row.baseline_failure_time,
+        result_family_digest=row.result_family_digest,
+        result_signals=tuple(row.result_failure_signals),
+        result_time=row.result_failure_time,
+        result_divergence_present=bool(row.result_failure_signals),
+        artifact_ref=row.artifact_dir,
+    )
 
 
 def _from_cache(base_row: MatrixRow, cached: MatrixRow) -> MatrixRow:
@@ -485,6 +506,13 @@ def _from_cache(base_row: MatrixRow, cached: MatrixRow) -> MatrixRow:
         }
     )
     return updated
+
+
+def _observed_effect_counts(rows: list[MatrixRow]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row.observed_effect] = counts.get(row.observed_effect, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def _summary(rows: list[MatrixRow]) -> MatrixSummary:

@@ -60,6 +60,8 @@ class ExperimentOutcome(BaseModel):
     template_kind: str | None = None
     confidence: str | None = None
     execution_status: str
+    observed_effect: str = "unknown"
+    observed_effect_rationale: str | None = None
     counterfactual_outcome: str | None = None
     fingerprint_relation: str | None = None
     failure_removed: bool = False
@@ -67,6 +69,7 @@ class ExperimentOutcome(BaseModel):
     family_preserved: bool = False
     failure_time_shifted: bool = False
     result_family_digest: str | None = None
+    artifact_dir: str | None = None
 
 
 class Observation(BaseModel):
@@ -91,6 +94,7 @@ class MvpDemoSummary(BaseModel):
     candidate_counts: dict[str, int] = Field(default_factory=dict)
     experiment_outcomes: list[ExperimentOutcome] = Field(default_factory=list)
     outcome_counts: dict[str, int] = Field(default_factory=dict)
+    observed_effect_counts: dict[str, int] = Field(default_factory=dict)
     observations: list[Observation] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     disclaimer: str = MVP_DEMO_DISCLAIMER

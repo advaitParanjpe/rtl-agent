@@ -74,20 +74,19 @@ def _markdown(summary: MvpDemoSummary) -> str:
     lines += ["## 3. Experiment outcomes", ""]
     if summary.experiment_outcomes:
         lines += [
-            "| Experiment | Kind | Status | Counterfactual | Fingerprint | Removed | Different |",
-            "| --- | --- | --- | --- | --- | --- | --- |",
+            "| Experiment | Kind | Status | Observed effect | Fingerprint | Rationale |",
+            "| --- | --- | --- | --- | --- | --- |",
         ]
         for o in summary.experiment_outcomes:
             lines.append(
                 f"| `{o.intervention_id}` | {o.template_kind or '-'} | {o.execution_status} | "
-                f"{o.counterfactual_outcome or '-'} | {o.fingerprint_relation or '-'} | "
-                f"{'yes' if o.failure_removed else 'no'} | "
-                f"{'yes' if o.different_failure else 'no'} |"
+                f"**{o.observed_effect}** | {o.fingerprint_relation or '-'} | "
+                f"{o.observed_effect_rationale or '-'} |"
             )
         lines.append("")
         lines.append(
-            "Outcome counts: "
-            + ", ".join(f"{k}={v}" for k, v in sorted(summary.outcome_counts.items()))
+            "Observed-effect labels: "
+            + ", ".join(f"{k}={v}" for k, v in sorted(summary.observed_effect_counts.items()))
         )
     else:
         lines.append("_No experiments were run._")

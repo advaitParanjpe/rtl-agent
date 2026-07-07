@@ -187,6 +187,7 @@ def run_mvp_demo(
         candidate_counts=_candidate_counts(candidates),
         experiment_outcomes=outcomes,
         outcome_counts=_outcome_counts(matrix),
+        observed_effect_counts=_observed_effect_counts(outcomes),
         observations=_observations(original, minimization, candidates, outcomes),
         warnings=sorted(dict.fromkeys(warnings)),
         parser_notes=_PARSER_NOTES,
@@ -265,6 +266,8 @@ def _outcomes(
                 template_kind=kind_by_id.get(row.intervention_id),
                 confidence=conf_by_id.get(row.intervention_id),
                 execution_status=row.execution_status,
+                observed_effect=row.observed_effect,
+                observed_effect_rationale=row.observed_effect_rationale,
                 counterfactual_outcome=row.counterfactual_outcome,
                 fingerprint_relation=row.fingerprint_relation,
                 failure_removed=row.failure_removed,
@@ -272,6 +275,7 @@ def _outcomes(
                 family_preserved=row.family_preserved,
                 failure_time_shifted=row.failure_time_shifted,
                 result_family_digest=row.result_family_digest,
+                artifact_dir=row.artifact_dir,
             )
         )
     return outcomes
@@ -322,9 +326,7 @@ def _observations(
     )
     hypothesis_by_id = {c.candidate_id: c.hypothesis for c in candidates}
     for outcome in outcomes:
-        label = _observed_effect(outcome)
-        if label is None:
-            continue
+        phrase = _effect_phrase(outcome.observed_effect)
         where = hypothesis_by_id.get(outcome.intervention_id, outcome.intervention_id)
         observations.append(
             Observation(
@@ -332,11 +334,12 @@ def _observations(
                 category="experiment_result",
                 statement=(
                     f"Experiment `{outcome.intervention_id}` ({outcome.template_kind}, "
-                    f"{outcome.confidence}) {label}. Hypothesis under test: {where}"
+                    f"{outcome.confidence}) → observed effect `{outcome.observed_effect}`: "
+                    f"{phrase}. Hypothesis under test: {where}"
                 ),
             )
         )
-    if not any(o.category == "experiment_result" for o in observations):
+    if not outcomes:
         observations.append(
             Observation(
                 category="experiment_result",
@@ -346,21 +349,27 @@ def _observations(
     return observations
 
 
-def _observed_effect(outcome: ExperimentOutcome) -> str | None:
-    if outcome.execution_status != "executed":
-        return None
-    if outcome.failure_removed:
-        return "removed the observed failure (no divergence reproduced)"
-    if outcome.different_failure:
-        return (
-            "produced a materially different observed failure "
-            f"(fingerprint relation: {outcome.fingerprint_relation})"
-        )
-    if outcome.failure_time_shifted:
-        return f"shifted the observed failure in time ({outcome.counterfactual_outcome})"
-    if outcome.counterfactual_outcome == "no_observable_effect":
-        return "had no observable effect on the failure"
-    return None
+_EFFECT_PHRASES = {
+    "failure_removed": "the observed failure no longer reproduced",
+    "failure_delayed": "the same observed failure reproduced later in time",
+    "failure_advanced": "the same observed failure reproduced earlier in time",
+    "failure_changed": "the same signal produced a materially different observed failure",
+    "no_observable_effect": "no observable change in the failure was measured",
+    "new_failure": "a different observed failure appeared on another signal",
+    "experiment_invalid": "the experiment did not produce a comparable observation",
+    "unknown": "the observed effect could not be classified deterministically",
+}
+
+
+def _effect_phrase(effect: str) -> str:
+    return _EFFECT_PHRASES.get(effect, "the observed effect could not be classified")
+
+
+def _observed_effect_counts(outcomes: list[ExperimentOutcome]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for outcome in outcomes:
+        counts[outcome.observed_effect] = counts.get(outcome.observed_effect, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def _read[ModelT: BaseModel](path: Path, model: type[ModelT]) -> ModelT:
