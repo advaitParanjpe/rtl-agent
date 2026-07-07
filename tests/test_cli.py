@@ -66,6 +66,7 @@ def test_readme_documented_commands_have_help() -> None:
         "compare-waveforms",
         "compare-fingerprints",
         "discover",
+        "generate-interventions",
         "divergence-graph",
         "export-evidence",
         "export-failure-package",

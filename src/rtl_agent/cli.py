@@ -63,6 +63,10 @@ from rtl_agent.implementation import (
     run_bounded_implementation,
     write_implementation_report,
 )
+from rtl_agent.intervention_templates import (
+    InterventionTemplateError,
+    generate_interventions,
+)
 from rtl_agent.issues import IssueParsingError, parse_issue_file, write_task_contract
 from rtl_agent.reduction import StimulusReductionError, minimize_stimulus
 from rtl_agent.review import ReviewError, review_implementation, write_review_report
@@ -995,6 +999,47 @@ def run_experiment_matrix_command(
     _print_experiment_matrix_summary(report, output)
 
 
+@app.command("generate-interventions")
+def generate_interventions_command(
+    failure_run: Annotated[
+        Path, typer.Option("--failure-run", help="Validated failure-intelligence run dir.")
+    ],
+    repo: Annotated[Path, typer.Option("--repo", help="Target Git RTL repository root.")],
+    allowed_file: Annotated[
+        list[str],
+        typer.Option("--allowed-file", help="Allowed source file (repeatable)."),
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Generation output directory.")],
+    max_candidates: Annotated[
+        int, typer.Option("--max-candidates", min=1, help="Maximum candidate count.")
+    ] = 8,
+    reduction_report: Annotated[
+        Path | None,
+        typer.Option("--reduction-report", help="Optional minimized-stimulus reduction report."),
+    ] = None,
+    baseline_commit: Annotated[
+        str | None,
+        typer.Option("--baseline-commit", help="Commit/ref to validate edits against (HEAD)."),
+    ] = None,
+) -> None:
+    """Generate reviewable intervention candidates from failure evidence (generation only)."""
+    try:
+        report = generate_interventions(
+            failure_run=failure_run,
+            repo=repo,
+            allowed_files=allowed_file,
+            output=output,
+            max_candidates=max_candidates,
+            reduction_report=reduction_report,
+            baseline_commit=baseline_commit,
+        )
+    except InterventionTemplateError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_generate_interventions_summary(report, output)
+
+
 @app.command("export-failure-package")
 def export_failure_package_command(
     run_dir: Annotated[
@@ -1417,6 +1462,32 @@ def _print_minimize_summary(report: object, output: Path) -> None:
             "cache_hits": report.cache_hits,
             "final_classification": report.final_classification,
             "termination_reason": report.termination_reason,
+        }
+    )
+
+
+def _print_generate_interventions_summary(report: object, output: Path) -> None:
+    from rtl_agent.intervention_template_models import InterventionTemplateReport
+
+    assert isinstance(report, InterventionTemplateReport)
+    candidates = [
+        {
+            "candidate_id": c.candidate_id,
+            "template_kind": str(c.template_kind),
+            "confidence": str(c.confidence),
+            "location": f"{c.file}:{c.source_line}",
+            "affected_signal": c.affected_signal,
+        }
+        for c in report.candidates
+    ]
+    _print_json(
+        {
+            "schema_version": report.schema_version,
+            "output": str(output),
+            "manifest": str(output / "interventions.json"),
+            "target_commit": report.target_commit,
+            "candidates": candidates,
+            "summary": report.summary.model_dump(mode="json"),
         }
     )
 
