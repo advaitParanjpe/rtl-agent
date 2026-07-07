@@ -1412,3 +1412,37 @@ Cases intentionally left unknown/unsupported:
 - Experiments with no result fingerprint (apply failure, timeout, exec error, or an unreadable failure report) are `unsupported` with the recorded reasons rather than being force-compared.
 - Two different defined-value corruptions on the same signal compare as `failure_changed` with the family/canonical digests changed, but the comparison does not attempt to characterize *how* the value differs beyond the digest change (exact values remain out of the canonical identity, as decided in the fingerprint-stability milestone).
 - The comparison reports observed differences only; it makes no claim about which change is closer to a fix or a cause, performs no ranking, and does no cross-experiment correlation.
+
+## 2026-07-07 - Multi-Failure Clustering v0
+
+Added a deterministic clustering layer that groups failures into clusters representing the same or closely related observed failure behavior, using only the existing fingerprint and comparison infrastructure. No new fingerprint algorithms, no new intervention templates, no LLM, no automatic patching, no Hardware Knowledge Graph, additive metadata only, and no causal/root-cause claims.
+
+Clustering rules (`src/rtl_agent/failure_clustering.py` / `failure_clustering_models.py`): `cluster_failures` groups a list of `FailureClusterMember`s primarily by the canonical fingerprint. Members sharing a canonical digest form one cluster — because the canonical fingerprint is stable across benign variations (differing absolute timestamps, differing stimulus lengths, equivalent reduced traces), identical failures and different manifestations of the same failure land in one cluster while different failure mechanisms stay separate. Grouping by canonical-digest equality is exactly the fingerprint comparison's `canonical_match` applied by digest bucketing (O(n), deterministic), so no new comparison algorithm is introduced. The family fingerprint provides the secondary relationship: clusters that share a family digest are linked via `related_cluster_ids` (closely related but not identical behavior). Every failure receives a cluster identifier (derived deterministically from the canonical digest, `cluster-<canonical[:16]>`), a membership, and a representative chosen by a fixed evidence-completeness rule (most earliest-divergent signals, then a present exact digest, then the lexicographically smallest member id). Each cluster reports its size, shared canonical fingerprint, the family digests seen, an observed-outcome distribution, the member artifact references, and the related-cluster links. Failures without a usable canonical fingerprint (insufficient evidence) are left as their own singleton clusters and listed in `unclustered_member_ids` rather than being force-merged. Clusters and members are sorted, so the report is byte-deterministic. `member_from_fingerprint` builds a member from an existing `FailureFingerprintReport`.
+
+Cluster assignments for the current failure corpus (real Icarus, clustering a full-stimulus and a minimized-core reproduction of each design):
+
+- `cluster-eba371251cab0080` (size 2) — `fsm-sequencer:full`, `fsm-sequencer:core` (FSM transition bug).
+- `cluster-2dc5e4134bbdb3dc` (size 2) — `fifo-underflow:full`, `fifo-underflow:core` (FIFO underflow bug).
+- `cluster-5fc0449882f637c7` (size 2) — `counter-overflow:full`, `counter-overflow:core` (counter/state-update bug).
+
+Both manifestations of each mechanism share a cluster (they share a canonical fingerprint even though — for fsm-sequencer — their family digests differ across full vs minimized), and the three mechanisms occupy three distinct clusters with no cross-links (distinct families).
+
+Validation evidence:
+
+- Focused unit tests (`tests/test_failure_clustering.py`, 8): identical failures cluster together; different manifestations of the same failure (same canonical, different family/exact, different signal counts) cluster together with the richer member as representative; different mechanisms remain separate; a shared family digest links related clusters; insufficient-evidence failures become non-merged singletons while still receiving a cluster id and representative; the observed-outcome distribution and member artifacts are aggregated; clustering is deterministic and ordered regardless of input order; and `member_from_fingerprint` maps a fingerprint (including an insufficient one) correctly.
+- Gated Icarus integration check (`scripts/failure_clustering_check.py`, registered in `scripts/check.py`): reproduces each corpus design from both the full and the minimized-core stimulus, clusters all six fingerprints, and asserts the two manifestations of each mechanism land in the same cluster and the three mechanisms occupy three separate canonical clusters. Skips cleanly without Icarus.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict (203 source files), 418 pytest tests, agent portability check, all example checks (including the gated failure-clustering, fingerprint-stability, and failure-corpus checks), and packaging smoke.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The new clustering layer is separate from the existing family-clustering service (`failure_family.cluster_fingerprints`, which groups by family digest): this layer clusters by the more stable canonical fingerprint and is named distinctly (`cluster_failures`), so the two coexist without collision and neither changes.
+- Clustering consumes lightweight `FailureClusterMember` records (built from fingerprints via `member_from_fingerprint`) rather than full fingerprint reports, so it is trivially unit-testable and decoupled from how the fingerprints were produced.
+- No CLI command was added: the clustering layer is a library plus a gated corpus check, keeping the milestone focused and avoiding CLI/README/inventory churn.
+
+Intentionally unsupported clustering situations:
+
+- Failures with insufficient evidence (no canonical fingerprint) are not clustered with each other or with real clusters; each becomes an insufficient-evidence singleton, recorded in `unclustered_member_ids`, because grouping unknowns would imply an equivalence the evidence does not support.
+- Clustering is by exact canonical-fingerprint identity only; failures whose canonical fingerprints differ are never merged even if they share a family (they are only linked as related clusters), so near-miss or fuzzy grouping is intentionally out of scope.
+- The layer performs no cross-run temporal or historical reasoning and makes no causal claim: a cluster asserts shared observed failure behavior, not a shared root cause.

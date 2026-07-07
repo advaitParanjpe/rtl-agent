@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Counterfactual Result Comparison
+Multi-Failure Clustering v0
 
 ## Completed Work
 
