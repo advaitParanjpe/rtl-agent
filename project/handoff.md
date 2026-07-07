@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Pre-HKG Architecture Review
+Hardware Knowledge Graph v0 - Graph Construction
 
 ## Completed Work
 
