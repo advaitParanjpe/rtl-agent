@@ -1275,3 +1275,37 @@ Known limitations:
 - Same-family `failure_delayed` / `failure_advanced` labels require a time shift that preserves the family digest; because the current fingerprint family is window-sensitive, a fabricated waveform time-shift usually also changes the family (classified `failure_changed`), so those two labels are primarily validated by unit tests rather than the hermetic waveform fixtures.
 - The classifier consumes existing evidence only; it adds no new comparison beyond family/time/signal and does not attempt to disambiguate `unknown` cases further.
 - Labels describe observed experimental effects; they intentionally imply no ranking, prioritization, or causal inference.
+
+## 2026-07-06 - Evidence Report Synthesis v0
+
+Added a deterministic report synthesis layer so the final counterfactual / MVP report reads like a coherent evidence-backed debug summary rather than a dump of pipeline artifacts. This is a presentation/synthesis layer only: no new analysis algorithms, no new intervention templates, no LLM, no automatic patching, and no causal/root-cause claims.
+
+Synthesis layer (`src/rtl_agent/mvp_demo/synthesis.py`): deterministic pure builders over the already-computed MVP demo summary. `build_notable_effects` groups the classified experiment outcomes by observed-effect label using a fixed display priority (failure_removed, failure_changed, new_failure, failure_delayed, failure_advanced, no_observable_effect, experiment_invalid, unknown) with interventions sorted within each group. `build_evidence_references` consolidates the auditable artifact paths (failure run, portable failure package, reduction report, generated interventions manifest, experiment-matrix report, and each experiment's row artifact directory). `build_next_debug_checks` derives concise, deterministic next steps from the observed labels only — inspect the sites whose experiments removed the failure, compare the fingerprints of those that changed it, check disjoint-signal results as possible separate issues, re-run experiments that did not complete, manually review unclassified ones, note when nothing altered the failure, and always cite the minimized stimulus as the compact reproducer. Every check is phrased as an observation about what to inspect next, never a causal claim. `render_debug_summary` produces the Markdown with clearly ordered sections: original failure, minimized stimulus, generated interventions, outcome classification counts, notable observed effects grouped by label (with source locations and the classifier rationale), evidence references, next debug checks, and the explicit non-causality disclaimer.
+
+Exposure (additive fields only): `MvpDemoSummary` gained `notable_effects`, `evidence_references`, and `next_debug_checks` (plus `NotableEffectGroup`, `EvidenceReference`, `NextDebugCheck` models), computed in the service and stored on the summary so the JSON stays machine-readable and auditable. The Markdown renderer now delegates to the synthesis layer (the previous ad-hoc renderer was removed). The `run-mvp-demo` terminal output was trimmed to stay concise — stage statuses, observed-effect counts, and the next-debug checks — with full detail in the Markdown/JSON. Deterministic ordering is preserved throughout.
+
+Report sections added / reorganized: the synthesized Markdown now leads with a one-line non-causal framing and presents (1) original failure, (2) minimized stimulus, (3) generated interventions with confidence counts, (4) outcome classification counts, (5) notable observed effects grouped by label, (6) evidence references, (7) next debug checks, and (8) the disclaimer — replacing the earlier flat stage/observation dump.
+
+Example synthesized observations from the counterexample demo fixture (8 experiments): grouped as `failure_removed` (4) — "the observed failure no longer reproduced when the edit was applied" for the hold-register, override-condition, and block-state-transition edits — and `failure_changed` (4) — "the same failing signal produced a materially different failure family" for the suppress-assignment edits, each with its source location and family-digest rationale. The derived next-debug checks are: inspect the four failure_removed edit sites first, compare the four failure_changed result fingerprints against the original family, and use the 3-item minimized stimulus as the compact reproducer.
+
+Intentionally omitted claims: the report asserts no cause, root cause, fix, ranking, or prioritization among the edits; `unknown` and `experiment_invalid` outcomes are surfaced as such rather than guessed; and where no generated edit altered the failure the report says so and suggests widening the allowed files or candidate budget instead of inferring anything.
+
+Validation evidence:
+
+- Focused synthesis tests (`tests/test_mvp_synthesis.py`, 6): label grouping and fixed-priority ordering, deterministic and observation-only next-debug checks (including the no-effect and unknown/invalid cases), the ordered Markdown section structure (golden-style heading-order assertions), evidence-reference rendering, absence of affirmative causal language, and render determinism.
+- MVP-demo integration coverage extended (`tests/test_mvp_demo.py`): the synthesized report contains the ordered debug-summary sections, every observed-effect label present in the summary is grouped in the report, the notable-effect counts match the classified outcomes, the next-debug checks and evidence references are populated, and the rendered Markdown is free of affirmative causal language; the CLI test confirms the terminal output stays concise (no full observations dump).
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict (192 source files), 385 pytest tests, agent portability check, all example checks (including the gated MVP-demo pilot), and packaging smoke.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Synthesis is computed once in the service and stored as additive summary fields, so the JSON is the single source of truth and the Markdown is a pure rendering of it; no existing schema field or downstream consumer changed.
+- Next-debug checks are derived strictly from the observed-effect labels already assigned by the classifier, so the synthesis introduces no new comparison or analysis and cannot make a claim the evidence does not support.
+- Label grouping and check ordering use a fixed priority table and sorted ids, keeping the report byte-deterministic for golden-style testing.
+
+Known limitations:
+
+- The synthesis reorganizes and summarizes existing evidence only; it does not rank interventions, estimate fix likelihood, or attempt any causal attribution.
+- Next-debug checks are template phrasings keyed on observed labels; they intentionally suggest what to inspect rather than what to change.
+- The report groups by observed-effect label and cites source locations from the generated candidates; it does not correlate across experiments beyond that grouping.

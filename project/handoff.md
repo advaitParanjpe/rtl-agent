@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Counterfactual Outcome Classification
+Evidence Report Synthesis v0
 
 ## Completed Work
 
