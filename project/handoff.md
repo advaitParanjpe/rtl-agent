@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Intervention Quality and Ranking v0
+Pre-HKG Architecture Review
 
 ## Completed Work
 
