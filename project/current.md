@@ -1,24 +1,22 @@
-# Hypothesis-Driven Intervention Templates
+# Evidence-Guided Counterfactual MVP Demonstration
 
 ## Objective
 
-Introduce a small deterministic library of safe, bounded intervention templates derived from existing driver and divergence evidence, and generate candidate experiments as explicit, reviewable intervention manifests. The library proposes reviewable artifacts; it must not execute unrestricted autonomous patching. All generated interventions must be expressible in the existing manual-intervention representation (patch or structured `replace_text` edit) so they can be fed unchanged into the experiment matrix.
+Compose one complete, public-facing workflow that runs end to end on a realistic multi-module RTL example: from a failing regression, through failure-intelligence + fingerprinting, counterexample minimization, generated reviewable intervention candidates, experiment-matrix execution, and a final evidence-qualified summary. This milestone is a demonstration and integration layer that composes the already-built services into one coherent, reproducible story; it must not add new analysis behavior, automatic patching, or causal claims.
 
 ## Scope
 
-- Add an `intervention-templates` service and CLI command that, given a validated failure-intelligence run (its driver trace and divergence/fingerprint evidence) and the target repository + config, emit a bounded, deterministic set of candidate interventions as an explicit intervention manifest (the same schema consumed by `run-experiment-matrix`).
-- Implement a small fixed library of safe, evidence-anchored templates, each deriving its target site strictly from existing evidence (driver trace, earliest-divergence signals, mapped source locations). Start with a minimal set such as: suppress one assignment to a divergent signal, hold a register value across a bounded window, and override one condition for a bounded window. Each template must produce a structured bounded edit restricted to explicitly allowed files, a stable intervention id, a human description citing the evidence it was derived from, and tags/metadata; templates must never mutate more than their declared site.
-- Each generated candidate must be a reviewable artifact only: the service writes the manifest and a typed template report but does not apply or run anything. Applying candidates remains the job of `run-experiment-matrix`.
-- Deterministic and bounded: a fixed maximum number of candidates, deterministic ordering independent of filesystem enumeration, a semantic digest per candidate, and no randomness. Reuse the existing driver-trace, divergence/fingerprint, signal-source-map, and manual-intervention representations; do not add a new edit engine.
-- Emit a typed, versioned template report (JSON + Markdown) recording, per candidate: template id/kind, derived target site with cited evidence (signal, source location, driver reference), the generated bounded edit, allowed files, a reviewability note, and an explicit disclaimer that a template is an evidence-anchored hypothesis, not a proven fix or a causal claim. Include a summary of templates considered, candidates emitted, and evidence sites skipped (with reasons).
-- Add a gated Icarus-backed pilot (skipped when the simulator is absent) that derives candidate interventions from the counterexample fixture's baseline evidence, writes a manifest, and confirms the manifest is valid input to `run-experiment-matrix` (optionally running it to show at least one generated candidate removes or changes the observed failure) — without ever applying edits outside isolated worktrees. Plus deterministic hermetic tests covering: template derivation from evidence, bounded/allowed-file safety, deterministic ordering and candidate count, per-candidate digest stability, skipping sites with insufficient evidence, malformed/insufficient input handling, manifest schema compatibility with the experiment matrix, no source mutation, and stable serialization.
+- Add an `mvp-demo` (or similarly named) orchestration that runs the existing services in sequence on one realistic multi-module RTL fixture: (1) run the configured failing command and build a failure-intelligence run; (2) fingerprint it; (3) minimize the failing structured stimulus to a counterexample; (4) generate reviewable intervention candidates from the evidence; (5) run the experiment matrix against the generated manifest and the minimized counterexample; (6) emit a single evidence-qualified summary tying the stages together.
+- Reuse the existing `run-failure-intelligence`/failure-report, `fingerprint-run`, `minimize-stimulus`, `generate-interventions`, and `run-experiment-matrix` services and their typed reports. Do not re-implement any stage; the orchestration only sequences them, passes artifacts between them, and reads their outputs.
+- Extend or add a compact but realistic multi-module RTL example (building on the existing AXI-style fixtures) with a seeded failure that exercises more than one module, so the demonstration is not trivially single-signal. Keep it Icarus-backed and gate cleanly when the simulator is unavailable.
+- Emit a typed, versioned MVP summary report (JSON + Markdown) that references each stage's run/report by path and digest and states, in evidence-qualified language: the observed failure family, the minimized counterexample size reduction, the generated candidate count by confidence, and the experiment-matrix outcomes (which candidates removed / changed / had no observed effect on the failure). The summary must carry an explicit disclaimer that it reports observed experimental results, not proven causality or a fix.
+- Keep the whole demonstration read-only with respect to the source repository: every simulation runs in isolated worktrees via the existing services, and nothing is committed, pushed, or applied to the target repo.
 
 ## Acceptance Criteria
 
-- Candidate interventions are derived deterministically from existing evidence and emitted as explicit, reviewable manifests compatible with `run-experiment-matrix`, with no automatic application and no source-repository mutation.
-- The template library is small, fixed, bounded, and evidence-anchored; each candidate cites the evidence it came from and stays within its declared edit site and allowed files.
-- No LLM-generated patches, no intervention search/optimization, no ranking by suspected root cause, and no causal claims.
-- The Icarus pilot passes when the simulator is present and skips cleanly otherwise; canonical validation stays hermetic.
+- One command (or one pilot script) runs the full failing-regression-to-summary workflow on the realistic fixture, reusing the existing services with no new analysis behavior and no parallel path.
+- The final summary is typed, versioned, evidence-qualified, references every upstream stage by path/digest, and makes no causal or root-cause claim.
+- The source repository is never modified; the demonstration gates cleanly when Icarus is unavailable and canonical validation stays hermetic.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
 ## Required Validation Commands
@@ -29,8 +27,8 @@ Introduce a small deterministic library of safe, bounded intervention templates 
 
 ## Exclusions
 
-- No automatic application of generated interventions (generation only), no LLM-generated patches, no search/optimization over templates, no ranking by suspected cause, and no causal/root-cause claims.
-- No new analysis behavior, model providers, databases, remote execution, CI, or UI.
+- No new analysis behavior, no automatic application of interventions, no LLM-generated hypotheses, no search/optimization, no ranking by suspected root cause, and no causal/root-cause claims.
+- No new model providers, databases, remote execution, CI, or UI.
 - Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 
 ## Completion State

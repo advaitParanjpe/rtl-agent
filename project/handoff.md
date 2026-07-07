@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Counterfactual Experiment Matrix
+Hypothesis-Driven Intervention Templates
 
 ## Completed Work
 
@@ -36,4 +36,4 @@ Counterfactual Experiment Matrix
 
 ## Resume Instructions
 
-- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Hypothesis-Driven Intervention Templates`.
+- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Evidence-Guided Counterfactual MVP Demonstration`.
