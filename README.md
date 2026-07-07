@@ -520,6 +520,17 @@ memory = lookup_historical_failure(query, "<canonical-digest>")
 
 The result describes matches only as shared canonical fingerprint / related HKG evidence. It does not infer a shared root cause, suggest a fix, or rank history globally. The HKG does not parse Markdown, infer, call an LLM, apply patches, run graph algorithms beyond construction, create a server/database/UI, or make causal/root-cause claims. `scripts/hkg_failure_corpus_check.py` is a gated Icarus-backed corpus check; on the current three-example failure corpus it builds a graph with 69 nodes, 167 edges, and 3 canonical failure clusters, and demonstrates query/memory results such as `cluster-2dc5e4134bbdb3dc -> ['fifo-underflow']`, canonical fingerprint prefix `2dc5e4134bbd -> ['fifo-underflow']`, and `memory_seen=True`.
 
+The optional LLM Supervisor v0 is an evidence-only planning interface over existing structured artifacts. It accepts an MVP demo summary, outcome classifications, experiment comparisons, intervention rankings, and/or HKG historical memory, then asks a configured provider to return a typed debug plan:
+
+```python
+from rtl_agent.supervisor import build_supervisor_evidence, supervise_debug
+
+evidence = build_supervisor_evidence(mvp_summary=summary, hkg_memory=memory)
+plan = supervise_debug(evidence, provider=None)
+```
+
+When no provider is configured, the result is `status="unavailable"` and no API key or network call is required. Provider integration is abstract (`SupervisorProvider`); tests and local examples use `FakeSupervisorProvider`. The supervisor prompt explicitly limits reasoning to supplied structured evidence and forbids raw RTL reasoning, tool execution, patch generation, and causal/root-cause claims. The structured plan contains an evidence summary, recommended next checks, questions for the engineer, risks/uncertainties, and cited artifact references. The failure-corpus HKG check demonstrates the fake provider with HKG memory evidence; the current example recommends comparing the failure against prior cluster `cluster-2dc5e4134bbdb3dc`.
+
 `export-failure-package` packages a validated run directory into a single self-contained, portable failure package (read-only):
 
 ```bash

@@ -1522,3 +1522,15 @@ The lookup reports whether the canonical fingerprint has been seen before, match
 Validation added focused tests for seen-before matches, no-match behavior, multiple prior members, prior intervention/outcome/ranking retrieval, deterministic empty results, and provenance retention. The gated corpus HKG check now exercises historical memory on the current failure corpus; the example lookup reports `memory_seen=True` for canonical prefix `2dc5e4134bbd` with member `fifo-underflow`.
 
 Deferred capabilities remain explicit: no inference beyond canonical lookup, no root-cause or causal claim, no LLM integration, no automatic patching, no database/server/UI, no report generation, no global historical ranking, and no cross-run trend analysis.
+
+## 2026-07-07 - LLM Supervisor v0 - Evidence-Only Planning Interface
+
+Added an optional evidence-only supervisor interface in `rtl_agent.supervisor`. It accepts existing structured artifacts (MVP demo summary, outcome classifications, experiment comparisons, intervention rankings, and HKG historical memory) and projects them into a compact `SupervisorEvidence` payload for a provider. The provider returns a typed `DebugPlan` with evidence summary, recommended next checks, questions for the engineer, risks/uncertainties, and cited artifact references.
+
+Provider integration is abstract through `SupervisorProvider`; there is no hardcoded OpenAI/Anthropic dependency. A deterministic `FakeSupervisorProvider` supports tests and local examples. If no provider is configured, `supervise_debug` returns `status="unavailable"` with clear no-provider/no-API-key risks and makes no network call, so default workflows do not require an API key.
+
+The supervisor prompt explicitly restricts reasoning to supplied structured evidence only and forbids raw RTL reasoning, Markdown/log/waveform inference, automatic tool execution, patch generation, and causal/root-cause claims. Artifact references from supplied evidence are preserved in the final plan even when a provider returns additional references.
+
+Validation added focused supervisor unit tests for fake-provider output, disabled/no-provider behavior, prompt guardrails, citation preservation, and deterministic evidence projection. The corpus-backed HKG check now demonstrates a fake-provider plan from HKG memory evidence; the example recommends comparing the failure against prior cluster `cluster-2dc5e4134bbdb3dc`.
+
+Deferred capabilities remain explicit: no default LLM dependency, no API-key requirement for normal use, no automatic tool orchestration, no patch generation, no raw RTL analysis, no provider-specific integration, no UI/server/database, and no causal/root-cause claims.

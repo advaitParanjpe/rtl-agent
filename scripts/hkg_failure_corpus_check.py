@@ -38,6 +38,11 @@ from rtl_agent.hkg import (
     write_graph,
 )
 from rtl_agent.stimulus import materialize_stimulus, parse_stimulus
+from rtl_agent.supervisor import (
+    FakeSupervisorProvider,
+    build_supervisor_evidence,
+    supervise_debug,
+)
 
 CORPUS = ROOT / "examples" / "failure-corpus"
 
@@ -124,6 +129,11 @@ def main() -> int:
         assert query.get_provenance(first_failure.node_id)
         assert query.find_interventions_for_failure(first_member) == []
         assert query.find_experiments_for_intervention("missing") == []
+        supervisor_evidence = build_supervisor_evidence(hkg_memory=memory)
+        supervisor_plan = supervise_debug(supervisor_evidence, FakeSupervisorProvider())
+        assert supervisor_plan.status == "available"
+        assert supervisor_plan.recommended_next_checks
+        assert supervisor_plan.cited_artifact_references
 
         print(
             "HKG failure corpus check passed "
@@ -136,7 +146,8 @@ def main() -> int:
             f"members={[node.label for node in cluster_members]}, "
             f"canonical {first_canonical[:12]} "
             f"failures={[node.label for node in matching_failures]}, "
-            f"memory_seen={memory.seen_before}"
+            f"memory_seen={memory.seen_before}, "
+            f"supervisor_check={supervisor_plan.recommended_next_checks[0]!r}"
         )
     return 0
 

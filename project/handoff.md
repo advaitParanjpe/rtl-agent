@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Historical Failure Memory v0
+LLM Supervisor v0 - Evidence-Only Planning Interface
 
 ## Completed Work
 
