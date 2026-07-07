@@ -30,6 +30,7 @@ class FingerprintComponent(BaseModel):
 class FingerprintDigest(BaseModel):
     exact: str
     family: str
+    canonical: str | None = None
 
 
 class FailureFingerprintReport(BaseModel):
@@ -40,6 +41,7 @@ class FailureFingerprintReport(BaseModel):
     inputs: list[FingerprintArtifactInput] = Field(default_factory=list)
     exact_digest: str
     family_digest: str
+    canonical_digest: str = ""
     digest: FingerprintDigest
     assertion_identity: list[str] = Field(default_factory=list)
     terminal_outcome: list[str] = Field(default_factory=list)
@@ -53,7 +55,9 @@ class FailureFingerprintReport(BaseModel):
     unresolved_markers: list[str] = Field(default_factory=list)
     ambiguous_markers: list[str] = Field(default_factory=list)
     graph_shape: list[str] = Field(default_factory=list)
+    canonical_divergence: list[str] = Field(default_factory=list)
     components: list[FingerprintComponent] = Field(default_factory=list)
+    canonical_components: list[FingerprintComponent] = Field(default_factory=list)
     insufficient_evidence: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     parser_notes: list[str] = Field(default_factory=list)
@@ -75,6 +79,7 @@ class FingerprintComparisonReport(BaseModel):
     match_kind: FingerprintMatchKind
     exact_match: bool
     family_match: bool
+    canonical_match: bool = False
     component_matches: list[FingerprintComponentComparison] = Field(default_factory=list)
     summary: str
     warnings: list[str] = Field(default_factory=list)

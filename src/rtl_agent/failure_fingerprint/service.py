@@ -68,6 +68,26 @@ _FAMILY_FIELDS = [
     "graph_shape",
 ]
 
+# The canonical fingerprint is built from evidence that identifies *what* failed
+# and *where* — the assertion, the terminal outcome, the earliest divergent
+# signals, the divergence x/z nature, the mapped RTL sources, the structural
+# driver/graph shape, and the evidence-completeness markers. It deliberately
+# excludes the length/timing-sensitive fields (absolute timestamps, transition
+# counts and durations, and relevance scores) so equivalent manifestations of the
+# same underlying failure — e.g. a minimized vs a full-stimulus reproduction —
+# canonicalize to the same identifier.
+_CANONICAL_FIELDS = [
+    "assertion_identity",
+    "terminal_outcome",
+    "earliest_divergent_signals",
+    "canonical_divergence",
+    "mapped_sources",
+    "driver_dependency_shape",
+    "unresolved_markers",
+    "ambiguous_markers",
+    "graph_shape",
+]
+
 
 def fingerprint_run(run_dir: Path) -> FailureFingerprintReport:
     resolved = run_dir.resolve()
@@ -160,18 +180,26 @@ def fingerprint_run(run_dir: Path) -> FailureFingerprintReport:
         triage=triage,
         command=command,
     )
+    fields["canonical_divergence"] = _canonical_divergence(failure_report, comparison)
     insufficient = _insufficient_evidence(fields)
     exact_digest = _digest({name: fields[name] for name in _EXACT_FIELDS})
     family_digest = _digest({name: fields[name] for name in _FAMILY_FIELDS})
+    canonical_digest = _digest({name: fields[name] for name in _CANONICAL_FIELDS})
     components = [
         FingerprintComponent(name=name, values=list(fields[name])) for name in _EXACT_FIELDS
+    ]
+    canonical_components = [
+        FingerprintComponent(name=name, values=list(fields[name])) for name in _CANONICAL_FIELDS
     ]
     return FailureFingerprintReport(
         source_run_dir=None,
         inputs=sorted(inputs, key=lambda item: (item.kind, str(item.path))),
         exact_digest=exact_digest,
         family_digest=family_digest,
-        digest=FingerprintDigest(exact=exact_digest, family=family_digest),
+        canonical_digest=canonical_digest,
+        digest=FingerprintDigest(
+            exact=exact_digest, family=family_digest, canonical=canonical_digest
+        ),
         assertion_identity=fields["assertion_identity"],
         terminal_outcome=fields["terminal_outcome"],
         failure_time_characteristics=fields["failure_time_characteristics"],
@@ -184,7 +212,9 @@ def fingerprint_run(run_dir: Path) -> FailureFingerprintReport:
         unresolved_markers=fields["unresolved_markers"],
         ambiguous_markers=fields["ambiguous_markers"],
         graph_shape=fields["graph_shape"],
+        canonical_divergence=fields["canonical_divergence"],
         components=components,
+        canonical_components=canonical_components,
         insufficient_evidence=insufficient,
         warnings=sorted(dict.fromkeys(warnings)),
         parser_notes=_PARSER_NOTES,
@@ -219,6 +249,11 @@ def compare_fingerprint_reports(
     ]
     exact_match = left.exact_digest == right.exact_digest
     family_match = left.family_digest == right.family_digest
+    canonical_match = bool(
+        left.canonical_digest
+        and right.canonical_digest
+        and left.canonical_digest == right.canonical_digest
+    )
     if left.insufficient_evidence or right.insufficient_evidence:
         kind = FingerprintMatchKind.INSUFFICIENT
     elif exact_match:
@@ -238,6 +273,7 @@ def compare_fingerprint_reports(
         match_kind=kind,
         exact_match=exact_match,
         family_match=family_match,
+        canonical_match=canonical_match,
         component_matches=component_matches,
         summary=_comparison_summary(kind, component_matches),
         warnings=sorted(dict.fromkeys(left.warnings + right.warnings)),
@@ -438,6 +474,30 @@ def _ranked_relevant(
             for item in reduction.retained_signals
         ]
     return []
+
+
+def _canonical_divergence(
+    failure_report: FailureReport | None, comparison: WaveformComparisonReport | None
+) -> list[str]:
+    """Length-invariant nature of the divergence: per signal, whether it is x/z.
+
+    This keeps the identity distinction between an unknown-value (x/z) corruption
+    and a defined-value corruption without pinning the exact values, transition
+    counts, or timing, which vary benignly across equivalent reproductions.
+    """
+
+    values: list[str] = []
+    if failure_report and failure_report.observed_failure_facts:
+        values.extend(
+            _join(fact.identifier, "xz", str(fact.xz_difference))
+            for fact in failure_report.observed_failure_facts
+        )
+    elif comparison:
+        values.extend(
+            _join(signal.name, "xz", str(signal.xz_difference))
+            for signal in comparison.diverging_signals
+        )
+    return sorted(dict.fromkeys(values))
 
 
 def _transition_xz(
