@@ -1446,3 +1446,41 @@ Intentionally unsupported clustering situations:
 - Failures with insufficient evidence (no canonical fingerprint) are not clustered with each other or with real clusters; each becomes an insufficient-evidence singleton, recorded in `unclustered_member_ids`, because grouping unknowns would imply an equivalence the evidence does not support.
 - Clustering is by exact canonical-fingerprint identity only; failures whose canonical fingerprints differ are never merged even if they share a family (they are only linked as related clusters), so near-miss or fuzzy grouping is intentionally out of scope.
 - The layer performs no cross-run temporal or historical reasoning and makes no causal claim: a cluster asserts shared observed failure behavior, not a shared root cause.
+
+## 2026-07-07 - Intervention Quality and Ranking v0
+
+Added a deterministic ranking layer that ranks generated intervention candidates by counterfactual informativeness using only evidence already collected across experiment outcomes, so engineers can identify the most informative counterfactuals first. Ranking assembly only: no new intervention templates, no new fingerprint algorithms, no Hardware Knowledge Graph, no LLM, no automatic patching, additive metadata only, and no causal/root-cause claims.
+
+Ranking rules (`src/rtl_agent/intervention_ranking.py` / `intervention_ranking_models.py`): `rank_interventions` scores each completed experiment from its `ExperimentComparison` as a fixed sum of integer factors:
+
+- Base by observed-effect label (informativeness): failure_removed 100, new_failure 70, failure_changed 60, failure_delayed/advanced 50, no_observable_effect 10, unknown 5. Experiments labeled experiment_invalid (or not executed) are left unranked.
+- Fingerprint-relationship bonus: failure_removed +10 (removed is distinct); otherwise a changed canonical fingerprint +15, else a changed family fingerprint +10.
+- Candidate-confidence bonus: high_evidence +6, moderate_evidence +3, low_evidence +1.
+- Result-cluster membership bonus: the experiment result fingerprints are clustered with the existing clustering layer, and a unique result cluster (size 1) scores +8 while a near-unique cluster (size 2) scores +4 — a result behavior shared with other interventions is less individually informative.
+
+The total score determines the rank; ties break on the intervention id, so the ranking is byte-deterministic. Each intervention receives a rank, the deterministic score, a factor-by-factor explanation, its result-cluster id and size, and supporting evidence references (artifact directory, result cluster, result family digest). Experiments that produced no comparable observation are recorded as unranked with a reason rather than force-scored.
+
+Additive surfacing: `MvpDemoSummary` gains an `intervention_rankings` list; the synthesized debug summary renders a new "Intervention ranking" section (rank, score, observed effect, result cluster, and the scoring explanation) while preserving all raw evidence; and the `run-mvp-demo` terminal output adds a concise top-3 line. Nothing existing was changed or removed.
+
+Ranked interventions for the existing corpus (counter-overflow, real Icarus): the three edits that removed the failure rank highest — `hold_register` and `override_condition` on the count fault (score 124: failure_removed 100 + removed-distinct 10 + high_evidence 6 + unique-result-cluster 8) and a `suppress_assignment` on the count fault (121, moderate confidence) — followed by the failure_changed edits (89 for the high-evidence canonical-changing suppress, 86 for the moderate ones with unique result clusters, and 82 for two edits sharing a result cluster, which get the near-unique +4 instead of +8). The fsm-sequencer and fifo-underflow examples rank analogously by observed effect, fingerprint change, confidence, and result-cluster distinctness.
+
+Validation evidence:
+
+- Focused unit tests (`tests/test_intervention_ranking.py`, 7): a removed failure ranks above a no-observable-effect edit; a changed canonical fingerprint scores higher than a family-only change; an invalid experiment is unranked with its reason; confidence breaks score ties; a unique result cluster scores higher than a shared one; ranking is deterministic with an id tie-break (equal scores -> alphabetical id wins the higher rank); and the explanation and evidence references are populated.
+- MVP-demo integration test (`tests/test_mvp_demo.py`): the rankings are produced (one per experiment), densely ranked 1..N by descending score, each with an explanation and evidence references, a failure_removed edit outscores a no_observable_effect one when both are present, and the "Intervention ranking" section with the top-ranked id appears in the rendered report.
+- Gated Icarus corpus check (`scripts/failure_corpus_check.py`): for every corpus design the rankings are present, one per experiment, densely ranked by descending score, with explanations and evidence references.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict (206 source files), 426 pytest tests, agent portability check, all example checks (including the gated failure-corpus, failure-clustering, fingerprint-stability, and MVP-demo checks), and packaging smoke.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- Ranking is a pure function over the experiment comparisons (which already carry the observed effect, fingerprint relationship, confidence, and result digests), so it is trivially unit-testable and independent of how the experiments ran.
+- Result-cluster membership is computed by reusing the multi-failure clustering layer on the experiment result fingerprints, so "cluster membership" as a ranking factor introduces no new grouping algorithm.
+- The score is a transparent fixed sum of small integer factors with a full per-factor explanation, so every rank is auditable and reproducible rather than an opaque weight.
+
+Intentionally unranked / unsupported cases:
+
+- Experiments that produced no comparable observation — experiment_invalid (apply failure, timeout, exec error, or an unreadable failure report) or a non-executed row — are left unranked with the recorded reason, because there is no evidence to score.
+- The ranking measures observed informativeness only (how much an experiment changed the observed failure and how distinct that change is); it makes no claim that a higher-ranked intervention is closer to a fix or a cause, and it performs no ranking by suspected root cause.
+- Scores are comparable only within a single demonstration (one original failure and its experiment set); the layer does not rank across independent failures or runs.

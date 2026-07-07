@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Multi-Failure Clustering v0
+Intervention Quality and Ranking v0
 
 ## Completed Work
 
