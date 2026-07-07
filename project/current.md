@@ -1,21 +1,21 @@
-# MVP Demonstration CLI and Documentation Surface
+# Prohibited-Shortcut Review Finding Example Check
 
 ## Objective
 
-Expose the evidence-guided counterfactual demonstration workflow as a first-class `rtl-agent` command over the existing `run_mvp_demo` service, with a concise terminal summary, README usage documentation, and packaging-smoke coverage. This is a thin interface layer only: it reuses the existing service unchanged and adds no new analysis behavior, no automatic patching, and no causal claims.
+Add a compact, deterministic local example check that exercises the existing but currently untested `det-prohibited-shortcut-N` review finding, using a deliberate diff that textually conflicts with a task-contract prohibited shortcut. This closes the last remaining coverage gap for the review service's prohibited-shortcut detection. It is read-only and reuses the existing review and task-contract representations with no new analysis behavior.
 
 ## Scope
 
-- Add a CLI command (for example `mvp-demo` / `demo-workflow`) that wraps `rtl_agent.mvp_demo.run_mvp_demo`, accepting the failure run, target repo, config, named command, failing stimulus, allowed files (repeatable), output directory, and the max-candidates / max-experiments / timeout / baseline-commit options, and printing a concise terminal summary (stage statuses, minimized item counts, candidate counts by confidence, experiment outcome counts, and the observed effects) plus the output paths.
-- Reuse the existing `run_mvp_demo` service and its typed summary verbatim; do not change the service, its models, or any upstream service. The command only parses options, calls the service, and renders a summary.
-- Add a README section documenting the command and how its generated summary ties the stages together, consistent with the existing per-command documentation and the CLI-doc test that cross-checks documented commands against registered commands.
-- Ensure the new command appears in the packaging smoke check (its `--help` is exercised) and in the CLI command inventory test.
+- Add a small example check (a `scripts/*_check.py` registered in `scripts/check.py`, consistent with the existing example checks) that constructs a minimal task contract containing at least one explicit prohibited shortcut, plus a candidate implementation diff whose text deliberately conflicts with that prohibited shortcut, runs the existing review service, and asserts the `det-prohibited-shortcut-N` finding is produced with the expected deterministic finding id and evidence.
+- Reuse the existing review service, task-contract parsing/representation, and review-report models verbatim; do not add new analysis behavior, new finding types, or schema changes.
+- Keep the check hermetic (no simulator dependency) and deterministic; if any real dependency is required, gate it cleanly, but prefer a fully hermetic fixture.
+- If a genuine defect in the existing prohibited-shortcut detection is discovered while writing the check, fix only that narrow defect; otherwise leave the review service unchanged.
 
 ## Acceptance Criteria
 
-- One `rtl-agent` command runs the full evidence-guided demonstration by delegating to the existing service, printing a concise, evidence-qualified terminal summary and the output artifact paths, with no new analysis behavior and no causal claims.
-- The command is documented in the README, listed in the CLI-doc/inventory test, and exercised by the packaging smoke check.
-- The source repository is never modified by the command; canonical validation stays hermetic and all existing tests, example checks, packaging smoke, and validation continue to pass.
+- One registered example check deterministically exercises the `det-prohibited-shortcut-N` review finding via the existing review service and asserts the finding is emitted for a diff that conflicts with a task-contract prohibited shortcut, and absent for a clean diff.
+- No new analysis behavior, finding types, or schema changes; the check is read-only and hermetic.
+- All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
 ## Required Validation Commands
 
@@ -25,9 +25,8 @@ Expose the evidence-guided counterfactual demonstration workflow as a first-clas
 
 ## Exclusions
 
-- No changes to the `run_mvp_demo` service or any upstream service, no new analysis behavior, no automatic application of interventions, no LLM-generated hypotheses, no search/optimization, no ranking by suspected root cause, and no causal/root-cause claims.
+- No new review analysis behavior, no new finding types, no schema changes, no automatic patching, and no causal claims.
 - No new model providers, databases, remote execution, CI, or UI.
-- Do not implement the still-deferred Prohibited-Shortcut Review Finding Example Check in this milestone.
 
 ## Completion State
 

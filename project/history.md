@@ -1219,3 +1219,29 @@ Known limitations:
 - The driver requires an already-built, validated failure-intelligence run and a structured reducible stimulus; it demonstrates the workflow on the counterexample AXI fixture and does not yet run against arbitrary external regressions.
 - The Icarus demonstration depends on a locally installed simulator to produce real evidence; the hermetic test synthesizes the failure-intelligence run and simulator behavior instead.
 - Observations are qualitative observed-effect statements; the summary intentionally makes no ranking, prioritization, or causal inference over the experiments.
+
+## 2026-07-06 - MVP Demonstration CLI and Documentation Surface
+
+Exposed the evidence-guided counterfactual demonstration workflow as a first-class user-facing command, `rtl-agent run-mvp-demo`, over the existing `run_mvp_demo` service. This is a thin interface layer only: the service, its models, and every upstream service are unchanged, and the command adds no new analysis, no automatic patching, and no causal claims.
+
+The command (`src/rtl_agent/cli.py`) accepts the validated failure-intelligence run, target repository, config, named command, failing structured stimulus, allowed files (repeatable), output directory, and the max-candidates / max-experiments / timeout / baseline-commit options, matching the service inputs. It delegates to `run_mvp_demo`, which writes the existing `mvp-demo-summary.json` and `mvp-demo-summary.md` (plus the per-stage `failure-package/`, `minimization/`, `generated/`, and `matrix/` directories), and prints a concise evidence-qualified terminal summary: per-stage statuses, the observed failure family, minimized item counts, candidate counts by confidence, experiment outcome counts, the observed effects, and the output paths. An invalid failure run is rejected with a non-zero exit via `MvpDemoError`.
+
+Documentation and coverage: a focused README section documents what the demo does, the Icarus simulator dependency, one example command, the expected output files, and an explicit reminder that results are observed counterfactual effects rather than proof of a root cause. The command was added to the CLI inventory test's expected set; because both that test and the packaging smoke scrape the README for `rtl-agent <command>` lines, `run-mvp-demo --help` is automatically exercised by the packaging smoke. Focused CLI tests (`tests/test_mvp_demo.py`) invoke the command end to end over a hermetic failure-intelligence run (no simulator), asserting the summary JSON/Markdown outputs, in-order stage coverage, and the non-zero exit on an invalid run.
+
+Validation evidence:
+
+- Targeted tests: `tests/test_mvp_demo.py` (6, including the two new CLI tests) and `tests/test_cli.py` (inventory + per-command `--help`) pass.
+- `scripts/packaging_smoke.py` - passed, now exercising `rtl-agent run-mvp-demo --help` from the installed console script.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict (188 source files), 364 pytest tests, agent portability check, all example checks (including the gated MVP demonstration), and packaging smoke.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The command is a pure delegation to `run_mvp_demo` with option parsing and a terminal-summary printer; no logic beyond argument wiring lives in the CLI, keeping the interface layer thin and the service the single source of behavior.
+- The README is the single registry of documented commands consumed by both the CLI inventory test and the packaging smoke, so adding the documented example command was sufficient to wire up both coverage paths without duplicating a command list.
+
+Known limitations:
+
+- The command surfaces the existing demonstration unchanged; it inherits the service's requirement of an already-built, validated failure-intelligence run and a structured reducible stimulus, and its dependence on a configured simulator command for the live pipeline.
+- The terminal summary is a concise projection of the full typed summary; the complete evidence and per-candidate detail remain in the written JSON/Markdown artifacts.

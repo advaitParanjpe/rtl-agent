@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Evidence-Guided Counterfactual MVP Demonstration
+MVP Demonstration CLI and Documentation Surface
 
 ## Completed Work
 
@@ -36,4 +36,4 @@ Evidence-Guided Counterfactual MVP Demonstration
 
 ## Resume Instructions
 
-- Read `AGENTS.md` and `project/current.md`; the next active milestone is `MVP Demonstration CLI and Documentation Surface`.
+- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Prohibited-Shortcut Review Finding Example Check`.
