@@ -507,7 +507,18 @@ signals = query.find_signals(module="axi_pipe", name="payload_out")
 failures = query.find_failures_by_canonical_fingerprint("<canonical-digest>")
 ```
 
-Supported query helpers include `get_node`, `list_nodes_by_type`, `outgoing_edges`, `incoming_edges`, `find_signals`, `find_failures_by_canonical_fingerprint`, `find_cluster_members`, `find_interventions_for_failure`, `find_experiments_for_intervention`, and `get_provenance`. Results are typed HKG model objects returned in deterministic order; missing queries return `None` or empty lists. The HKG does not parse Markdown, infer, call an LLM, apply patches, run graph algorithms beyond construction, create a server/database/UI, or make causal/root-cause claims. `scripts/hkg_failure_corpus_check.py` is a gated Icarus-backed corpus check; on the current three-example failure corpus it builds a graph with 69 nodes, 167 edges, and 3 canonical failure clusters, and demonstrates query results such as `cluster-2dc5e4134bbdb3dc -> ['fifo-underflow']` and canonical fingerprint prefix `2dc5e4134bbd -> ['fifo-underflow']`.
+Supported query helpers include `get_node`, `list_nodes_by_type`, `outgoing_edges`, `incoming_edges`, `find_signals`, `find_failures_by_canonical_fingerprint`, `find_cluster_members`, `find_interventions_for_failure`, `find_experiments_for_intervention`, and `get_provenance`. Results are typed HKG model objects returned in deterministic order; missing queries return `None` or empty lists.
+
+Historical failure memory is a read-only lookup over that query API. Given a `FailureFingerprintReport` or canonical fingerprint string, `lookup_historical_failure(...)` reports whether matching failures already exist, matching cluster ids, prior member failures, prior interventions tried, observed effects, ranking summaries where present, and provenance references:
+
+```python
+from rtl_agent.hkg import lookup_historical_failure, query_graph_file
+
+query = query_graph_file(Path(".rtl-agent/hkg/debug-session-001.json"))
+memory = lookup_historical_failure(query, "<canonical-digest>")
+```
+
+The result describes matches only as shared canonical fingerprint / related HKG evidence. It does not infer a shared root cause, suggest a fix, or rank history globally. The HKG does not parse Markdown, infer, call an LLM, apply patches, run graph algorithms beyond construction, create a server/database/UI, or make causal/root-cause claims. `scripts/hkg_failure_corpus_check.py` is a gated Icarus-backed corpus check; on the current three-example failure corpus it builds a graph with 69 nodes, 167 edges, and 3 canonical failure clusters, and demonstrates query/memory results such as `cluster-2dc5e4134bbdb3dc -> ['fifo-underflow']`, canonical fingerprint prefix `2dc5e4134bbd -> ['fifo-underflow']`, and `memory_seen=True`.
 
 `export-failure-package` packages a validated run directory into a single self-contained, portable failure package (read-only):
 

@@ -1512,3 +1512,13 @@ Supported focused queries: get node by id, list nodes by type, list outgoing/inc
 Validation added focused unit tests for every query family, serialized-graph loading, deterministic ordering, provenance lookup, and missing-result behavior. The gated failure-corpus HKG check now exercises the query API on the existing corpus graph; on the current corpus it still builds 69 nodes, 167 edges, and 3 clusters, and example queries return `cluster-2dc5e4134bbdb3dc -> ['fifo-underflow']` and canonical prefix `2dc5e4134bbd -> ['fifo-underflow']`.
 
 Deferred capabilities remain explicit: no inference, LLM integration, automatic patching, database/server/UI, report generation, generic graph database abstraction, new graph construction semantics, or causal/root-cause claims.
+
+## 2026-07-07 - Historical Failure Memory v0
+
+Added a deterministic read-only historical lookup layer over the HKG query API. `rtl_agent.hkg.memory` exposes `lookup_historical_failure`, accepting either a `FailureFingerprintReport` or canonical fingerprint string plus an `HkgGraph`/`HkgQuery`, and returning a typed `HistoricalMemoryResult`.
+
+The lookup reports whether the canonical fingerprint has been seen before, matching cluster ids, prior member failures, prior interventions tried, prior experiment/observed-effect summaries, ranking metadata where present (rank, score, ranked status, observed effect, result cluster), and deduplicated provenance references. It uses only existing HKG query functions and graph evidence; it does not alter graph construction or create a new matching algorithm.
+
+Validation added focused tests for seen-before matches, no-match behavior, multiple prior members, prior intervention/outcome/ranking retrieval, deterministic empty results, and provenance retention. The gated corpus HKG check now exercises historical memory on the current failure corpus; the example lookup reports `memory_seen=True` for canonical prefix `2dc5e4134bbd` with member `fifo-underflow`.
+
+Deferred capabilities remain explicit: no inference beyond canonical lookup, no root-cause or causal claim, no LLM integration, no automatic patching, no database/server/UI, no report generation, no global historical ranking, and no cross-run trend analysis.

@@ -32,6 +32,7 @@ from rtl_agent.hkg import (
     Provenance,
     build_hkg,
     load_failure_bundle,
+    lookup_historical_failure,
     query_graph,
     serialize_graph,
     write_graph,
@@ -111,6 +112,13 @@ def main() -> int:
         assert [node.label for node in cluster_members] == first_cluster.members
         matching_failures = query.find_failures_by_canonical_fingerprint(first_canonical)
         assert [node.label for node in matching_failures] == [first_member]
+        memory = lookup_historical_failure(query, first_canonical)
+        assert memory.seen_before is True
+        assert memory.matching_cluster_ids == (first_cluster.cluster_id,)
+        assert memory.prior_member_failures == (first_member,)
+        assert memory.prior_interventions == ()
+        assert memory.prior_observed_effects == ()
+        assert memory.provenance
         first_failure = query.get_node(f"failure:{first_member}")
         assert first_failure is not None
         assert query.get_provenance(first_failure.node_id)
@@ -127,7 +135,8 @@ def main() -> int:
             f"cluster {first_cluster.cluster_id} "
             f"members={[node.label for node in cluster_members]}, "
             f"canonical {first_canonical[:12]} "
-            f"failures={[node.label for node in matching_failures]}"
+            f"failures={[node.label for node in matching_failures]}, "
+            f"memory_seen={memory.seen_before}"
         )
     return 0
 

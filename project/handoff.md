@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Hardware Knowledge Graph Query API v0
+Historical Failure Memory v0
 
 ## Completed Work
 

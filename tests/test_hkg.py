@@ -17,12 +17,13 @@ from rtl_agent.hkg import (
     Provenance,
     build_hkg,
     load_failure_bundle,
+    lookup_historical_failure,
     query_graph,
     query_graph_file,
     serialize_graph,
     write_graph,
 )
-from rtl_agent.hkg.models import EdgeType, NodeType
+from rtl_agent.hkg.models import EdgeType, HkgEdge, HkgGraph, HkgNode, NodeType
 from rtl_agent.intervention_ranking_models import InterventionRanking, RankingFactor
 from rtl_agent.intervention_template_models import (
     ConfidenceLevel,
@@ -510,3 +511,149 @@ def test_query_graph_file_loads_serialized_graph(tmp_path: Path) -> None:
     assert [node.node_id for node in query.list_nodes_by_type(NodeType.FAILURE)] == [
         "failure:failure-core"
     ]
+
+
+def test_historical_memory_seen_before_match(tmp_path: Path) -> None:
+    bundle = _bundle(tmp_path, with_counterfactual=False)
+    graph = build_hkg(
+        [bundle],
+        graph_id="g",
+        cluster_report=_cluster("failure-core", bundle.fingerprint.canonical_digest),
+    )
+
+    result = lookup_historical_failure(graph, bundle.fingerprint)
+
+    assert result.seen_before is True
+    assert result.canonical_digest == bundle.fingerprint.canonical_digest
+    assert result.matching_cluster_ids == ("cluster-abc",)
+    assert result.prior_member_failures == ("failure-core",)
+    assert result.provenance
+    assert "root-cause" in result.disclaimer
+
+
+def test_historical_memory_no_prior_match(tmp_path: Path) -> None:
+    graph = build_hkg([_bundle(tmp_path, with_counterfactual=False)], graph_id="g")
+
+    result = lookup_historical_failure(graph, "missing-canonical")
+
+    assert result.seen_before is False
+    assert result.canonical_digest == "missing-canonical"
+    assert result.matching_cluster_ids == ()
+    assert result.prior_member_failures == ()
+    assert result.prior_interventions == ()
+    assert result.prior_observed_effects == ()
+    assert result.provenance == ()
+
+
+def test_historical_memory_multiple_prior_members() -> None:
+    graph = _manual_history_graph()
+
+    result = lookup_historical_failure(graph, "canon-shared")
+
+    assert result.seen_before is True
+    assert result.matching_cluster_ids == ("cluster-shared",)
+    assert result.prior_member_failures == ("failure-a", "failure-b")
+    assert result.prior_interventions == ()
+    assert result.prior_observed_effects == ()
+
+
+def test_historical_memory_prior_interventions_outcomes_and_rankings(tmp_path: Path) -> None:
+    bundle = _bundle(tmp_path)
+    graph = build_hkg(
+        [bundle],
+        graph_id="g",
+        cluster_report=_cluster("failure-core", bundle.fingerprint.canonical_digest),
+    )
+
+    result = lookup_historical_failure(query_graph(graph), bundle.fingerprint.canonical_digest)
+
+    assert result.seen_before is True
+    assert [item.intervention_id for item in result.prior_interventions] == ["cand-a", "cand-b"]
+    cand_a = result.prior_interventions[0]
+    assert cand_a.failure_id == "failure-core"
+    assert cand_a.template_kind == "hold_register"
+    assert cand_a.confidence == "high_evidence"
+    assert cand_a.ranking_rank == 1
+    assert cand_a.ranking_score == 116
+    assert cand_a.ranking_ranked is True
+    assert cand_a.ranking_observed_effect == "failure_removed"
+    assert cand_a.provenance
+    assert result.prior_observed_effects == ("failure_changed", "failure_removed")
+    assert [(item.intervention_id, item.observed_effects) for item in result.prior_experiments] == [
+        ("cand-a", ("failure_removed",)),
+        ("cand-b", ("failure_changed",)),
+    ]
+    assert result.provenance
+
+
+def _manual_history_graph() -> HkgGraph:
+    prov = Provenance(artifact_id="manual_test", schema_version=1, content_sha256="abc")
+    nodes = [
+        HkgNode(
+            node_id="canonical_fingerprint:canon-shared",
+            type=NodeType.CANONICAL_FINGERPRINT,
+            label="canon-shared",
+            attributes={"canonical_digest": "canon-shared"},
+            provenance=[prov],
+        ),
+        HkgNode(
+            node_id="failure:failure-a",
+            type=NodeType.FAILURE,
+            label="failure-a",
+            provenance=[prov],
+        ),
+        HkgNode(
+            node_id="failure:failure-b",
+            type=NodeType.FAILURE,
+            label="failure-b",
+            provenance=[prov],
+        ),
+        HkgNode(
+            node_id="failure_cluster:cluster-shared",
+            type=NodeType.FAILURE_CLUSTER,
+            label="cluster-shared",
+            attributes={"canonical_digest": "canon-shared", "size": "2"},
+            provenance=[prov],
+        ),
+    ]
+    edges = [
+        HkgEdge(
+            edge_id="references|failure:failure-a|canonical_fingerprint:canon-shared",
+            type=EdgeType.REFERENCES,
+            source="failure:failure-a",
+            target="canonical_fingerprint:canon-shared",
+            attributes={"role": "fingerprint"},
+            provenance=[prov],
+        ),
+        HkgEdge(
+            edge_id="references|failure:failure-b|canonical_fingerprint:canon-shared",
+            type=EdgeType.REFERENCES,
+            source="failure:failure-b",
+            target="canonical_fingerprint:canon-shared",
+            attributes={"role": "fingerprint"},
+            provenance=[prov],
+        ),
+        HkgEdge(
+            edge_id="belongs_to_cluster|failure:failure-a|failure_cluster:cluster-shared",
+            type=EdgeType.BELONGS_TO_CLUSTER,
+            source="failure:failure-a",
+            target="failure_cluster:cluster-shared",
+            provenance=[prov],
+        ),
+        HkgEdge(
+            edge_id="belongs_to_cluster|failure:failure-b|failure_cluster:cluster-shared",
+            type=EdgeType.BELONGS_TO_CLUSTER,
+            source="failure:failure-b",
+            target="failure_cluster:cluster-shared",
+            provenance=[prov],
+        ),
+    ]
+    return HkgGraph(
+        graph_id="manual-history",
+        node_count=len(nodes),
+        edge_count=len(edges),
+        node_type_counts={"canonical_fingerprint": 1, "failure": 2, "failure_cluster": 1},
+        edge_type_counts={"belongs_to_cluster": 2, "references": 2},
+        nodes=nodes,
+        edges=edges,
+    )

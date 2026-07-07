@@ -6,6 +6,13 @@ from rtl_agent.hkg.builder import (
     serialize_graph,
     write_graph,
 )
+from rtl_agent.hkg.memory import (
+    HISTORICAL_MEMORY_DISCLAIMER,
+    HistoricalMemoryResult,
+    PriorExperimentSummary,
+    PriorInterventionSummary,
+    lookup_historical_failure,
+)
 from rtl_agent.hkg.models import (
     HKG_SCHEMA_VERSION,
     EdgeType,
@@ -26,6 +33,7 @@ from rtl_agent.hkg.query import (
 
 __all__ = [
     "HKG_SCHEMA_VERSION",
+    "HISTORICAL_MEMORY_DISCLAIMER",
     "EdgeType",
     "ExperimentOutcomeResult",
     "FailureBundle",
@@ -35,11 +43,15 @@ __all__ = [
     "HkgNode",
     "HkgQuery",
     "HkgQueryError",
+    "HistoricalMemoryResult",
     "NodeType",
+    "PriorExperimentSummary",
+    "PriorInterventionSummary",
     "Provenance",
     "build_hkg",
     "load_failure_bundle",
     "load_graph",
+    "lookup_historical_failure",
     "query_graph",
     "query_graph_file",
     "serialize_graph",
