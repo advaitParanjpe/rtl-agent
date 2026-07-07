@@ -1191,3 +1191,31 @@ Known limitations:
 - Direct templates require an exact/probable single source mapping and a syntactically simple assignment/guard; multi-region edits, blocking assignments in complex forms, and non-trivial guard expressions are refused rather than approximated. The bounded-signal-override template is intentionally unsupported under the current edit model.
 - Confidence reflects only evidence completeness, not fix likelihood; a high-evidence candidate is not a suspected root cause.
 - The pilot depends on a locally installed Icarus Verilog to produce real evidence; the hermetic tests synthesize a real failure-intelligence run from hand-authored VCDs and a fake command rather than a simulator.
+
+## 2026-07-06 - Evidence-Guided Counterfactual MVP Demonstration
+
+Added the capstone demonstration layer: a single deterministic driver (`run_mvp_demo` in `src/rtl_agent/mvp_demo/`) that composes the already-built services into one complete, evidence-qualified workflow, with no new analysis, no new intervention templates, no automatic patching, and no changes to existing schemas.
+
+Given a validated failure-intelligence run plus the target repository, config, named command, failing structured stimulus, and allowed-file policy, `run_mvp_demo` sequences the existing services in order: it inspects the run via the run inspector (refusing an invalid run), fingerprints it, exports a portable failure package, minimizes the failing stimulus to a counterexample, generates reviewable intervention candidates from the evidence, and runs the experiment matrix against the generated manifest and the minimized counterexample. It reuses each stage's service and typed reports verbatim and only sequences them, passes artifacts between them, and reads their outputs.
+
+It emits one typed, versioned summary (`src/rtl_agent/mvp_demo_models.py`; JSON + Markdown) whose four sections are cleanly separated: the original failure (run validity, observed failure family and exact digests, earliest divergence signals/time, portable package reference), the generated intervention candidates (id, template kind, confidence, source location, hypothesis, plus confidence counts), the experiment outcomes (per candidate: execution status, counterfactual outcome, fingerprint relation, and removed/different/family-preserved/time-shift flags, plus outcome counts), and evidence-backed observations. Each observation is phrased strictly as an observed experimental result — an experiment removed the observed failure, produced a materially different observed failure, shifted it in time, or had no observable effect — tied to the candidate's hypothesis under test, with an explicit disclaimer that the summary reports observed results only and establishes no causality, root cause, or fix. Every stage is referenced by path, and the source repository is never modified (all simulation runs inside the downstream services' isolated worktrees).
+
+Validation evidence:
+
+- Real Icarus-backed demonstration (`scripts/mvp_demo_check.py`, registered in `scripts/check.py`): builds a target repo from the counterexample AXI fixture, produces a genuine baseline failure-intelligence run, and runs the full driver. On the fixture it inspects 11 verified artifacts, exports a 13-file failure package, minimizes the stimulus 7 -> 3 items (same failure family), generates 8 candidates (3 high-evidence), and runs 8 experiments where the high-evidence hold-register and override-condition edits on the fault line remove the observed failure and the suppress-assignment edits produce a materially different failure — all reported observationally with no causal claim, and the repo left byte-for-byte unchanged. Skips cleanly without Icarus.
+- Deterministic hermetic integration test (`tests/test_mvp_demo.py`, 4): composes the entire workflow with no simulator by building a real failure-intelligence run from hand-authored VCDs and a fake command that reproduces the family-A failure only while both the stall stimulus item and the fault assignment are present (so minimization and the intervention experiments both behave meaningfully). It asserts in-order stage coverage, the four separated summary sections, stimulus reduction, at least one experiment measurably removing the failure, output artifacts written, absence of causal language, invalid-run rejection, and repository immutability.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict (188 source files), 362 pytest tests, agent portability check, all example checks (including the new MVP demonstration), and packaging smoke.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The driver consumes a post-regression failure-intelligence run as input (like `generate-interventions` and `run-experiment-matrix` do) rather than running the raw simulator itself, because building an FI run from a bare command is fixture-specific; the demonstration/pilot represents the "failing regression" entry point by constructing that run from the configured command, keeping the driver a pure composition of existing services.
+- `minimize-stimulus` is included as a necessary reused service between the failure package and the matrix, because the experiment matrix requires a reduction report and minimized stimulus; it adds no new analysis.
+- The demonstration is delivered as a service plus a gated pilot and a hermetic test rather than a new CLI command, to keep this milestone focused on composition and avoid CLI/documentation surface changes; exposing it as a first-class command is scoped as the next milestone.
+
+Known limitations:
+
+- The driver requires an already-built, validated failure-intelligence run and a structured reducible stimulus; it demonstrates the workflow on the counterexample AXI fixture and does not yet run against arbitrary external regressions.
+- The Icarus demonstration depends on a locally installed simulator to produce real evidence; the hermetic test synthesizes the failure-intelligence run and simulator behavior instead.
+- Observations are qualitative observed-effect statements; the summary intentionally makes no ranking, prioritization, or causal inference over the experiments.

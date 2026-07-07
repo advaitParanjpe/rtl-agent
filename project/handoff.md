@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Hypothesis-Driven Intervention Templates
+Evidence-Guided Counterfactual MVP Demonstration
 
 ## Completed Work
 
@@ -36,4 +36,4 @@ Hypothesis-Driven Intervention Templates
 
 ## Resume Instructions
 
-- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Evidence-Guided Counterfactual MVP Demonstration`.
+- Read `AGENTS.md` and `project/current.md`; the next active milestone is `MVP Demonstration CLI and Documentation Surface`.
