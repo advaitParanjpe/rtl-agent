@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "interventions": [
+    {
+      "id": "remove-fault",
+      "description": "Neutralize the seeded corruption so the payload holds stable",
+      "allowed_files": [
+        "rtl/axi_pipe.sv"
+      ],
+      "tags": [
+        "fix-candidate"
+      ],
+      "replace": {
+        "file": "rtl/axi_pipe.sv",
+        "old": "            payload_reg <= 'x;",
+        "new": "            payload_reg <= payload_reg;"
+      }
+    },
+    {
+      "id": "benign-marker",
+      "description": "Add a benign declaration comment with no observable effect",
+      "allowed_files": [
+        "rtl/axi_pipe.sv"
+      ],
+      "replace": {
+        "file": "rtl/axi_pipe.sv",
+        "old": "    logic             locked;",
+        "new": "    logic             locked;  // experiment marker"
+      }
+    },
+    {
+      "id": "advance-fault",
+      "description": "Corrupt the payload one cycle earlier at capture (faulted build only)",
+      "allowed_files": [
+        "rtl/axi_pipe.sv"
+      ],
+      "replace": {
+        "file": "rtl/axi_pipe.sv",
+        "old": "            payload_reg <= payload_in;",
+        "new": "`ifdef INJECT_FAULT\n            payload_reg <= 'x;\n`else\n            payload_reg <= payload_in;\n`endif"
+      }
+    },
+    {
+      "id": "defined-corruption",
+      "description": "Corrupt the held payload to a defined wrong value instead of x",
+      "allowed_files": [
+        "rtl/axi_pipe.sv"
+      ],
+      "replace": {
+        "file": "rtl/axi_pipe.sv",
+        "old": "            payload_reg <= 'x;",
+        "new": "            payload_reg <= ~payload_reg;"
+      }
+    },
+    {
+      "id": "remove-fault-again",
+      "description": "Duplicate of remove-fault (semantic cache hit)",
+      "allowed_files": [
+        "rtl/axi_pipe.sv"
+      ],
+      "tags": [
+        "fix-candidate"
+      ],
+      "replace": {
+        "file": "rtl/axi_pipe.sv",
+        "old": "            payload_reg <= 'x;",
+        "new": "            payload_reg <= payload_reg;"
+      }
+    }
+  ]
+}

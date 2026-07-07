@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -10,6 +9,13 @@ from pydantic import ValidationError
 from rtl_agent.artifacts import RunStore
 from rtl_agent.config import AgentConfig, load_config
 from rtl_agent.counterfactual.classify import classify_outcome
+from rtl_agent.counterfactual.intervention import (
+    InterventionError,
+    PatchIntervention,
+    ReplaceIntervention,
+    apply_intervention,
+    normalize_intervention,
+)
 from rtl_agent.counterfactual.report import render_experiment_markdown, write_experiment_report
 from rtl_agent.counterfactual_models import (
     BaselineReference,
@@ -47,20 +53,6 @@ _PARSER_NOTES = [
 
 class CounterfactualError(RuntimeError):
     pass
-
-
-@dataclass
-class _PatchIntervention:
-    patch_path: Path
-    description: str | None
-
-
-@dataclass
-class _ReplaceIntervention:
-    file: str
-    old: str
-    new: str
-    description: str | None
 
 
 def run_counterfactual(
@@ -229,23 +221,17 @@ def _normalize_intervention(
     replace_old: str | None,
     replace_new: str | None,
     description: str | None,
-) -> _PatchIntervention | _ReplaceIntervention:
-    has_patch = patch is not None
-    has_replace = replace_file is not None or replace_old is not None or replace_new is not None
-    if has_patch and has_replace:
-        raise CounterfactualError("provide either a --patch or a replace_text edit, not both")
-    if has_patch:
-        assert patch is not None
-        if not patch.exists() or not patch.is_file():
-            raise CounterfactualError(f"patch file not found: {patch}")
-        return _PatchIntervention(patch_path=patch.resolve(), description=description)
-    if replace_file is None or replace_old is None or replace_new is None:
-        raise CounterfactualError(
-            "a replace_text edit requires --replace-file, --replace-old, and --replace-new"
+) -> PatchIntervention | ReplaceIntervention:
+    try:
+        return normalize_intervention(
+            patch=patch,
+            replace_file=replace_file,
+            replace_old=replace_old,
+            replace_new=replace_new,
+            description=description,
         )
-    return _ReplaceIntervention(
-        file=replace_file, old=replace_old, new=replace_new, description=description
-    )
+    except InterventionError as exc:
+        raise CounterfactualError(str(exc)) from exc
 
 
 def _load_config(config_path: Path) -> AgentConfig:
@@ -306,13 +292,13 @@ def _load_baseline(
 
 
 def _preserve_intervention(
-    intervention: _PatchIntervention | _ReplaceIntervention,
+    intervention: PatchIntervention | ReplaceIntervention,
     experiment_dir: Path,
     allowed_files: list[str],
 ) -> InterventionSpec:
     intervention_dir = experiment_dir / "intervention"
     intervention_dir.mkdir(parents=True, exist_ok=True)
-    if isinstance(intervention, _PatchIntervention):
+    if isinstance(intervention, PatchIntervention):
         artifact = intervention_dir / "intervention.patch"
         shutil.copyfile(intervention.patch_path, artifact)
         return InterventionSpec(
@@ -340,86 +326,14 @@ def _preserve_intervention(
 
 
 def _apply_intervention(
-    intervention: _PatchIntervention | _ReplaceIntervention,
+    intervention: PatchIntervention | ReplaceIntervention,
     worktree_path: Path,
     allowed_files: list[str],
 ) -> list[str]:
-    if isinstance(intervention, _PatchIntervention):
-        return _apply_patch(intervention.patch_path, worktree_path, allowed_files)
-    return _apply_replace(intervention, worktree_path, allowed_files)
-
-
-def _apply_patch(patch_path: Path, worktree_path: Path, allowed_files: list[str]) -> list[str]:
-    targets = _patch_target_files(patch_path, worktree_path)
-    if not targets:
-        raise CounterfactualError("patch does not modify any files")
-    disallowed = [name for name in targets if name not in allowed_files]
-    if disallowed:
-        raise CounterfactualError(
-            f"intervention targets files not in --allowed-file: {', '.join(sorted(disallowed))}"
-        )
-    check = subprocess.run(
-        ["git", "-C", str(worktree_path), "apply", "--check", str(patch_path)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if check.returncode != 0:
-        raise CounterfactualError(
-            f"patch does not apply cleanly: {check.stderr.strip() or 'git apply --check failed'}"
-        )
-    applied = subprocess.run(
-        ["git", "-C", str(worktree_path), "apply", str(patch_path)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if applied.returncode != 0:
-        raise CounterfactualError(
-            f"patch failed to apply: {applied.stderr.strip() or 'git apply failed'}"
-        )
-    return sorted(targets)
-
-
-def _patch_target_files(patch_path: Path, worktree_path: Path) -> list[str]:
-    numstat = subprocess.run(
-        ["git", "-C", str(worktree_path), "apply", "--numstat", str(patch_path)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if numstat.returncode != 0:
-        raise CounterfactualError(
-            f"patch could not be parsed: {numstat.stderr.strip() or 'git apply --numstat failed'}"
-        )
-    files: list[str] = []
-    for line in numstat.stdout.splitlines():
-        parts = line.split("\t")
-        if len(parts) == 3 and parts[2]:
-            files.append(parts[2])
-    return files
-
-
-def _apply_replace(
-    intervention: _ReplaceIntervention, worktree_path: Path, allowed_files: list[str]
-) -> list[str]:
-    if intervention.file not in allowed_files:
-        raise CounterfactualError(
-            f"intervention targets a file not in --allowed-file: {intervention.file}"
-        )
-    target = (worktree_path / intervention.file).resolve()
-    if not target.is_relative_to(worktree_path.resolve()):
-        raise CounterfactualError(f"intervention file escapes the worktree: {intervention.file}")
-    if not target.exists() or not target.is_file():
-        raise CounterfactualError(f"intervention file does not exist: {intervention.file}")
-    text = target.read_text(encoding="utf-8")
-    occurrences = text.count(intervention.old)
-    if occurrences != 1:
-        raise CounterfactualError(
-            f"replace_text expected exactly one match in {intervention.file}, found {occurrences}"
-        )
-    target.write_text(text.replace(intervention.old, intervention.new, 1), encoding="utf-8")
-    return [intervention.file]
+    try:
+        return apply_intervention(intervention, worktree_path, allowed_files)
+    except InterventionError as exc:
+        raise CounterfactualError(str(exc)) from exc
 
 
 def _run_command(

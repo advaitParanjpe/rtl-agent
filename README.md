@@ -436,6 +436,23 @@ rtl-agent minimize-stimulus \
 
 The stimulus is one compact JSON of ordered, independent actions (each with a stable id, index, kind, and payload; metadata is excluded from identity). A deterministic ddmin reduction removes whole items (never mutating item contents and preserving the relative order of retained items); each candidate is materialized only inside an isolated Git worktree, rerun via the named configured command, analyzed with the existing pipeline, and fingerprinted, and its result is classified as `same_failure_exact`, `same_failure_family`, `different_failure`, `failure_removed`, `insufficient_evidence`, `candidate_invalid`, `execution_failed`, or `timed_out` (only the first two preserve the counterexample). Evaluations are cached by a semantic digest of the candidate so identical candidates are never re-simulated, the evaluation budget and per-evaluation timeout are configurable, and the source repository is never modified. The typed versioned report records the baseline and candidate digests, the ordered evaluation history, cache hits, termination reason, retained/removed items, reproducibility instructions, and an explicit disclaimer that preserving a failure family does not prove identical root cause. `scripts/counterexample_pilot_check.py` is a gated Icarus-backed pilot that removes irrelevant idle actions from a seeded `send`/`stall` stimulus while preserving the failure family and leaving the repository byte-for-byte unchanged; it skips cleanly when the simulator is absent.
 
+`run-experiment-matrix` composes the complete experimental-debugging workflow (baseline failure → minimized counterexample → explicit interventions → isolated experiment runs → failure-intelligence analysis → fingerprint comparison → intervention-outcome matrix). It runs a bounded, explicit set of manual RTL interventions against one minimized counterexample and compares every resulting fingerprint against the reference:
+
+```bash
+rtl-agent run-experiment-matrix \
+  --baseline-run .rtl-agent/runs/failure-001 \
+  --reduction-report .rtl-agent/minimizations/min-001/reduction-report.json \
+  --repo ../axi-router \
+  --config rtl-agent.yaml \
+  --command structured-failure \
+  --interventions interventions.json \
+  --output .rtl-agent/experiments/matrix-001 \
+  --max-experiments 12 \
+  --timeout 30
+```
+
+Interventions come from an explicit manifest — a bounded ordered list, each with a stable id, human description, a patch or a structured `replace_text` edit, allowed files, optional tags/metadata, and an enabled flag — reusing the existing manual-intervention representation (no new edit engine, no automatic or LLM-generated patches, no intervention search or ranking). The matrix first runs the minimized stimulus with no intervention to establish the comparison reference (validated to share the baseline failure family), then, for each enabled intervention, creates an isolated Git worktree, applies the intervention only inside it, materializes the same minimized stimulus, runs the named command, and reuses the existing triage, failure-intelligence, fingerprint, and counterfactual services to classify the outcome. Each typed row records the intervention and reference digests, files affected, execution and simulator status, resulting fingerprint digests, the counterfactual outcome (`failure_removed`, `failure_delayed`, `failure_advanced`, `failure_changed`, `no_observable_effect`, `new_failure_introduced`, `experiment_failed`, `insufficient_evidence`), the fingerprint-comparison relation, whether the family was preserved / removed / shifted in time / replaced by a different failure, warnings, artifact references, and an explicit disclaimer that the matrix records observed effects and does not establish causality. Experiments are cached by a semantic digest over the target commit, baseline family, minimized-stimulus digest, command identity, and canonical intervention, so repeated equivalent interventions are never re-simulated; row ordering is deterministic and the source repository is never modified. `scripts/experiment_matrix_pilot_check.py` is a gated Icarus-backed pilot that runs four distinct interventions (remove the failure, no observable effect, advance the same failure, expose a different failure) plus a cached duplicate against one minimized counterexample; it skips cleanly when the simulator is absent.
+
 `export-failure-package` packages a validated run directory into a single self-contained, portable failure package (read-only):
 
 ```bash

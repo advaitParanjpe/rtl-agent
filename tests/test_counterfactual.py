@@ -342,7 +342,7 @@ def test_invalid_baseline_is_refused(tmp_path: Path, baseline: Path) -> None:
 def test_disallowed_file_modification_is_refused(tmp_path: Path, baseline: Path) -> None:
     repo, config = _make_repo(tmp_path, _copy_command(AXI_PASS))
 
-    with pytest.raises(CounterfactualError, match="not in --allowed-file"):
+    with pytest.raises(CounterfactualError, match="not in allowed files"):
         run_counterfactual(
             baseline_run=baseline,
             repo=repo,
