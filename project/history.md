@@ -1378,3 +1378,37 @@ Remaining situations intentionally left non-canonical:
 - Exact corruption values are not canonicalized: two different defined-value corruptions on the same signal (e.g. a register forced to 0x00 vs 0xFF) share a canonical fingerprint; the exact/family digests still distinguish them, and only the x/z-vs-defined distinction is preserved canonically.
 - Absolute timing, transition counts/durations, and relevance scores are intentionally excluded, so the canonical fingerprint does not distinguish a failure that reproduces earlier vs later in time or with more vs fewer surrounding transitions — those benign variations are exactly what canonicalization collapses (the exact digest still separates them).
 - Structurally identical failures in genuinely different modules are distinguished only insofar as the mapped sources / signal identities differ; canonicalization does not add any new cross-module or semantic equivalence reasoning, and it performs no clustering (deferred to a later milestone).
+
+## 2026-07-07 - Counterfactual Result Comparison
+
+Added a structured, deterministic comparison of every counterfactual experiment result against the original failure so engineers can understand how the observed behavior changed. Comparison assembly only: no new intervention templates, no new fingerprint algorithms, no clustering, no LLM, no automatic patching, additive metadata only, and no causal/root-cause claims.
+
+Comparison fields (`src/rtl_agent/experiment_comparison_models.py` / `experiment_comparison.py`): `build_experiment_comparison` assembles one `ExperimentComparison` per experiment-matrix row (whose baseline fields are the minimized-counterexample reference, validated to share the original failure family) from already-computed evidence — the observed-effect label and its rationale; a `FingerprintRelationship` with the match_kind relation and exact/family/canonical match booleans; the baseline and result exact/family/canonical digests; `family_changed` / `canonical_changed` / `assertion_changed` flags; the baseline and result earliest failure times and their `earliest_divergence_time_change`; a `SignalChange` with the shared/added/removed divergent signals; the shared `minimized_stimulus_digest`; the experiment `artifact_dir`; a deterministic non-causal one-line `summary`; and `unsupported_reasons`. A removed failure (no divergence) is `comparable=False` but valid (no unsupported reasons); an experiment that produced no result fingerprint is marked unsupported with the recorded insufficient-evidence reasons; ambiguous outcomes stay `unknown`. Every signal list is sorted so the object is byte-deterministic.
+
+To supply the canonical relationship and assertion changes, `MatrixRow` gained additive `baseline_canonical_digest`, `result_canonical_digest`, `baseline_assertion_identity`, and `result_assertion_identity` fields, computed in the experiment-matrix service from the reference and result fingerprints (using the fingerprint `canonical_digest` added in the prior milestone). `MvpDemoSummary` gained an additive `experiment_comparisons` list (one per experiment, in matrix order), and the synthesized debug summary renders a new "Result comparisons" section (observed effect, exact/family/canonical matches, time delta, shared/added/removed signals, and the summary). The `run-mvp-demo` terminal output is unchanged and stays concise; full comparison detail lives in the JSON and Markdown.
+
+Example comparisons from the corpus (counter-overflow, real Icarus):
+
+- `hold_register` / `override_condition` on the fault line -> observed_effect `failure_removed`, comparable False, signals removed `['count','payload_out','valid_out']`, summary "The failure no longer reproduced ... so there is no result fingerprint to compare against the original failure."
+- `suppress_assignment` on the count fault (drives a defined 0) -> observed_effect `failure_changed`, same shared signals `['count','payload_out','valid_out']`, family and canonical both changed (e.g. family af4ecd94 -> 01af47fb), summary "Same failing signal(s) ..., but the failure family changed (family af4ecd94214f -> 01af47fb4573, canonical changed)."
+- `suppress_assignment` on `payload_out`'s continuous driver -> `failure_changed` with `payload_out` removed from the divergent set (shared `['count','valid_out']`), family/canonical changed.
+
+Validation evidence:
+
+- Focused unit tests (`tests/test_experiment_comparison.py`, 7): the no-observable-effect, failure-changed, failure-removed, new-failure, timing-shift, and invalid/unsupported comparison cases, plus determinism and deterministic signal sorting, all over synthetic matrix rows.
+- MVP-demo integration test (`tests/test_mvp_demo.py`): one comparison per experiment in matrix order, the comparison fields agree with the classified outcomes (failure_changed -> family_changed; failure_removed -> not comparable with the removed summary), the minimized-stimulus digest is carried, and the "Result comparisons" section with the first comparison id appears in the rendered report.
+- `python3 scripts/check.py` - passed: Ruff format check, Ruff lint, mypy strict (199 source files), 410 pytest tests, agent portability check, all example checks (including the gated MVP-demo, failure-corpus, and fingerprint-stability checks), and packaging smoke.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Architectural decisions:
+
+- The comparison is a pure function over one MatrixRow (plus the intervention kind/confidence and the shared minimized-stimulus digest), so it is trivially unit-testable with synthetic rows and independent of how the matrix was produced.
+- "Comparable" means the result reproduced a divergence that can be compared as a failure; a removed failure is deliberately not comparable-as-a-failure yet not unsupported, while only a missing result fingerprint is unsupported — keeping the two cases distinct in both the flags and the summary.
+- The comparison lives in the MVP layer as additive summary metadata rather than replacing the outcome labels, so the observed-effect classification and the fingerprint/counterfactual relations remain available and unchanged.
+
+Cases intentionally left unknown/unsupported:
+
+- Experiments with no result fingerprint (apply failure, timeout, exec error, or an unreadable failure report) are `unsupported` with the recorded reasons rather than being force-compared.
+- Two different defined-value corruptions on the same signal compare as `failure_changed` with the family/canonical digests changed, but the comparison does not attempt to characterize *how* the value differs beyond the digest change (exact values remain out of the canonical identity, as decided in the fingerprint-stability milestone).
+- The comparison reports observed differences only; it makes no claim about which change is closer to a fix or a cause, performs no ranking, and does no cross-experiment correlation.

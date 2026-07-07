@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Failure Fingerprint Stability
+Counterfactual Result Comparison
 
 ## Completed Work
 
