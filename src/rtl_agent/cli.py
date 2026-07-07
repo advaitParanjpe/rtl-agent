@@ -1527,22 +1527,15 @@ def _print_mvp_demo_summary(summary: object, output: Path) -> None:
             "output": str(output),
             "summary_json": str(output / "mvp-demo-summary.json"),
             "summary_markdown": str(output / "mvp-demo-summary.md"),
-            "stages": [
-                {"stage": s.stage, "status": s.status, "detail": s.detail} for s in summary.stages
-            ],
-            "original_failure_family": summary.original_failure.family_digest,
+            "stages": [f"{s.stage}={s.status}" for s in summary.stages],
+            "original_failure_family": (summary.original_failure.family_digest or "")[:16],
             "minimized_items": (
                 f"{summary.minimization.original_item_count} -> "
                 f"{summary.minimization.minimized_item_count}"
             ),
             "candidate_counts": summary.candidate_counts,
-            "outcome_counts": summary.outcome_counts,
             "observed_effect_counts": summary.observed_effect_counts,
-            "observed_effects": [
-                {"intervention_id": o.intervention_id, "observed_effect": o.observed_effect}
-                for o in summary.experiment_outcomes
-            ],
-            "observations": [o.statement for o in summary.observations],
+            "next_debug_checks": [c.statement for c in summary.next_debug_checks],
         }
     )
 

@@ -78,6 +78,24 @@ class Observation(BaseModel):
     statement: str
 
 
+class NotableEffectGroup(BaseModel):
+    label: str
+    count: int = Field(ge=0)
+    summary: str
+    interventions: list[str] = Field(default_factory=list)
+
+
+class EvidenceReference(BaseModel):
+    name: str
+    path: str
+
+
+class NextDebugCheck(BaseModel):
+    priority: int = Field(ge=1)
+    statement: str
+    basis: str
+
+
 class MvpDemoSummary(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
@@ -96,6 +114,9 @@ class MvpDemoSummary(BaseModel):
     outcome_counts: dict[str, int] = Field(default_factory=dict)
     observed_effect_counts: dict[str, int] = Field(default_factory=dict)
     observations: list[Observation] = Field(default_factory=list)
+    notable_effects: list[NotableEffectGroup] = Field(default_factory=list)
+    evidence_references: list[EvidenceReference] = Field(default_factory=list)
+    next_debug_checks: list[NextDebugCheck] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     disclaimer: str = MVP_DEMO_DISCLAIMER
     parser_notes: list[str] = Field(default_factory=list)

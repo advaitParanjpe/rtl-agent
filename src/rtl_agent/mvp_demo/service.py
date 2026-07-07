@@ -14,6 +14,11 @@ from rtl_agent.intervention_template_models import InterventionTemplateReport
 from rtl_agent.intervention_templates import generate_interventions
 from rtl_agent.models import utc_now
 from rtl_agent.mvp_demo.report import render_demo_markdown, write_demo_summary
+from rtl_agent.mvp_demo.synthesis import (
+    build_evidence_references,
+    build_next_debug_checks,
+    build_notable_effects,
+)
 from rtl_agent.mvp_demo_models import (
     CandidateSummary,
     ExperimentOutcome,
@@ -189,6 +194,9 @@ def run_mvp_demo(
         outcome_counts=_outcome_counts(matrix),
         observed_effect_counts=_observed_effect_counts(outcomes),
         observations=_observations(original, minimization, candidates, outcomes),
+        notable_effects=build_notable_effects(outcomes),
+        evidence_references=build_evidence_references(stages, original, minimization, outcomes),
+        next_debug_checks=build_next_debug_checks(minimization, outcomes, candidates),
         warnings=sorted(dict.fromkeys(warnings)),
         parser_notes=_PARSER_NOTES,
     )

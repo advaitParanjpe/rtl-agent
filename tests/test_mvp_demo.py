@@ -215,12 +215,37 @@ def test_outputs_written(fixture: _Fixture, tmp_path: Path) -> None:
     assert (out / "matrix" / "experiment-matrix.json").exists()
     text = (out / "mvp-demo-summary.md").read_text(encoding="utf-8")
     for heading in (
-        "Original failure",
-        "intervention candidates",
-        "Experiment outcomes",
-        "observations",
+        "# Counterfactual debug summary",
+        "## Original failure",
+        "## Minimized stimulus",
+        "## Generated interventions",
+        "## Outcome classification",
+        "## Notable observed effects",
+        "## Evidence references",
+        "## Next debug checks",
+        "## Disclaimer",
     ):
         assert heading in text
+
+
+def test_synthesized_report_surfaces_outcome_labels(fixture: _Fixture, tmp_path: Path) -> None:
+    summary = _run(fixture, tmp_path)
+    out = tmp_path / "demo"
+    text = (out / "mvp-demo-summary.md").read_text(encoding="utf-8")
+
+    # Every observed-effect label present in the summary is grouped in the report.
+    assert summary.observed_effect_counts
+    for label in summary.observed_effect_counts:
+        assert f"### `{label}`" in text
+    # The synthesized structures are populated and match the classified outcomes.
+    assert summary.notable_effects
+    assert sum(g.count for g in summary.notable_effects) == len(summary.experiment_outcomes)
+    assert summary.next_debug_checks
+    assert summary.next_debug_checks[-1].statement.__contains__("compact reproducer")
+    assert summary.evidence_references
+    # At least one removed experiment yields a "next check" that references it.
+    if any(o.observed_effect == "failure_removed" for o in summary.experiment_outcomes):
+        assert any("did not reproduce" in c.statement for c in summary.next_debug_checks)
 
 
 def test_no_causal_language(fixture: _Fixture, tmp_path: Path) -> None:
@@ -229,6 +254,10 @@ def test_no_causal_language(fixture: _Fixture, tmp_path: Path) -> None:
     assert "root cause of" not in blob
     assert "caused by" not in blob
     assert "does not establish causality" in summary.disclaimer
+    # The rendered debug summary is also free of affirmative causal language.
+    md = (tmp_path / "demo" / "mvp-demo-summary.md").read_text(encoding="utf-8").lower()
+    assert "caused by" not in md
+    assert "root cause of" not in md
 
 
 def test_invalid_failure_run_rejected(fixture: _Fixture, tmp_path: Path) -> None:
@@ -270,10 +299,12 @@ def test_cli_run_mvp_demo(fixture: _Fixture, tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert payload["summary_json"].endswith("mvp-demo-summary.json")
-    assert {s["stage"] for s in payload["stages"]} >= {
-        "inspect-run",
-        "run-experiment-matrix",
-    }
+    # The terminal output stays concise: stage statuses, label counts, next checks.
+    assert any(s.startswith("inspect-run=") for s in payload["stages"])
+    assert any(s.startswith("run-experiment-matrix=") for s in payload["stages"])
+    assert payload["observed_effect_counts"]
+    assert payload["next_debug_checks"]
+    assert "observations" not in payload  # full detail belongs in Markdown/JSON
     assert (output / "mvp-demo-summary.json").exists()
     assert (output / "mvp-demo-summary.md").exists()
 
