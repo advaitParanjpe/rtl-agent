@@ -1535,6 +1535,11 @@ def _print_mvp_demo_summary(summary: object, output: Path) -> None:
             ),
             "candidate_counts": summary.candidate_counts,
             "observed_effect_counts": summary.observed_effect_counts,
+            "top_ranked_interventions": [
+                f"#{r.rank} {r.intervention_id} (score {r.score}, {r.observed_effect})"
+                for r in summary.intervention_rankings
+                if r.rank is not None and r.rank <= 3
+            ],
             "next_debug_checks": [c.statement for c in summary.next_debug_checks],
         }
     )

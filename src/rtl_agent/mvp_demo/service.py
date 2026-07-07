@@ -12,6 +12,8 @@ from rtl_agent.failure_fingerprint import fingerprint_run
 from rtl_agent.failure_intelligence_run_models import FailureIntelligenceRunManifest
 from rtl_agent.failure_package import export_failure_package
 from rtl_agent.failure_report_models import FailureReport
+from rtl_agent.intervention_ranking import rank_interventions
+from rtl_agent.intervention_ranking_models import InterventionRanking
 from rtl_agent.intervention_template_models import InterventionTemplateReport
 from rtl_agent.intervention_templates import generate_interventions
 from rtl_agent.models import utc_now
@@ -150,6 +152,7 @@ def run_mvp_demo(
     matrix: ExperimentMatrixReport | None = None
     outcomes: list[ExperimentOutcome] = []
     comparisons: list[ExperimentComparison] = []
+    rankings: list[InterventionRanking] = []
     if candidates:
         matrix = run_experiment_matrix(
             baseline_run=failure_run,
@@ -165,6 +168,7 @@ def run_mvp_demo(
         )
         outcomes = _outcomes(matrix, generated)
         comparisons = _comparisons(matrix, generated, minimization.minimized_stimulus_digest)
+        rankings = rank_interventions(comparisons)
         stages.append(
             StageRef(
                 stage="run-experiment-matrix",
@@ -196,6 +200,7 @@ def run_mvp_demo(
         candidate_counts=_candidate_counts(candidates),
         experiment_outcomes=outcomes,
         experiment_comparisons=comparisons,
+        intervention_rankings=rankings,
         outcome_counts=_outcome_counts(matrix),
         observed_effect_counts=_observed_effect_counts(outcomes),
         observations=_observations(original, minimization, candidates, outcomes),

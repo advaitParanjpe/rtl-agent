@@ -171,6 +171,16 @@ def _check_summary(summary: object, example: dict[str, str]) -> None:
     for outcome in summary.experiment_outcomes:
         assert outcome.observed_effect in valid, (name, outcome.observed_effect)
     assert summary.next_debug_checks, f"{name}: no synthesized next-debug checks"
+
+    # Interventions are ranked deterministically by informativeness.
+    assert summary.intervention_rankings, f"{name}: no intervention rankings"
+    assert len(summary.intervention_rankings) == len(summary.experiment_outcomes), name
+    ranked = [r for r in summary.intervention_rankings if r.ranked]
+    assert ranked, f"{name}: no ranked interventions"
+    assert [r.rank for r in ranked] == list(range(1, len(ranked) + 1)), name
+    assert [r.score for r in ranked] == sorted((r.score for r in ranked), reverse=True), name
+    assert all(r.explanation and r.evidence_refs for r in ranked), name
+
     blob = summary.model_dump_json().lower()
     assert "root cause of" not in blob
     assert "caused by" not in blob

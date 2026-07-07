@@ -254,6 +254,31 @@ def test_result_comparisons_present(fixture: _Fixture, tmp_path: Path) -> None:
     assert summary.experiment_comparisons[0].intervention_id in text
 
 
+def test_interventions_are_ranked(fixture: _Fixture, tmp_path: Path) -> None:
+    summary = _run(fixture, tmp_path)
+    assert summary.intervention_rankings
+    assert len(summary.intervention_rankings) == len(summary.experiment_outcomes)
+
+    ranked = [r for r in summary.intervention_rankings if r.ranked]
+    assert ranked, "no intervention was ranked"
+    # Ranks are a dense 1..N with no gaps, ordered by descending score.
+    assert [r.rank for r in ranked] == list(range(1, len(ranked) + 1))
+    scores = [r.score for r in ranked]
+    assert scores == sorted(scores, reverse=True)
+    for r in ranked:
+        assert r.score > 0
+        assert "total=" in r.explanation
+        assert r.evidence_refs
+    # A failure_removed edit is more informative than a no-observable-effect one.
+    by_effect = {r.observed_effect: r for r in ranked}
+    if "failure_removed" in by_effect and "no_observable_effect" in by_effect:
+        assert by_effect["failure_removed"].score > by_effect["no_observable_effect"].score
+    # The ranking appears in the rendered report.
+    text = (tmp_path / "demo" / "mvp-demo-summary.md").read_text(encoding="utf-8")
+    assert "## Intervention ranking" in text
+    assert ranked[0].intervention_id in text
+
+
 def test_synthesized_report_surfaces_outcome_labels(fixture: _Fixture, tmp_path: Path) -> None:
     summary = _run(fixture, tmp_path)
     out = tmp_path / "demo"

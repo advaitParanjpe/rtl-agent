@@ -228,6 +228,29 @@ def render_debug_summary(summary: MvpDemoSummary) -> str:
     else:
         lines += ["_No experiments were classified._", ""]
 
+    lines += ["## Intervention ranking", ""]
+    if summary.intervention_rankings:
+        lines += [
+            "Most informative counterfactuals first, scored deterministically from observed "
+            "evidence only (no causal claim).",
+            "",
+            "| Rank | Intervention | Score | Observed effect | Result cluster | Why |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ]
+        for r in summary.intervention_rankings:
+            rank = str(r.rank) if r.rank is not None else "—"
+            cluster = (
+                f"{r.result_cluster_id} (n={r.result_cluster_size})" if r.result_cluster_id else "-"
+            )
+            why = r.explanation if r.ranked else (r.unranked_reason or "unranked")
+            lines.append(
+                f"| {rank} | `{r.intervention_id}` | {r.score} | **{r.observed_effect}** "
+                f"| {cluster} | {why} |"
+            )
+        lines.append("")
+    else:
+        lines += ["_No experiments to rank._", ""]
+
     lines += ["## Result comparisons", ""]
     if summary.experiment_comparisons:
         lines += [
