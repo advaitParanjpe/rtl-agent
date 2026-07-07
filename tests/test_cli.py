@@ -85,6 +85,7 @@ def test_readme_documented_commands_have_help() -> None:
         "run-benchmark",
         "run-command",
         "run-experiment-matrix",
+        "run-mvp-demo",
         "run-counterfactual",
         "run-failure-intelligence",
         "synthesize-failure-report",

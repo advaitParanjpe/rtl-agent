@@ -217,3 +217,74 @@ def test_invalid_failure_run_rejected(fixture: _Fixture, tmp_path: Path) -> None
     (fixture.run_dir / "signal-source-map.json").write_text("corrupt", encoding="utf-8")
     with pytest.raises(MvpDemoError, match="invalid failure run"):
         _run(fixture, tmp_path, "demo2")
+
+
+def test_cli_run_mvp_demo(fixture: _Fixture, tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from rtl_agent.cli import app
+
+    output = tmp_path / "cli-demo"
+    result = CliRunner().invoke(
+        app,
+        [
+            "run-mvp-demo",
+            "--failure-run",
+            str(fixture.run_dir),
+            "--repo",
+            str(fixture.repo),
+            "--config",
+            str(fixture.config),
+            "--command",
+            "sim",
+            "--stimulus",
+            str(fixture.stimulus),
+            "--allowed-file",
+            "rtl/core.sv",
+            "--output",
+            str(output),
+            "--max-candidates",
+            "8",
+            "--max-experiments",
+            "12",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["summary_json"].endswith("mvp-demo-summary.json")
+    assert {s["stage"] for s in payload["stages"]} >= {
+        "inspect-run",
+        "run-experiment-matrix",
+    }
+    assert (output / "mvp-demo-summary.json").exists()
+    assert (output / "mvp-demo-summary.md").exists()
+
+
+def test_cli_invalid_failure_run_exits_2(fixture: _Fixture, tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from rtl_agent.cli import app
+
+    (fixture.run_dir / "signal-source-map.json").write_text("corrupt", encoding="utf-8")
+    result = CliRunner().invoke(
+        app,
+        [
+            "run-mvp-demo",
+            "--failure-run",
+            str(fixture.run_dir),
+            "--repo",
+            str(fixture.repo),
+            "--config",
+            str(fixture.config),
+            "--command",
+            "sim",
+            "--stimulus",
+            str(fixture.stimulus),
+            "--allowed-file",
+            "rtl/core.sv",
+            "--output",
+            str(tmp_path / "cli-demo2"),
+        ],
+    )
+    assert result.exit_code == 2
+    assert "error:" in result.output

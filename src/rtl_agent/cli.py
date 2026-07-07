@@ -68,6 +68,7 @@ from rtl_agent.intervention_templates import (
     generate_interventions,
 )
 from rtl_agent.issues import IssueParsingError, parse_issue_file, write_task_contract
+from rtl_agent.mvp_demo import MvpDemoError, run_mvp_demo
 from rtl_agent.reduction import StimulusReductionError, minimize_stimulus
 from rtl_agent.review import ReviewError, review_implementation, write_review_report
 from rtl_agent.rtl_driver_trace import (
@@ -1040,6 +1041,56 @@ def generate_interventions_command(
     _print_generate_interventions_summary(report, output)
 
 
+@app.command("run-mvp-demo")
+def run_mvp_demo_command(
+    failure_run: Annotated[
+        Path, typer.Option("--failure-run", help="Validated failure-intelligence run dir.")
+    ],
+    repo: Annotated[Path, typer.Option("--repo", help="Target Git RTL repository root.")],
+    config: Annotated[Path, typer.Option("--config", "-c", help="rtl-agent YAML config.")],
+    command: Annotated[str, typer.Option("--command", help="Named configured simulator command.")],
+    stimulus: Annotated[Path, typer.Option("--stimulus", help="Structured failing stimulus JSON.")],
+    allowed_file: Annotated[
+        list[str],
+        typer.Option("--allowed-file", help="Allowed source file for generation (repeatable)."),
+    ],
+    output: Annotated[Path, typer.Option("--output", help="Demonstration output directory.")],
+    max_candidates: Annotated[
+        int, typer.Option("--max-candidates", min=1, help="Maximum intervention candidates.")
+    ] = 8,
+    max_experiments: Annotated[
+        int, typer.Option("--max-experiments", min=1, help="Maximum experiments to run.")
+    ] = 12,
+    timeout: Annotated[
+        int | None, typer.Option("--timeout", min=1, help="Timeout (s) per simulation.")
+    ] = None,
+    baseline_commit: Annotated[
+        str | None,
+        typer.Option("--baseline-commit", help="Commit/ref for the worktrees (default HEAD)."),
+    ] = None,
+) -> None:
+    """Run the full evidence-guided counterfactual demonstration (composition only)."""
+    try:
+        summary = run_mvp_demo(
+            failure_run=failure_run,
+            repo=repo,
+            config_path=config,
+            command=command,
+            stimulus=stimulus,
+            allowed_files=allowed_file,
+            output=output,
+            max_candidates=max_candidates,
+            max_experiments=max_experiments,
+            timeout=timeout,
+            baseline_commit=baseline_commit,
+        )
+    except MvpDemoError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+
+    _print_mvp_demo_summary(summary, output)
+
+
 @app.command("export-failure-package")
 def export_failure_package_command(
     run_dir: Annotated[
@@ -1462,6 +1513,31 @@ def _print_minimize_summary(report: object, output: Path) -> None:
             "cache_hits": report.cache_hits,
             "final_classification": report.final_classification,
             "termination_reason": report.termination_reason,
+        }
+    )
+
+
+def _print_mvp_demo_summary(summary: object, output: Path) -> None:
+    from rtl_agent.mvp_demo_models import MvpDemoSummary
+
+    assert isinstance(summary, MvpDemoSummary)
+    _print_json(
+        {
+            "schema_version": summary.schema_version,
+            "output": str(output),
+            "summary_json": str(output / "mvp-demo-summary.json"),
+            "summary_markdown": str(output / "mvp-demo-summary.md"),
+            "stages": [
+                {"stage": s.stage, "status": s.status, "detail": s.detail} for s in summary.stages
+            ],
+            "original_failure_family": summary.original_failure.family_digest,
+            "minimized_items": (
+                f"{summary.minimization.original_item_count} -> "
+                f"{summary.minimization.minimized_item_count}"
+            ),
+            "candidate_counts": summary.candidate_counts,
+            "outcome_counts": summary.outcome_counts,
+            "observations": [o.statement for o in summary.observations],
         }
     )
 

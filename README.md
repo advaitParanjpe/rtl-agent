@@ -466,6 +466,23 @@ rtl-agent run-experiment-matrix \
 
 Interventions come from an explicit manifest — a bounded ordered list, each with a stable id, human description, a patch or a structured `replace_text` edit, allowed files, optional tags/metadata, and an enabled flag — reusing the existing manual-intervention representation (no new edit engine, no automatic or LLM-generated patches, no intervention search or ranking). The matrix first runs the minimized stimulus with no intervention to establish the comparison reference (validated to share the baseline failure family), then, for each enabled intervention, creates an isolated Git worktree, applies the intervention only inside it, materializes the same minimized stimulus, runs the named command, and reuses the existing triage, failure-intelligence, fingerprint, and counterfactual services to classify the outcome. Each typed row records the intervention and reference digests, files affected, execution and simulator status, resulting fingerprint digests, the counterfactual outcome (`failure_removed`, `failure_delayed`, `failure_advanced`, `failure_changed`, `no_observable_effect`, `new_failure_introduced`, `experiment_failed`, `insufficient_evidence`), the fingerprint-comparison relation, whether the family was preserved / removed / shifted in time / replaced by a different failure, warnings, artifact references, and an explicit disclaimer that the matrix records observed effects and does not establish causality. Experiments are cached by a semantic digest over the target commit, baseline family, minimized-stimulus digest, command identity, and canonical intervention, so repeated equivalent interventions are never re-simulated; row ordering is deterministic and the source repository is never modified. `scripts/experiment_matrix_pilot_check.py` is a gated Icarus-backed pilot that runs four distinct interventions (remove the failure, no observable effect, advance the same failure, expose a different failure) plus a cached duplicate against one minimized counterexample; it skips cleanly when the simulator is absent.
 
+`run-mvp-demo` is the end-to-end demonstration: one command that composes the existing services into the complete evidence-guided counterfactual workflow. From a validated failure-intelligence run it inspects the run, exports a portable failure package, minimizes the failing stimulus to a counterexample, generates reviewable intervention candidates from the evidence, runs the experiment matrix against the generated manifest, and writes one evidence-qualified summary. It only sequences existing services — no new analysis, no automatic patching — and never modifies the source repository. Running the pipeline needs a simulator (Icarus Verilog) available for the configured command:
+
+```bash
+rtl-agent run-mvp-demo \
+  --failure-run .rtl-agent/runs/failure-001 \
+  --repo ../axi-router \
+  --config rtl-agent.yaml \
+  --command structured-failure \
+  --stimulus failing-stimulus.json \
+  --allowed-file rtl/axi_pipe.sv \
+  --output .rtl-agent/demos/demo-001 \
+  --max-candidates 8 \
+  --max-experiments 12
+```
+
+It writes `mvp-demo-summary.json` and `mvp-demo-summary.md` (plus the per-stage `failure-package/`, `minimization/`, `generated/`, and `matrix/` directories) into the output directory. The summary is organized into four separated sections — original failure, generated intervention candidates, experiment outcomes, and evidence-backed observations. Every observation is an observed counterfactual effect of a bounded, reviewable experiment (an edit removed / materially changed / time-shifted / had no observable effect on the failure); it is not proof of a root cause or a fix, and no intervention is ever applied to the repository. `scripts/mvp_demo_check.py` is a gated Icarus-backed demonstration that skips cleanly when the simulator is absent.
+
 `export-failure-package` packages a validated run directory into a single self-contained, portable failure package (read-only):
 
 ```bash
