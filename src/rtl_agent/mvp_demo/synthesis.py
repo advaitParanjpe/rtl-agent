@@ -228,6 +228,34 @@ def render_debug_summary(summary: MvpDemoSummary) -> str:
     else:
         lines += ["_No experiments were classified._", ""]
 
+    lines += ["## Result comparisons", ""]
+    if summary.experiment_comparisons:
+        lines += [
+            "Each experiment compared against the original failure (reproduced on the minimized "
+            "counterexample).",
+            "",
+            "| Experiment | Observed effect | Fingerprint (exact/family/canonical) "
+            "| Δt | Signals (shared/+/-) | Summary |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ]
+        for cmp in summary.experiment_comparisons:
+            fp = cmp.fingerprint
+            fp_cell = f"{_yn(fp.exact_match)}/{_yn(fp.family_match)}/{_yn(fp.canonical_match)}"
+            delta = (
+                f"{cmp.earliest_divergence_time_change:+d}"
+                if cmp.earliest_divergence_time_change is not None
+                else "-"
+            )
+            sig = cmp.signal_change
+            signals = f"{sig.shared or '[]'} / {sig.added or '[]'} / {sig.removed or '[]'}"
+            lines.append(
+                f"| `{cmp.intervention_id}` | **{cmp.observed_effect}** | {fp_cell} | {delta} "
+                f"| {signals} | {cmp.summary} |"
+            )
+        lines.append("")
+    else:
+        lines += ["_No experiments to compare._", ""]
+
     lines += ["## Evidence references", ""]
     for ref in summary.evidence_references:
         lines.append(f"- {ref.name}: `{ref.path}`")
@@ -236,6 +264,10 @@ def render_debug_summary(summary: MvpDemoSummary) -> str:
         lines.append(f"{check.priority}. {check.statement}")
     lines += ["", "## Disclaimer", "", summary.disclaimer, ""]
     return "\n".join(lines)
+
+
+def _yn(value: bool) -> str:
+    return "yes" if value else "no"
 
 
 def _ordered_counts(counts: dict[str, int]) -> list[tuple[str, int]]:

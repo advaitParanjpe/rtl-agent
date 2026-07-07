@@ -421,10 +421,12 @@ def _classify_evidence(base_row: MatrixRow, outcome: _Outcome, reference: _Basel
 
     base_row.result_exact_digest = fingerprint.exact_digest
     base_row.result_family_digest = fingerprint.family_digest
+    base_row.result_canonical_digest = fingerprint.canonical_digest or None
     base_row.counterfactual_outcome = str(result_outcome)
     base_row.fingerprint_relation = str(comparison.match_kind)
     base_row.result_failure_signals = list(identity.signals)
     base_row.result_failure_time = identity.failure_time
+    base_row.result_assertion_identity = list(fingerprint.assertion_identity)
     base_row.family_preserved = family_preserved
     base_row.failure_removed = failure_removed
     base_row.failure_time_shifted = time_shifted
@@ -465,8 +467,10 @@ def _base_row(
         execution_status="pending",
         baseline_exact_digest=reference.fingerprint.exact_digest,
         baseline_family_digest=reference.fingerprint.family_digest,
+        baseline_canonical_digest=reference.fingerprint.canonical_digest or None,
         baseline_failure_signals=list(reference.identity.signals),
         baseline_failure_time=reference.identity.failure_time,
+        baseline_assertion_identity=list(reference.fingerprint.assertion_identity),
     )
 
 

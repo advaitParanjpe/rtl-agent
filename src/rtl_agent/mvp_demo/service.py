@@ -4,6 +4,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
+from rtl_agent.experiment_comparison import build_experiment_comparison
+from rtl_agent.experiment_comparison_models import ExperimentComparison
 from rtl_agent.experiment_matrix import run_experiment_matrix
 from rtl_agent.experiment_matrix_models import ExperimentMatrixReport
 from rtl_agent.failure_fingerprint import fingerprint_run
@@ -147,6 +149,7 @@ def run_mvp_demo(
     # Stage 6: run the experiment matrix against the generated manifest.
     matrix: ExperimentMatrixReport | None = None
     outcomes: list[ExperimentOutcome] = []
+    comparisons: list[ExperimentComparison] = []
     if candidates:
         matrix = run_experiment_matrix(
             baseline_run=failure_run,
@@ -161,6 +164,7 @@ def run_mvp_demo(
             baseline_commit=baseline_commit,
         )
         outcomes = _outcomes(matrix, generated)
+        comparisons = _comparisons(matrix, generated, minimization.minimized_stimulus_digest)
         stages.append(
             StageRef(
                 stage="run-experiment-matrix",
@@ -191,6 +195,7 @@ def run_mvp_demo(
         generated_candidates=candidates,
         candidate_counts=_candidate_counts(candidates),
         experiment_outcomes=outcomes,
+        experiment_comparisons=comparisons,
         outcome_counts=_outcome_counts(matrix),
         observed_effect_counts=_observed_effect_counts(outcomes),
         observations=_observations(original, minimization, candidates, outcomes),
@@ -287,6 +292,24 @@ def _outcomes(
             )
         )
     return outcomes
+
+
+def _comparisons(
+    matrix: ExperimentMatrixReport,
+    generated: InterventionTemplateReport,
+    minimized_stimulus_digest: str,
+) -> list[ExperimentComparison]:
+    kind_by_id = {c.candidate_id: str(c.template_kind) for c in generated.candidates}
+    conf_by_id = {c.candidate_id: str(c.confidence) for c in generated.candidates}
+    return [
+        build_experiment_comparison(
+            row,
+            template_kind=kind_by_id.get(row.intervention_id),
+            confidence=conf_by_id.get(row.intervention_id),
+            minimized_stimulus_digest=minimized_stimulus_digest,
+        )
+        for row in matrix.rows
+    ]
 
 
 def _outcome_counts(matrix: ExperimentMatrixReport | None) -> dict[str, int]:

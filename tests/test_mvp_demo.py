@@ -221,11 +221,37 @@ def test_outputs_written(fixture: _Fixture, tmp_path: Path) -> None:
         "## Generated interventions",
         "## Outcome classification",
         "## Notable observed effects",
+        "## Result comparisons",
         "## Evidence references",
         "## Next debug checks",
         "## Disclaimer",
     ):
         assert heading in text
+
+
+def test_result_comparisons_present(fixture: _Fixture, tmp_path: Path) -> None:
+    summary = _run(fixture, tmp_path)
+    # One deterministic comparison object per experiment result.
+    assert summary.experiment_comparisons
+    assert len(summary.experiment_comparisons) == len(summary.experiment_outcomes)
+    ids = [c.intervention_id for c in summary.experiment_comparisons]
+    assert ids == [o.intervention_id for o in summary.experiment_outcomes]
+    for cmp in summary.experiment_comparisons:
+        assert cmp.observed_effect
+        assert cmp.summary
+        assert cmp.minimized_stimulus_digest == summary.minimization.minimized_stimulus_digest
+        # Fingerprint relationship covers exact/family/canonical.
+        assert cmp.fingerprint is not None
+        if cmp.observed_effect == "failure_changed":
+            assert cmp.comparable is True
+            assert cmp.family_changed is True
+        if cmp.observed_effect == "failure_removed":
+            assert cmp.comparable is False
+            assert "no longer reproduced" in cmp.summary
+    # At least one comparison appears in the rendered report.
+    text = (tmp_path / "demo" / "mvp-demo-summary.md").read_text(encoding="utf-8")
+    assert "## Result comparisons" in text
+    assert summary.experiment_comparisons[0].intervention_id in text
 
 
 def test_synthesized_report_surfaces_outcome_labels(fixture: _Fixture, tmp_path: Path) -> None:

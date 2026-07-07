@@ -58,14 +58,18 @@ class MatrixRow(BaseModel):
     simulator_exit_code: int | None = None
     baseline_exact_digest: str
     baseline_family_digest: str
+    baseline_canonical_digest: str | None = None
     result_exact_digest: str | None = None
     result_family_digest: str | None = None
+    result_canonical_digest: str | None = None
     counterfactual_outcome: str | None = None
     fingerprint_relation: str | None = None
     baseline_failure_signals: list[str] = Field(default_factory=list)
     baseline_failure_time: int | None = None
+    baseline_assertion_identity: list[str] = Field(default_factory=list)
     result_failure_signals: list[str] = Field(default_factory=list)
     result_failure_time: int | None = None
+    result_assertion_identity: list[str] = Field(default_factory=list)
     family_preserved: bool = False
     failure_removed: bool = False
     failure_time_shifted: bool = False
