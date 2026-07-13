@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Prohibited-Shortcut Review Finding Example Check
+Evidence Artifact Provenance Integrity Check
 
 ## Completed Work
 
@@ -36,4 +36,4 @@ Prohibited-Shortcut Review Finding Example Check
 
 ## Resume Instructions
 
-- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Evidence Artifact Provenance Integrity Check`.
+- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Persistent HKG Lifecycle and Counterfactual Evidence Integration Audit`.

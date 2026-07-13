@@ -1,21 +1,25 @@
-# Evidence Artifact Provenance Integrity Check
+# Persistent HKG Lifecycle and Counterfactual Evidence Integration Audit
 
 ## Objective
 
-Add a deterministic local check that validates existing MVP/failure-intelligence artifact references and hashes remain internally consistent across generated summaries, evidence bundles, and exported packages. This should tighten confidence in artifact provenance without adding analysis behavior.
+Produce a bounded design/audit artifact that prepares the next implementation milestone for deterministic HKG persistence and integration with counterfactual evidence, without implementing the lifecycle itself.
 
 ## Scope
 
-- Add a compact `scripts/*_check.py` registered in `scripts/check.py` that reuses existing example fixtures and typed models.
-- Verify that artifact references in generated reports resolve to the expected local files and that recorded SHA-256 values match file contents where the existing schemas record hashes.
-- Keep the check deterministic and local; gate any simulator-backed path cleanly if needed, but prefer existing hermetic artifacts.
-- Do not add schemas, new analysis behavior, graph features, provider integration, automatic patching, or broad refactors.
+- Audit the current HKG construction/query/memory surfaces and the MVP/counterfactual artifacts they would need to ingest.
+- Specify deterministic HKG build, update, and idempotence semantics.
+- Specify ingestion expectations for real MVP intervention and experiment evidence.
+- Define the standard artifact location and CLI lifecycle expectations for future implementation.
+- Define how historical-memory wiring should feed later MVP runs.
+- Record schema compatibility and provenance requirements, including artifact references and hashes.
+- Keep this design/audit only; do not change runtime behavior.
 
 ## Acceptance Criteria
 
-- One registered deterministic local check validates provenance/path/hash consistency across existing generated artifacts.
-- The implementation reuses existing models and artifact conventions only.
-- All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
+- One focused design/audit document is added under `docs/architecture/`.
+- The document identifies concrete implementation boundaries, inputs, outputs, invariants, and risks for the future persistent-HKG lifecycle milestone.
+- No HKG lifecycle code, CLI commands, schema changes, supervisor enforcement, or historical-memory wiring is implemented.
+- Canonical validation continues to pass.
 
 ## Required Validation Commands
 
@@ -25,7 +29,7 @@ Add a deterministic local check that validates existing MVP/failure-intelligence
 
 ## Exclusions
 
-- No new analysis behavior, schema changes, graph features, model providers, databases, remote execution, CI, UI, automatic patching, or causal claims.
+- No implementation of HKG persistence lifecycle, build/update CLI commands, database/server/UI, external model integration, supervisor enforcement, historical-memory wiring, automatic patching, or causal/root-cause claims.
 
 ## Completion State
 

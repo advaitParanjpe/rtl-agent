@@ -1566,3 +1566,45 @@ Required completion validation:
 - `git status --short` - reviewed before commit.
 
 Next active milestone recorded in `project/current.md`: Evidence Artifact Provenance Integrity Check.
+
+## 2026-07-13 - Evidence Artifact Provenance Integrity Check
+
+Added `scripts/evidence_artifact_provenance_check.py` and registered it in `scripts/check.py`. The check is deterministic and hermetic: it uses checked-in AXI-stream-router RTL/VCD fixtures plus a temporary Git repository whose configured validation command is a local Python VCD emitter. No simulator, network service, external model provider, database, or mutable external repository is required.
+
+The check drives real existing generation/export paths rather than synthetic dictionaries:
+
+- `run_failure_intelligence(...)` creates a manifest-backed failure-intelligence run from checked-in VCDs and the temporary target repo.
+- `inspect_run(...)` validates the originating run.
+- `export_evidence_bundle(...)` generates the existing index-only evidence bundle.
+- `export_failure_package(...)` exports a portable package and the check reinspects the packaged `run/` directory from its exported location.
+- `run_mvp_demo(...)` runs inspect-run, failure-package export, stimulus minimization, intervention generation, experiment matrix execution, result comparison, intervention ranking, repair suggestions, and summary/Markdown rendering over the hermetic Python-backed target repo.
+
+Validated existing provenance conventions:
+
+- Artifact identity is the run manifest's `RunArtifact.artifact_id` plus kind and run-relative path; stage outputs must match manifest artifacts.
+- Run identity comes from `RunStore.run_id`, `run.json`, and `run-manifest.json`; the check asserts these agree.
+- Run artifacts are `PathKind.RUN_RELATIVE` paths resolved within the run root; unsafe absolute/`..` paths are rejected by existing inspection.
+- Content integrity uses SHA-256 hex over file bytes; the check recomputes hashes for run-manifest artifacts, evidence-bundle indexed source artifacts, and packaged copied artifacts.
+- Evidence bundles are intentionally index-only (`include_contents=false`), so the check verifies indexed source paths/hashes and asserts contents are not duplicated.
+- Failure packages copy validated manifest artifacts under package-relative paths, retain run-relative provenance, and remain inspectable from the exported package location.
+- MVP summaries contain a mix of absolute stage/package/reduction references and existing matrix-relative experiment artifact references; the check validates both forms and verifies Markdown references derived from the JSON.
+
+Negative controls:
+
+- A copied run with `waveform/comparison.json` modified without updating the manifest hash is detected by `inspect_run(...)` as `hash_mismatch`.
+- A copied run with a manifest artifact path changed to `../escape.json` is detected by `inspect_run(...)` as `unsafe_path`.
+
+No production code, schemas, hash algorithms, artifact layout, HKG behavior, supervisor behavior, or historical-memory wiring changed. The only implementation is the registered validation script.
+
+Validation:
+
+- Focused `python3 scripts/evidence_artifact_provenance_check.py` - passed.
+- Focused `.venv/bin/python -m ruff format --check scripts/evidence_artifact_provenance_check.py scripts/check.py` - passed after formatting.
+- Focused `.venv/bin/python -m ruff check scripts/evidence_artifact_provenance_check.py scripts/check.py` - passed.
+- `python3 scripts/check.py` - passed: ruff format, ruff lint, mypy over 219 source files, 455 pytest tests, agent portability check, all registered example/pilot checks including the new provenance check, gated simulator-backed checks where available in this environment, corpus checks, HKG corpus check, and packaging smoke.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Known limitation documented by the check rather than changed: the evidence bundle format is index-only by design, so there are no copied bundle payloads to byte-compare; copied-byte validation is performed for failure packages.
+
+Next active milestone recorded in `project/current.md`: Persistent HKG Lifecycle and Counterfactual Evidence Integration Audit.
