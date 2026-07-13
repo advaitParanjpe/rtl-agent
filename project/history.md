@@ -1608,3 +1608,49 @@ Validation:
 Known limitation documented by the check rather than changed: the evidence bundle format is index-only by design, so there are no copied bundle payloads to byte-compare; copied-byte validation is performed for failure packages.
 
 Next active milestone recorded in `project/current.md`: Persistent HKG Lifecycle and Counterfactual Evidence Integration Audit.
+
+## 2026-07-12 - Persistent HKG Lifecycle and Counterfactual Evidence Integration Audit
+
+Completed the read-only architecture and implementation-planning milestone in `docs/architecture/persistent-hkg-lifecycle-audit.md`. The audit distinguishes confirmed runtime behavior, architectural inference, proposed implementation behavior, and bounded unresolved issues across all 20 required sections. No production code, tests, schemas, CLI behavior, source artifact formats, or existing documentation changed.
+
+Required source inspection covered the HKG models/builder/query/memory API and tests/check, the complete MVP/counterfactual flow and typed artifacts, failure-intelligence/run inspection/package/provenance infrastructure, repair suggestions, supervisor, all call sites, CLI/config/packaging, README, roadmap/history, and the prior pre-HKG review.
+
+Runtime investigation confirmed:
+
+- 37 focused HKG, supervisor, repair-suggestion, and MVP tests pass.
+- The real Icarus-backed failure corpus builds a deterministic 69-node, 167-edge graph with three canonical clusters, but currently ingests failure-intelligence/clustering only.
+- The hermetic evidence-provenance workflow passes.
+- A separately generated real hermetic MVP output reduced a three-item stimulus to one item, generated and executed three interventions, emitted classifications/comparisons/rankings/repair suggestions and a 13-file portable package, and could be manually supplied to the current builder to produce a 35-node, 52-edge graph.
+- Real MVP counterfactual HKG ingestion is disconnected from production; current counterfactual HKG tests use synthetic typed objects, and `run_mvp_demo(...)` does not load HKG memory or pass it to the existing `generate_repair_suggestions(..., hkg_memory=...)` seam.
+
+Major findings:
+
+- Current same-input graph construction is byte-deterministic, but there is no persistent store, lifecycle/update service, integrity manifest, atomic write, standard location, lifecycle CLI, source conflict policy, or strict load validation.
+- Current global module/signal/location/candidate/experiment IDs and first-writer-wins merges are unsafe across persistent multi-run inputs; conflicting equal IDs can be order-sensitive.
+- HKG provenance sometimes records artifact kinds instead of actual run artifact IDs, omits the run-manifest hash, and uses a semantic exact fingerprint digest as though it were a serialized artifact content hash.
+- Failure manifests/packages already provide strong relocatable identity/path/hash contracts. MVP provides stable semantic stimulus/intervention/experiment/fingerprint digests and a fixed output layout, but no package-style manifest for its own artifacts and mixes absolute stage paths with matrix-relative row paths.
+- Repair suggestions should remain derived outputs outside HKG v1. Supervisor enforcement remains deferred.
+
+Decisions recorded:
+
+- Persist one canonical `.rtl-agent/hkg/hkg.json` plus `hkg-manifest.json`, using canonical JSON, SHA-256 over exact bytes, sorted source-relative artifact indexes, graph-first/manifest-last atomic replacement, and strict load validation. No database.
+- Give a dedicated HKG lifecycle service explicit ownership through only `hkg-build`, `hkg-update`, and `hkg-inspect`; failure-intelligence and MVP completion do not mutate the graph implicitly.
+- Advance only the HKG schema as needed for source-scoped identities and source-aware true-byte-hash provenance; leave source-artifact schemas unchanged and rebuild legacy HKG schema-1 files rather than add a migration framework.
+- Reject changed content under the same source identity; treat identical/relocated input as a no-op; recompute canonical cluster membership; retain distinct failure occurrences sharing a canonical fingerprint.
+- Let `run-mvp-demo` optionally load verified prior HKG memory, exclude current-run evidence, pass memory to repair suggestions, disclose used/no-match/unavailable state through existing structured summary fields and Markdown, and continue safely without memory.
+
+Focused validation performed during the audit:
+
+- `.venv/bin/python -m pytest tests/test_hkg.py tests/test_supervisor.py tests/test_repair_suggestions.py tests/test_mvp_demo.py -q` - passed (37 tests).
+- `python3 scripts/hkg_failure_corpus_check.py` - passed (69 nodes, 167 edges, 3 clusters; simulator-backed check ran in this environment).
+- `python3 scripts/evidence_artifact_provenance_check.py` - passed.
+
+Required completion validation:
+
+- `python3 scripts/check.py` - passed: Ruff format (219 files), Ruff lint, strict mypy (219 source files), 455 pytest tests, agent portability, all registered example/pilot/provenance checks, all simulator-gated checks in this environment, the three-example failure corpus, three-mechanism fingerprint stability, three-cluster failure clustering, the 69-node/167-edge/three-cluster HKG corpus check, and packaging smoke. No checks were skipped and no warnings required action.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit; only the new audit and four required project-control files were modified.
+
+The audit recommends one coherent next milestone rather than splitting persistence from the integrations that make it safe and useful. Exact implementation scope, acceptance criteria, expected files, and a ready-to-use implementation prompt are in sections 17-20 of the audit.
+
+Next active milestone recorded in `project/current.md`: Persistent HKG Lifecycle and Historical MVP Integration v1.

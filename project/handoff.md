@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Evidence Artifact Provenance Integrity Check
+Persistent HKG Lifecycle and Counterfactual Evidence Integration Audit
 
 ## Completed Work
 
@@ -36,4 +36,4 @@ Evidence Artifact Provenance Integrity Check
 
 ## Resume Instructions
 
-- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Persistent HKG Lifecycle and Counterfactual Evidence Integration Audit`.
+- Read `AGENTS.md`, `project/current.md`, and `docs/architecture/persistent-hkg-lifecycle-audit.md`; the next active milestone is `Persistent HKG Lifecycle and Historical MVP Integration v1`.

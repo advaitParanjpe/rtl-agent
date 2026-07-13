@@ -1,25 +1,26 @@
-# Persistent HKG Lifecycle and Counterfactual Evidence Integration Audit
+# Persistent HKG Lifecycle and Historical MVP Integration v1
 
 ## Objective
 
-Produce a bounded design/audit artifact that prepares the next implementation milestone for deterministic HKG persistence and integration with counterfactual evidence, without implementing the lifecycle itself.
+Implement one deterministic local vertical slice that persists and updates a provenance-validated HKG from real failure-intelligence runs, relocated failure packages, and MVP counterfactual outputs; exposes minimal build/update/inspect CLI operations; and optionally supplies prior, self-excluded HKG memory to later MVP repair suggestions with explicit JSON/Markdown disclosure and safe no-memory fallback.
 
 ## Scope
 
-- Audit the current HKG construction/query/memory surfaces and the MVP/counterfactual artifacts they would need to ingest.
-- Specify deterministic HKG build, update, and idempotence semantics.
-- Specify ingestion expectations for real MVP intervention and experiment evidence.
-- Define the standard artifact location and CLI lifecycle expectations for future implementation.
-- Define how historical-memory wiring should feed later MVP runs.
-- Record schema compatibility and provenance requirements, including artifact references and hashes.
-- Keep this design/audit only; do not change runtime behavior.
+- Implement the canonical `.rtl-agent/hkg/` graph plus integrity-manifest store specified in `docs/architecture/persistent-hkg-lifecycle-audit.md`.
+- Add validated lifecycle adapters for original failure runs, relocated failure packages, and real MVP demo outputs.
+- Implement deterministic build, update, idempotence, conflict rejection, provenance validation, and minimal `hkg-build`, `hkg-update`, and `hkg-inspect` commands.
+- Correct HKG-only persistent identities/provenance and ingest real minimized-stimulus, intervention, experiment, outcome, comparison, and ranking evidence.
+- Add optional self-excluded historical-memory lookup to later MVP repair suggestions with structured/Markdown disclosure and safe fallback.
+- Add focused tests and one deterministic hermetic registered lifecycle check.
 
 ## Acceptance Criteria
 
-- One focused design/audit document is added under `docs/architecture/`.
-- The document identifies concrete implementation boundaries, inputs, outputs, invariants, and risks for the future persistent-HKG lifecycle milestone.
-- No HKG lifecycle code, CLI commands, schema changes, supervisor enforcement, or historical-memory wiring is implemented.
-- Canonical validation continues to pass.
+- Rebuilding or reingesting identical relocated sources is byte-deterministic and idempotent.
+- Changed same-identity, tampered, unsafe, malformed, corrupt, or incompatible evidence is rejected without partial writes.
+- Real failure/package/MVP artifacts are ingested with source-relative, hash-cited provenance; same-canonical failures remain distinct occurrences.
+- The three bounded lifecycle commands validate and report the persistent store deterministically.
+- MVP remains valid with absent/unavailable memory and discloses verified historical evidence when used without causal overclaiming.
+- Focused, hermetic lifecycle, full canonical, whitespace, and Git-state validation pass.
 
 ## Required Validation Commands
 
@@ -29,7 +30,7 @@ Produce a bounded design/audit artifact that prepares the next implementation mi
 
 ## Exclusions
 
-- No implementation of HKG persistence lifecycle, build/update CLI commands, database/server/UI, external model integration, supervisor enforcement, historical-memory wiring, automatic patching, or causal/root-cause claims.
+- No external model-provider integration, supervisor enforcement, automatic patch generation, database/server/UI, source deletion/replacement, broad migration framework, graph federation, advanced graph algorithms, broad query language, or causal/root-cause claims.
 
 ## Completion State
 
