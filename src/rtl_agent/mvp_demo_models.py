@@ -17,6 +17,11 @@ MVP_DEMO_DISCLAIMER = (
     "anchored experiment proposal, not an applied change."
 )
 
+HISTORICAL_EVIDENCE_DISCLAIMER = (
+    "Historical HKG evidence is an observational canonical-fingerprint match only. It is not "
+    "proof of a shared root cause, a guaranteed repair, a verified fix, or causal evidence."
+)
+
 
 class StageRef(BaseModel):
     """A pointer to one workflow stage's produced artifacts."""
@@ -100,6 +105,19 @@ class NextDebugCheck(BaseModel):
     basis: str
 
 
+class HistoricalMemoryDisclosure(BaseModel):
+    requested: bool = False
+    graph_loaded: bool = False
+    graph_sha256: str | None = None
+    historical_match: bool = False
+    prior_failure_count: int = Field(default=0, ge=0)
+    prior_intervention_count: int = Field(default=0, ge=0)
+    prior_effect_count: int = Field(default=0, ge=0)
+    excluded_current_source_count: int = Field(default=0, ge=0)
+    status: str = "not_requested"
+    disclaimer: str = HISTORICAL_EVIDENCE_DISCLAIMER
+
+
 class MvpDemoSummary(BaseModel):
     model_config = ConfigDict(use_enum_values=True)
 
@@ -124,6 +142,9 @@ class MvpDemoSummary(BaseModel):
     notable_effects: list[NotableEffectGroup] = Field(default_factory=list)
     evidence_references: list[EvidenceReference] = Field(default_factory=list)
     next_debug_checks: list[NextDebugCheck] = Field(default_factory=list)
+    historical_memory: HistoricalMemoryDisclosure = Field(
+        default_factory=HistoricalMemoryDisclosure
+    )
     warnings: list[str] = Field(default_factory=list)
     disclaimer: str = MVP_DEMO_DISCLAIMER
     parser_notes: list[str] = Field(default_factory=list)

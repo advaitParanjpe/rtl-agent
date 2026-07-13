@@ -58,6 +58,14 @@ from rtl_agent.failure_report import (
     write_failure_markdown,
     write_failure_report,
 )
+from rtl_agent.hkg.lifecycle import (
+    HkgConflictError,
+    HkgLifecycleError,
+    build_hkg_store,
+    inspect_hkg_store,
+    update_hkg_store,
+)
+from rtl_agent.hkg.lifecycle_models import DEFAULT_HKG_ROOT
 from rtl_agent.implementation import (
     ImplementationError,
     run_bounded_implementation,
@@ -831,6 +839,105 @@ def inspect_run_command(
         raise typer.Exit(1)
 
 
+@app.command("hkg-build")
+def hkg_build_command(
+    failure_run: Annotated[
+        list[Path] | None,
+        typer.Option("--failure-run", help="Validated failure run directory (repeatable)."),
+    ] = None,
+    failure_package: Annotated[
+        list[Path] | None,
+        typer.Option("--failure-package", help="Portable failure package (repeatable)."),
+    ] = None,
+    mvp_demo: Annotated[
+        list[Path] | None,
+        typer.Option("--mvp-demo", help="Completed MVP demo directory (repeatable)."),
+    ] = None,
+    output: Annotated[
+        Path, typer.Option("--output", help="Persistent HKG store directory.")
+    ] = DEFAULT_HKG_ROOT,
+    overwrite: Annotated[
+        bool, typer.Option("--overwrite/--no-overwrite", help="Replace an existing store.")
+    ] = False,
+) -> None:
+    """Build a deterministic persistent HKG from validated evidence sources."""
+    try:
+        summary = build_hkg_store(
+            failure_runs=failure_run or [],
+            failure_packages=failure_package or [],
+            mvp_demos=mvp_demo or [],
+            output=output,
+            overwrite=overwrite,
+        )
+    except HkgConflictError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    except HkgLifecycleError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    _print_json(summary.model_dump(mode="json"))
+
+
+@app.command("hkg-update")
+def hkg_update_command(
+    failure_run: Annotated[
+        list[Path] | None,
+        typer.Option("--failure-run", help="Validated failure run directory (repeatable)."),
+    ] = None,
+    failure_package: Annotated[
+        list[Path] | None,
+        typer.Option("--failure-package", help="Portable failure package (repeatable)."),
+    ] = None,
+    mvp_demo: Annotated[
+        list[Path] | None,
+        typer.Option("--mvp-demo", help="Completed MVP demo directory (repeatable)."),
+    ] = None,
+    store: Annotated[
+        Path, typer.Option("--store", help="Persistent HKG store directory.")
+    ] = DEFAULT_HKG_ROOT,
+) -> None:
+    """Idempotently add validated evidence to an existing persistent HKG."""
+    try:
+        summary = update_hkg_store(
+            store=store,
+            failure_runs=failure_run or [],
+            failure_packages=failure_package or [],
+            mvp_demos=mvp_demo or [],
+        )
+    except HkgConflictError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    except HkgLifecycleError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    _print_json(summary.model_dump(mode="json"))
+
+
+@app.command("hkg-inspect")
+def hkg_inspect_command(
+    store: Annotated[
+        Path, typer.Option("--store", help="Persistent HKG store directory or hkg.json path.")
+    ] = DEFAULT_HKG_ROOT,
+    json_output: Annotated[
+        bool, typer.Option("--json", help="Emit the complete machine-readable inspection JSON.")
+    ] = False,
+) -> None:
+    """Validate and summarize a persistent HKG store without changing it."""
+    inspection = inspect_hkg_store(store)
+    if json_output:
+        _print_json(inspection.model_dump(mode="json"))
+    else:
+        typer.echo(
+            f"HKG {inspection.status}: sources={inspection.source_count} "
+            f"nodes={inspection.node_count} edges={inspection.edge_count} "
+            f"sha256={inspection.graph_sha256 or '-'}"
+        )
+        for warning in inspection.warnings:
+            typer.echo(f"warning: {warning}", err=True)
+    if not inspection.valid:
+        raise typer.Exit(1)
+
+
 @app.command("fingerprint-run")
 def fingerprint_run_command(
     run_dir: Annotated[
@@ -1068,6 +1175,10 @@ def run_mvp_demo_command(
         str | None,
         typer.Option("--baseline-commit", help="Commit/ref for the worktrees (default HEAD)."),
     ] = None,
+    hkg_store: Annotated[
+        Path | None,
+        typer.Option("--hkg-store", help="Optional verified persistent HKG for history lookup."),
+    ] = None,
 ) -> None:
     """Run the full evidence-guided counterfactual demonstration (composition only)."""
     try:
@@ -1083,6 +1194,7 @@ def run_mvp_demo_command(
             max_experiments=max_experiments,
             timeout=timeout,
             baseline_commit=baseline_commit,
+            hkg_store=hkg_store,
         )
     except MvpDemoError as exc:
         typer.echo(f"error: {exc}", err=True)

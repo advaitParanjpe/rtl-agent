@@ -81,7 +81,15 @@ def build_evidence_references(
         EvidenceReference(name="reduction_report", path=minimization.reduction_report)
     )
     for stage in stages:
-        if stage.stage in {"generate-interventions", "run-experiment-matrix"} and stage.reference:
+        if (
+            stage.stage
+            in {
+                "generate-interventions",
+                "run-experiment-matrix",
+                "historical-memory",
+            }
+            and stage.reference
+        ):
             references.append(EvidenceReference(name=stage.stage, path=stage.reference))
     for outcome in outcomes:
         if outcome.artifact_dir:
@@ -278,6 +286,24 @@ def render_debug_summary(summary: MvpDemoSummary) -> str:
         lines.append("")
     else:
         lines += ["_No experiments to compare._", ""]
+
+    history = summary.historical_memory
+    lines += ["## Historical evidence", ""]
+    if history.requested:
+        lines += [
+            f"- Status: `{history.status}`",
+            f"- Verified graph loaded: {history.graph_loaded}",
+            f"- Graph SHA-256: `{history.graph_sha256 or '-'}`",
+            f"- Historical canonical-fingerprint match: {history.historical_match}",
+            f"- Prior evidence supplied: failures={history.prior_failure_count}, "
+            f"interventions={history.prior_intervention_count}, "
+            f"effects={history.prior_effect_count}",
+            f"- Current source exclusions: {history.excluded_current_source_count}",
+            f"- Disclaimer: {history.disclaimer}",
+            "",
+        ]
+    else:
+        lines += ["_Historical HKG memory was not requested._", ""]
 
     lines += ["## Repair-direction suggestions", ""]
     if summary.repair_suggestions:

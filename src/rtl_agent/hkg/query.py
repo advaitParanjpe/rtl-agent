@@ -67,15 +67,20 @@ class HkgQuery:
     def find_signals(self, *, module: str | None = None, name: str | None = None) -> list[HkgNode]:
         signals: list[HkgNode]
         if module is not None:
-            module_node = self.get_node(f"{NodeType.MODULE}:{module}")
-            if module_node is None:
-                return []
-            signals = [
-                self._nodes[edge.target]
-                for edge in self.outgoing_edges(module_node.node_id, EdgeType.CONTAINS)
-                if edge.target in self._nodes
-                and str(self._nodes[edge.target].type) == str(NodeType.SIGNAL)
+            module_nodes = [
+                node
+                for node in self.list_nodes_by_type(NodeType.MODULE)
+                if node.label == module or node.node_id == module
             ]
+            if not module_nodes:
+                return []
+            by_id: dict[str, HkgNode] = {}
+            for module_node in module_nodes:
+                for edge in self.outgoing_edges(module_node.node_id, EdgeType.CONTAINS):
+                    target = self._nodes.get(edge.target)
+                    if target is not None and str(target.type) == str(NodeType.SIGNAL):
+                        by_id[target.node_id] = target
+            signals = list(by_id.values())
         else:
             signals = self.list_nodes_by_type(NodeType.SIGNAL)
 
@@ -84,7 +89,7 @@ class HkgQuery:
                 signal
                 for signal in signals
                 if signal.label == name
-                or signal.node_id == f"{NodeType.SIGNAL}:{name}"
+                or signal.node_id == name
                 or signal.attributes.get("full_name") == name
                 or (signal.attributes.get("full_name") or "").endswith(f".{name}")
             ]
@@ -104,9 +109,14 @@ class HkgQuery:
         return sorted(failures, key=lambda n: n.node_id)
 
     def find_cluster_members(self, cluster_id: str) -> list[HkgNode]:
-        node_id = _node_id(NodeType.FAILURE_CLUSTER, cluster_id)
-        if node_id not in self._nodes:
+        clusters = [
+            node
+            for node in self.list_nodes_by_type(NodeType.FAILURE_CLUSTER)
+            if node.node_id == cluster_id or node.label == cluster_id
+        ]
+        if not clusters:
             return []
+        node_id = clusters[0].node_id
         members = [
             self._nodes[edge.source]
             for edge in self.incoming_edges(node_id, EdgeType.BELONGS_TO_CLUSTER)
@@ -116,30 +126,44 @@ class HkgQuery:
         return sorted(members, key=lambda n: n.node_id)
 
     def find_interventions_for_failure(self, failure_id: str) -> list[HkgNode]:
-        node_id = _node_id(NodeType.FAILURE, failure_id)
-        if node_id not in self._nodes:
-            return []
-        interventions = [
-            self._nodes[edge.target]
-            for edge in self.outgoing_edges(node_id, EdgeType.GENERATED)
-            if edge.target in self._nodes
-            and str(self._nodes[edge.target].type) == str(NodeType.INTERVENTION)
+        failures = [
+            node
+            for node in self.list_nodes_by_type(NodeType.FAILURE)
+            if node.node_id == failure_id or node.label == failure_id
         ]
-        return sorted(interventions, key=lambda n: n.node_id)
+        if not failures:
+            return []
+        by_id: dict[str, HkgNode] = {}
+        for failure in failures:
+            for edge in self.outgoing_edges(failure.node_id, EdgeType.GENERATED):
+                intervention = self._nodes.get(edge.target)
+                if intervention is not None and str(intervention.type) == str(
+                    NodeType.INTERVENTION
+                ):
+                    by_id[intervention.node_id] = intervention
+        return [by_id[node_id] for node_id in sorted(by_id)]
 
     def find_experiments_for_intervention(
         self, intervention_id: str
     ) -> list[ExperimentOutcomeResult]:
-        node_id = _node_id(NodeType.INTERVENTION, intervention_id)
-        if node_id not in self._nodes:
-            return []
-        experiments = [
-            self._nodes[edge.source]
-            for edge in self.incoming_edges(node_id, EdgeType.REFERENCES)
-            if edge.source in self._nodes
-            and str(self._nodes[edge.source].type) == str(NodeType.EXPERIMENT)
-            and edge.attributes.get("role") == "tested"
+        intervention_nodes = [
+            node
+            for node in self.list_nodes_by_type(NodeType.INTERVENTION)
+            if node.node_id == intervention_id or node.label == intervention_id
         ]
+        if not intervention_nodes:
+            return []
+        experiments_by_id: dict[str, HkgNode] = {}
+        for intervention in intervention_nodes:
+            for edge in self.incoming_edges(intervention.node_id, EdgeType.REFERENCES):
+                experiment = self._nodes.get(edge.source)
+                if (
+                    experiment is not None
+                    and str(experiment.type) == str(NodeType.EXPERIMENT)
+                    and edge.attributes.get("role") == "tested"
+                ):
+                    experiments_by_id[experiment.node_id] = experiment
+        experiments = list(experiments_by_id.values())
         results: list[ExperimentOutcomeResult] = []
         for experiment in sorted(experiments, key=lambda n: n.node_id):
             outcomes = tuple(
@@ -186,10 +210,3 @@ def _filter_edges(edges: list[HkgEdge], edge_type: EdgeType | str | None) -> lis
         return list(edges)
     wanted = str(edge_type)
     return [edge for edge in edges if str(edge.type) == wanted]
-
-
-def _node_id(node_type: NodeType, key_or_id: str) -> str:
-    prefix = f"{node_type}:"
-    if key_or_id.startswith(prefix):
-        return key_or_id
-    return f"{prefix}{key_or_id}"

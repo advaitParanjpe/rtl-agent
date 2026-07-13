@@ -483,7 +483,34 @@ rtl-agent run-mvp-demo \
 
 It writes `mvp-demo-summary.json` and `mvp-demo-summary.md` (plus the per-stage `failure-package/`, `minimization/`, `generated/`, and `matrix/` directories) into the output directory. The summary is organized into four separated sections — original failure, generated intervention candidates, experiment outcomes, and evidence-backed observations. Every observation is an observed counterfactual effect of a bounded, reviewable experiment (an edit removed / materially changed / time-shifted / had no observable effect on the failure); it is not proof of a root cause or a fix, and no intervention is ever applied to the repository. `scripts/mvp_demo_check.py` is a gated Icarus-backed demonstration that skips cleanly when the simulator is absent.
 
-The Hardware Knowledge Graph v0 is a deterministic construction layer over existing structured, versioned evidence artifacts. It is a Python API, not a CLI: callers load validated failure-intelligence runs and optional typed counterfactual / clustering / ranking reports, call `build_hkg(...)`, and persist the versioned graph artifact with `write_graph(...)`.
+An MVP run may optionally read verified historical evidence from a persistent HKG with `--hkg-store .rtl-agent/hkg`. The current run is excluded from its own lookup. The JSON and Markdown summaries disclose whether the graph loaded, its SHA-256, whether a prior canonical-fingerprint match existed, and how many prior failures/interventions/effects were supplied. An explicitly supplied missing, corrupt, or incompatible store fails clearly; omitting the option preserves the existing no-memory workflow. Historical matches are observational and never prove shared cause or a repair.
+
+The persistent Hardware Knowledge Graph lifecycle stores validated, source-scoped evidence in `.rtl-agent/hkg/hkg.json`, with `.rtl-agent/hkg/hkg-manifest.json` as its integrity/commit record. It accepts original failure-intelligence runs, relocated portable failure packages, and completed MVP demo directories. Build is explicit:
+
+```bash
+rtl-agent hkg-build \
+  --failure-package .rtl-agent/packages/failure-001 \
+  --mvp-demo .rtl-agent/demos/demo-001 \
+  --output .rtl-agent/hkg
+```
+
+Updates are also explicit and idempotent:
+
+```bash
+rtl-agent hkg-update \
+  --store .rtl-agent/hkg \
+  --failure-run .rtl-agent/runs/failure-002
+```
+
+Inspect graph/manifest integrity without changing the store:
+
+```bash
+rtl-agent hkg-inspect --store .rtl-agent/hkg --json
+```
+
+Both files are canonical deterministic JSON. The manifest records the exact-byte SHA-256 of `hkg.json` plus sorted source/artifact indexes. Source provenance is relative to each validated source and remains stable when a package or demo is relocated. Re-ingesting identical content is a no-op; changed content under an existing source identity, unsafe paths, missing files, hash mismatches, incompatible node/edge collisions, and legacy schema-1 persistent graphs are rejected without replacing the prior valid store. Legacy graphs must be rebuilt. Lifecycle commands are the only HKG writers—failure analysis, package export, evidence export, and MVP completion never mutate it implicitly. Deletion/replacement and concurrent writers are not supported in v1.
+
+The lower-level Hardware Knowledge Graph construction API remains available for typed in-process use:
 
 ```python
 from pathlib import Path
@@ -495,7 +522,7 @@ graph = build_hkg([bundle], graph_id="debug-session-001")
 write_graph(graph, Path(".rtl-agent/hkg/debug-session-001.json"))
 ```
 
-The v0 graph has typed nodes for `module`, `signal`, `source_location`, `failure`, `canonical_fingerprint`, `failure_cluster`, `intervention`, `experiment`, and `observed_effect`, and typed edges for `contains`, `drives`, `depends_on`, `originated_from`, `belongs_to_cluster`, `generated`, `produced`, and `references`. Every node and edge carries provenance back to its originating structured artifact (`artifact_id`, schema version, content SHA-256/path where available). Construction and JSON serialization are deterministic: stable ids, sorted attributes/provenance, and sorted node/edge lists.
+The schema-2 graph has typed nodes for `module`, `signal`, `source_location`, `failure`, `canonical_fingerprint`, `failure_cluster`, `intervention`, `experiment`, and `observed_effect`, and typed edges for `contains`, `drives`, `depends_on`, `originated_from`, `belongs_to_cluster`, `generated`, `produced`, and `references`. Every persistent node and edge carries a source ID, actual artifact ID, source-relative path, producer schema version, and true artifact-byte SHA-256. Occurrence identities are source-scoped; canonical fingerprints remain shared semantic identities. Repair suggestions remain derived outputs and are never persisted as graph nodes.
 
 The HKG query API is a small read-only Python layer over an already constructed or serialized graph:
 

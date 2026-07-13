@@ -12,6 +12,9 @@ from rtl_agent.failure_fingerprint import fingerprint_run
 from rtl_agent.failure_intelligence_run_models import FailureIntelligenceRunManifest
 from rtl_agent.failure_package import export_failure_package
 from rtl_agent.failure_report_models import FailureReport
+from rtl_agent.hkg.identity import failure_source_id
+from rtl_agent.hkg.lifecycle import HkgLifecycleError, load_hkg_store
+from rtl_agent.hkg.memory import HistoricalMemoryResult, lookup_historical_failure
 from rtl_agent.intervention_ranking import rank_interventions
 from rtl_agent.intervention_ranking_models import InterventionRanking
 from rtl_agent.intervention_template_models import InterventionTemplateReport
@@ -26,6 +29,7 @@ from rtl_agent.mvp_demo.synthesis import (
 from rtl_agent.mvp_demo_models import (
     CandidateSummary,
     ExperimentOutcome,
+    HistoricalMemoryDisclosure,
     MinimizationSummary,
     MvpDemoSummary,
     Observation,
@@ -63,6 +67,7 @@ def run_mvp_demo(
     max_experiments: int = 12,
     timeout: int | None = None,
     baseline_commit: str | None = None,
+    hkg_store: Path | None = None,
 ) -> MvpDemoSummary:
     """Run the full failing-regression-to-summary demonstration (composition only)."""
 
@@ -92,6 +97,53 @@ def run_mvp_demo(
     )
 
     original = _original_failure(failure_run.resolve())
+    historical_memory: HistoricalMemoryResult | None = None
+    historical_disclosure = HistoricalMemoryDisclosure(requested=hkg_store is not None)
+    if hkg_store is not None:
+        try:
+            historical_graph, historical_manifest = load_hkg_store(hkg_store)
+        except HkgLifecycleError as exc:
+            raise MvpDemoError(f"supplied HKG store is invalid: {exc}") from exc
+        current_manifest = _read(
+            failure_run.resolve() / "run-manifest.json", FailureIntelligenceRunManifest
+        )
+        current_source = failure_source_id(current_manifest.run_id)
+        current_fingerprint = fingerprint_run(failure_run.resolve())
+        historical_memory = lookup_historical_failure(
+            historical_graph,
+            current_fingerprint,
+            exclude_source_ids={current_source},
+        )
+        historical_disclosure = HistoricalMemoryDisclosure(
+            requested=True,
+            graph_loaded=True,
+            graph_sha256=historical_manifest.graph_sha256,
+            historical_match=historical_memory.seen_before,
+            prior_failure_count=len(historical_memory.prior_member_failures),
+            prior_intervention_count=len(historical_memory.prior_interventions),
+            prior_effect_count=len(historical_memory.prior_observed_effects),
+            excluded_current_source_count=(
+                1
+                if any(
+                    node.attributes.get("source_id") == current_source
+                    for node in historical_graph.nodes
+                    if str(node.type) == "failure"
+                )
+                else 0
+            ),
+            status="used" if historical_memory.seen_before else "no_match",
+        )
+        stages.append(
+            StageRef(
+                stage="historical-memory",
+                status=historical_disclosure.status,
+                reference=str(hkg_store.resolve()),
+                detail=(
+                    f"{historical_disclosure.prior_failure_count} prior failure(s), "
+                    f"{historical_disclosure.prior_intervention_count} prior intervention(s)"
+                ),
+            )
+        )
 
     # Stage 3: export a portable failure package.
     package_dir = output_dir / "failure-package"
@@ -177,6 +229,7 @@ def run_mvp_demo(
             experiment_outcomes=outcomes,
             experiment_comparisons=comparisons,
             intervention_rankings=rankings,
+            hkg_memory=historical_memory,
         )
         stages.append(
             StageRef(
@@ -213,10 +266,13 @@ def run_mvp_demo(
         repair_suggestions=repair_suggestions,
         outcome_counts=_outcome_counts(matrix),
         observed_effect_counts=_observed_effect_counts(outcomes),
-        observations=_observations(original, minimization, candidates, outcomes),
+        observations=_observations(
+            original, minimization, candidates, outcomes, historical_disclosure
+        ),
         notable_effects=build_notable_effects(outcomes),
         evidence_references=build_evidence_references(stages, original, minimization, outcomes),
         next_debug_checks=build_next_debug_checks(minimization, outcomes, candidates),
+        historical_memory=historical_disclosure,
         warnings=sorted(dict.fromkeys(warnings)),
         parser_notes=_PARSER_NOTES,
     )
@@ -346,6 +402,7 @@ def _observations(
     minimization: MinimizationSummary,
     candidates: list[CandidateSummary],
     outcomes: list[ExperimentOutcome],
+    historical: HistoricalMemoryDisclosure,
 ) -> list[Observation]:
     observations: list[Observation] = []
     family = (original.family_digest or "")[:12]
@@ -390,6 +447,19 @@ def _observations(
             Observation(
                 category="experiment_result",
                 statement="No generated experiment produced a measurable change in the failure.",
+            )
+        )
+    if historical.requested:
+        observations.append(
+            Observation(
+                category="historical_memory",
+                statement=(
+                    f"Verified HKG historical evidence status `{historical.status}`: "
+                    f"{historical.prior_failure_count} prior failure(s), "
+                    f"{historical.prior_intervention_count} prior intervention(s), and "
+                    f"{historical.prior_effect_count} observed effect label(s). "
+                    f"{historical.disclaimer}"
+                ),
             )
         )
     return observations

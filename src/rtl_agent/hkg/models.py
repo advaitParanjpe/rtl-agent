@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-HKG_SCHEMA_VERSION = 1
+HKG_SCHEMA_VERSION = 2
 
 HKG_DISCLAIMER = (
     "The Hardware Knowledge Graph is a deterministic construction over existing structured "
@@ -42,10 +42,35 @@ class Provenance(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
+    source_id: str = ""
     artifact_id: str
     schema_version: int | None = None
     content_sha256: str | None = None
     path: str | None = None
+
+
+class HkgSourceType(StrEnum):
+    FAILURE = "failure"
+    MVP_DEMO = "mvp_demo"
+
+
+class HkgSourceArtifact(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    artifact_id: str
+    relative_path: str
+    schema_version: int | None = None
+    sha256: str
+
+
+class HkgSourceRecord(BaseModel):
+    model_config = ConfigDict(frozen=True, use_enum_values=True)
+
+    source_id: str
+    source_type: HkgSourceType
+    logical_id: str
+    content_sha256: str
+    artifacts: tuple[HkgSourceArtifact, ...] = ()
 
 
 class HkgNode(BaseModel):
@@ -76,8 +101,15 @@ class HkgGraph(BaseModel):
     edge_count: int = Field(ge=0)
     node_type_counts: dict[str, int] = Field(default_factory=dict)
     edge_type_counts: dict[str, int] = Field(default_factory=dict)
+    sources: list[HkgSourceRecord] = Field(default_factory=list)
     nodes: list[HkgNode] = Field(default_factory=list)
     edges: list[HkgEdge] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     disclaimer: str = HKG_DISCLAIMER
+    build_metadata: dict[str, str] = Field(
+        default_factory=lambda: {
+            "lifecycle": "persistent_hkg_v1",
+            "producer": "rtl-agent",
+        }
+    )
     parser_notes: list[str] = Field(default_factory=list)

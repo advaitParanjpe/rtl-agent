@@ -9,7 +9,9 @@ import pytest
 
 from rtl_agent.artifacts import RunStore
 from rtl_agent.failure_intelligence_run import run_failure_intelligence
+from rtl_agent.hkg.lifecycle import build_hkg_store
 from rtl_agent.mvp_demo import MvpDemoError, run_mvp_demo
+from rtl_agent.mvp_demo_models import MvpDemoSummary
 
 CORE_SV = """module core (
     input  logic       clk,
@@ -126,7 +128,13 @@ def fixture(tmp_path: Path) -> _Fixture:
     return _Fixture(store.run_dir, repo, config_path, stimulus)
 
 
-def _run(fixture: _Fixture, tmp_path: Path, name: str = "demo"):  # type: ignore[no-untyped-def]
+def _run(
+    fixture: _Fixture,
+    tmp_path: Path,
+    name: str = "demo",
+    *,
+    hkg_store: Path | None = None,
+) -> MvpDemoSummary:
     return run_mvp_demo(
         failure_run=fixture.run_dir,
         repo=fixture.repo,
@@ -137,6 +145,7 @@ def _run(fixture: _Fixture, tmp_path: Path, name: str = "demo"):  # type: ignore
         output=tmp_path / name,
         max_candidates=8,
         max_experiments=12,
+        hkg_store=hkg_store,
     )
 
 
@@ -169,6 +178,8 @@ def test_full_workflow_composes(fixture: _Fixture, tmp_path: Path) -> None:
     assert summary.original_failure.run_valid
     assert summary.original_failure.family_digest
     assert summary.original_failure.failure_package_files >= 1
+    assert summary.historical_memory.requested is False
+    assert summary.historical_memory.status == "not_requested"
 
     # Minimization actually reduced the stimulus.
     assert summary.minimization.minimized_item_count < summary.minimization.original_item_count
@@ -222,6 +233,7 @@ def test_outputs_written(fixture: _Fixture, tmp_path: Path) -> None:
         "## Outcome classification",
         "## Notable observed effects",
         "## Result comparisons",
+        "## Historical evidence",
         "## Evidence references",
         "## Next debug checks",
         "## Disclaimer",
@@ -317,6 +329,59 @@ def test_invalid_failure_run_rejected(fixture: _Fixture, tmp_path: Path) -> None
         _run(fixture, tmp_path, "demo2")
 
 
+def test_historical_memory_is_used_and_disclosed(fixture: _Fixture, tmp_path: Path) -> None:
+    prior = _equivalent_failure_run(fixture, tmp_path, "prior")
+    hkg_store = tmp_path / "hkg"
+    build_hkg_store(failure_runs=[prior], output=hkg_store)
+
+    summary = _run(fixture, tmp_path, "history-demo", hkg_store=hkg_store)
+
+    history = summary.historical_memory
+    assert history.requested is True
+    assert history.graph_loaded is True
+    assert history.graph_sha256
+    assert history.status == "used"
+    assert history.historical_match is True
+    assert history.prior_failure_count == 1
+    assert history.excluded_current_source_count == 0
+    assert any(observation.category == "historical_memory" for observation in summary.observations)
+    assert any(
+        "HKG memory found shared canonical fingerprint evidence" in basis
+        for suggestion in summary.repair_suggestions
+        for basis in suggestion.evidence_basis
+    )
+    persisted = json.loads(
+        (tmp_path / "history-demo/mvp-demo-summary.json").read_text(encoding="utf-8")
+    )
+    assert persisted["historical_memory"]["status"] == "used"
+    markdown = (tmp_path / "history-demo/mvp-demo-summary.md").read_text(encoding="utf-8")
+    assert "## Historical evidence" in markdown
+    assert "Historical canonical-fingerprint match: True" in markdown
+    assert "not proof of a shared root cause" in markdown
+
+
+def test_current_failure_source_is_excluded_from_history(fixture: _Fixture, tmp_path: Path) -> None:
+    hkg_store = tmp_path / "hkg"
+    build_hkg_store(failure_runs=[fixture.run_dir], output=hkg_store)
+
+    summary = _run(fixture, tmp_path, "self-excluded-demo", hkg_store=hkg_store)
+
+    assert summary.historical_memory.status == "no_match"
+    assert summary.historical_memory.historical_match is False
+    assert summary.historical_memory.prior_failure_count == 0
+    assert summary.historical_memory.excluded_current_source_count == 1
+
+
+def test_corrupt_explicit_hkg_fails_clearly(fixture: _Fixture, tmp_path: Path) -> None:
+    hkg_store = tmp_path / "hkg"
+    build_hkg_store(failure_runs=[fixture.run_dir], output=hkg_store)
+    graph_path = hkg_store / "hkg.json"
+    graph_path.write_text(graph_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+    with pytest.raises(MvpDemoError, match="supplied HKG store is invalid.*hash mismatch"):
+        _run(fixture, tmp_path, "corrupt-history-demo", hkg_store=hkg_store)
+
+
 def test_cli_run_mvp_demo(fixture: _Fixture, tmp_path: Path) -> None:
     from typer.testing import CliRunner
 
@@ -388,3 +453,19 @@ def test_cli_invalid_failure_run_exits_2(fixture: _Fixture, tmp_path: Path) -> N
     )
     assert result.exit_code == 2
     assert "error:" in result.output
+
+
+def _equivalent_failure_run(fixture: _Fixture, tmp_path: Path, run_id: str) -> Path:
+    manifest = json.loads((fixture.run_dir / "run-manifest.json").read_text(encoding="utf-8"))
+    store = RunStore(tmp_path / f"{run_id}-runs", run_id=run_id)
+    store.create()
+    run_failure_intelligence(
+        store,
+        failing_vcd=Path(manifest["failing_vcd"]),
+        passing_vcd=Path(manifest["passing_vcd"]),
+        repository_root=fixture.repo / "rtl",
+        failure_time=int(manifest["failure_time"]),
+        before=int(manifest["before"]),
+        after=int(manifest["after"]),
+    )
+    return store.run_dir

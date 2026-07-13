@@ -60,6 +60,8 @@ class HistoricalMemoryResult:
 def lookup_historical_failure(
     graph_or_query: HkgGraph | HkgQuery,
     fingerprint_or_canonical: FailureFingerprintReport | str,
+    *,
+    exclude_source_ids: set[str] | None = None,
 ) -> HistoricalMemoryResult:
     """Look up prior HKG evidence for one canonical failure fingerprint."""
 
@@ -68,12 +70,23 @@ def lookup_historical_failure(
     if not canonical_digest:
         return HistoricalMemoryResult(canonical_digest="", seen_before=False)
 
-    direct_failures = query.find_failures_by_canonical_fingerprint(canonical_digest)
+    excluded = exclude_source_ids or set()
+    direct_failures = [
+        failure
+        for failure in query.find_failures_by_canonical_fingerprint(canonical_digest)
+        if failure.attributes.get("source_id") not in excluded
+    ]
     if not direct_failures:
         return HistoricalMemoryResult(canonical_digest=canonical_digest, seen_before=False)
 
     cluster_ids = _cluster_ids(query, direct_failures)
-    member_failures = _member_failures(query, direct_failures, cluster_ids)
+    member_failures = [
+        failure
+        for failure in _member_failures(query, direct_failures, cluster_ids)
+        if failure.attributes.get("source_id") not in excluded
+    ]
+    if not member_failures:
+        return HistoricalMemoryResult(canonical_digest=canonical_digest, seen_before=False)
     interventions = _prior_interventions(query, member_failures)
     experiments = _prior_experiments(query, interventions)
     observed_effects = tuple(
@@ -124,22 +137,39 @@ def _prior_interventions(
 ) -> list[PriorInterventionSummary]:
     summaries: list[PriorInterventionSummary] = []
     for failure in failures:
-        for intervention in query.find_interventions_for_failure(failure.label):
+        generated = query.outgoing_edges(failure.node_id, EdgeType.GENERATED)
+        for edge in generated:
+            intervention = query.get_node(edge.target)
+            if intervention is None or str(intervention.type) != str(NodeType.INTERVENTION):
+                continue
             attrs = intervention.attributes
+            ranking_edges = [
+                ranking
+                for ranking in query.outgoing_edges(intervention.node_id, EdgeType.REFERENCES)
+                if ranking.attributes.get("role") == "ranking"
+            ]
+            ranking_attrs = ranking_edges[0].attributes if ranking_edges else {}
             summaries.append(
                 PriorInterventionSummary(
                     intervention_id=intervention.label,
                     failure_id=failure.label,
                     template_kind=_empty_to_none(attrs.get("template_kind")),
                     confidence=_empty_to_none(attrs.get("confidence")),
-                    ranking_rank=_int_or_none(attrs.get("ranking_rank")),
-                    ranking_score=_int_or_none(attrs.get("ranking_score")),
-                    ranking_ranked=_bool_or_none(attrs.get("ranking_ranked")),
-                    ranking_observed_effect=_empty_to_none(attrs.get("ranking_observed_effect")),
-                    ranking_result_cluster_id=_empty_to_none(
-                        attrs.get("ranking_result_cluster_id")
+                    ranking_rank=_int_or_none(ranking_attrs.get("ranking_rank")),
+                    ranking_score=_int_or_none(ranking_attrs.get("ranking_score")),
+                    ranking_ranked=_bool_or_none(ranking_attrs.get("ranking_ranked")),
+                    ranking_observed_effect=_empty_to_none(
+                        ranking_attrs.get("ranking_observed_effect")
                     ),
-                    provenance=tuple(intervention.provenance),
+                    ranking_result_cluster_id=_empty_to_none(
+                        ranking_attrs.get("ranking_result_cluster_id")
+                    ),
+                    provenance=tuple(
+                        _dedupe_provenance(
+                            [*intervention.provenance, *edge.provenance]
+                            + [item for ranking in ranking_edges for item in ranking.provenance]
+                        )
+                    ),
                 )
             )
     return sorted(summaries, key=lambda item: (item.failure_id, item.intervention_id))
@@ -177,7 +207,16 @@ def _result_provenance(
     for failure in direct_failures:
         provenance.extend(query.get_provenance(failure.node_id))
     for cluster_id in cluster_ids:
-        provenance.extend(query.get_provenance(f"{NodeType.FAILURE_CLUSTER}:{cluster_id}"))
+        cluster = next(
+            (
+                node
+                for node in query.list_nodes_by_type(NodeType.FAILURE_CLUSTER)
+                if node.label == cluster_id or node.node_id == cluster_id
+            ),
+            None,
+        )
+        if cluster is not None:
+            provenance.extend(query.get_provenance(cluster.node_id))
     for intervention in interventions:
         provenance.extend(intervention.provenance)
     for experiment in experiments:
@@ -186,12 +225,15 @@ def _result_provenance(
 
 
 def _dedupe_provenance(provenance: list[Provenance]) -> tuple[Provenance, ...]:
-    unique = {(p.artifact_id, p.path, p.content_sha256, p.schema_version): p for p in provenance}
+    unique = {
+        (p.source_id, p.artifact_id, p.path, p.content_sha256, p.schema_version): p
+        for p in provenance
+    }
     return tuple(
         unique[key]
         for key in sorted(
             unique,
-            key=lambda p: (p[0], p[1] or "", p[2] or "", p[3] or 0),
+            key=lambda p: (p[0], p[1], p[2] or "", p[3] or "", p[4] or 0),
         )
     )
 

@@ -7,9 +7,9 @@ intervention report, and a failure-clustering report) into a typed graph of
 nodes and edges. Every node and edge retains provenance back to the artifact it
 was built from (artifact id, schema version, content hash/path). Construction and
 serialization are deterministic: nodes and edges are keyed by stable ids,
-attributes are set first-writer-wins in a fixed ingestion order, provenance is
-de-duplicated and sorted, and the final lists are sorted by id. No querying, no
-inference, no graph algorithms beyond construction.
+attributes must agree when identities collide, provenance is de-duplicated and
+sorted, and the final lists are sorted by id. No querying, no inference, no
+graph algorithms beyond construction.
 """
 
 from __future__ import annotations
@@ -28,12 +28,19 @@ from rtl_agent.failure_fingerprint import fingerprint_run
 from rtl_agent.failure_fingerprint_models import FailureFingerprintReport
 from rtl_agent.failure_intelligence_run_models import FailureIntelligenceRunManifest
 from rtl_agent.failure_report_models import FailureReport
+from rtl_agent.hkg.identity import (
+    edge_id,
+    failure_source_id,
+    scoped_node_id,
+    semantic_node_id,
+)
 from rtl_agent.hkg.models import (
     HKG_SCHEMA_VERSION,
     EdgeType,
     HkgEdge,
     HkgGraph,
     HkgNode,
+    HkgSourceRecord,
     NodeType,
     Provenance,
 )
@@ -59,8 +66,11 @@ class FailureBundle:
     """The loaded structured artifacts for one failure to ingest into the graph."""
 
     failure_id: str
+    source_id: str
     manifest: FailureIntelligenceRunManifest
     fingerprint: FailureFingerprintReport
+    source_record: HkgSourceRecord | None = None
+    manifest_prov: Provenance | None = None
     source_map: SignalSourceMapReport | None = None
     driver_trace: RtlDriverTraceReport | None = None
     divergence: FailureDivergenceGraphReport | None = None
@@ -87,13 +97,17 @@ def load_failure_bundle(
 
     resolved = run_dir.resolve()
     manifest = _read(resolved / "run-manifest.json", FailureIntelligenceRunManifest, "run manifest")
-    prov_by_kind = _provenance_by_kind(manifest)
+    source_id = failure_source_id(manifest.run_id)
+    prov_by_kind = _provenance_by_kind(manifest, source_id)
     paths = _artifact_paths(manifest, resolved)
+    manifest_path = resolved / "run-manifest.json"
 
     bundle = FailureBundle(
         failure_id=failure_id,
+        source_id=source_id,
         manifest=manifest,
         fingerprint=fingerprint_run(resolved),
+        manifest_prov=_file_provenance("run-manifest", manifest_path, manifest, source_id),
         source_map=_read_optional(paths.get("signal_source_map_report"), SignalSourceMapReport),
         driver_trace=_read_optional(paths.get("rtl_driver_trace_report"), RtlDriverTraceReport),
         divergence=_read_optional(
@@ -104,13 +118,13 @@ def load_failure_bundle(
     )
     if matrix_path is not None:
         bundle.matrix = _read(matrix_path, ExperimentMatrixReport, "experiment matrix")
-        bundle.matrix_prov = _file_provenance("experiment_matrix", matrix_path, bundle.matrix)
+        bundle.matrix_prov = _file_provenance("experiment-matrix", matrix_path, bundle.matrix, "")
     if interventions_path is not None:
         bundle.interventions = _read(
             interventions_path, InterventionTemplateReport, "intervention templates"
         )
         bundle.interventions_prov = _file_provenance(
-            "intervention_templates", interventions_path, bundle.interventions
+            "intervention-templates", interventions_path, bundle.interventions, ""
         )
     return bundle
 
@@ -121,19 +135,27 @@ def build_hkg(
     graph_id: str,
     cluster_report: FailureClusterReport | None = None,
     cluster_report_prov: Provenance | None = None,
+    sources: list[HkgSourceRecord] | None = None,
 ) -> HkgGraph:
     """Build a deterministic HKG from one or more failure bundles."""
 
     builder = _GraphBuilder()
     warnings: list[str] = []
-    for bundle in sorted(bundles, key=lambda b: b.failure_id):
+    for bundle in sorted(bundles, key=lambda b: (b.source_id, b.failure_id)):
         _ingest_failure(builder, bundle, warnings)
     if cluster_report is not None:
         prov = cluster_report_prov or Provenance(
             artifact_id="failure_clustering", schema_version=cluster_report.schema_version
         )
         _ingest_clusters(builder, cluster_report, prov)
-    return builder.finalize(graph_id=graph_id, warnings=sorted(dict.fromkeys(warnings)))
+    records = (
+        sources if sources is not None else [b.source_record for b in bundles if b.source_record]
+    )
+    return builder.finalize(
+        graph_id=graph_id,
+        warnings=sorted(dict.fromkeys(warnings)),
+        sources=list(records),
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -143,37 +165,38 @@ def build_hkg(
 
 def _ingest_failure(builder: _GraphBuilder, bundle: FailureBundle, warnings: list[str]) -> None:
     manifest = bundle.manifest
-    manifest_prov = Provenance(
-        artifact_id="run_manifest",
+    manifest_prov = bundle.manifest_prov or Provenance(
+        source_id=bundle.source_id,
+        artifact_id="run-manifest",
         schema_version=manifest.schema_version,
         path="run-manifest.json",
     )
-    failure_id = _nid(NodeType.FAILURE, bundle.failure_id)
+    failure_id = scoped_node_id(NodeType.FAILURE, bundle.source_id, manifest.run_id)
     builder.node(
         failure_id,
         NodeType.FAILURE,
         bundle.failure_id,
-        {"run_id": manifest.run_id, "failure_time": str(manifest.failure_time)},
+        {
+            "run_id": manifest.run_id,
+            "source_id": bundle.source_id,
+            "failure_time": str(manifest.failure_time),
+            "family_digest": bundle.fingerprint.family_digest,
+            "exact_digest": bundle.fingerprint.exact_digest,
+        },
         manifest_prov,
     )
 
     fingerprint = bundle.fingerprint
-    fp_prov = Provenance(
-        artifact_id="failure_fingerprint",
-        schema_version=fingerprint.schema_version,
-        content_sha256=fingerprint.exact_digest or None,
-    )
+    fp_prov = manifest_prov
     if fingerprint.canonical_digest:
-        canonical_id = _nid(NodeType.CANONICAL_FINGERPRINT, fingerprint.canonical_digest)
+        canonical_id = semantic_node_id(
+            NodeType.CANONICAL_FINGERPRINT, fingerprint.canonical_digest
+        )
         builder.node(
             canonical_id,
             NodeType.CANONICAL_FINGERPRINT,
             fingerprint.canonical_digest[:16],
-            {
-                "canonical_digest": fingerprint.canonical_digest,
-                "family_digest": fingerprint.family_digest,
-                "exact_digest": fingerprint.exact_digest,
-            },
+            {"canonical_digest": fingerprint.canonical_digest},
             fp_prov,
         )
         builder.edge(
@@ -204,15 +227,24 @@ def _ingest_source_map(builder: _GraphBuilder, bundle: FailureBundle) -> None:
     )
     for mapping in bundle.source_map.mappings:
         signal_id = _signal_node(
-            builder, mapping.leaf, {"mapping_status": str(mapping.status)}, prov
+            builder,
+            bundle,
+            mapping.signal,
+            {"mapping_status": str(mapping.status), "full_name": mapping.signal},
+            prov,
+            label=mapping.leaf,
         )
         primary = next((c for c in mapping.candidates if c.primary), None)
         if primary is None:
             continue
-        location_id = _location_node(builder, primary.file_path, primary.line, prov)
+        location_id = _location_node(builder, bundle, primary.file_path, primary.line, prov)
         builder.edge(EdgeType.ORIGINATED_FROM, signal_id, location_id, {}, prov)
         if primary.declaration_kind == "module":
-            module_id = _nid(NodeType.MODULE, primary.declaration_name)
+            module_id = scoped_node_id(
+                NodeType.MODULE,
+                bundle.source_id,
+                f"{primary.file_path}:{primary.declaration_name}",
+            )
             builder.node(
                 module_id,
                 NodeType.MODULE,
@@ -234,12 +266,14 @@ def _ingest_driver_trace(builder: _GraphBuilder, bundle: FailureBundle) -> None:
     for traced in trace.traced_signals:
         signal_id = _signal_node(
             builder,
-            traced.leaf,
+            bundle,
+            traced.signal,
             {"full_name": traced.signal, "trace_status": str(traced.status)},
             prov,
+            label=traced.leaf,
         )
         for driver in traced.drivers:
-            location_id = _location_node(builder, driver.file_path, driver.line, prov)
+            location_id = _location_node(builder, bundle, driver.file_path, driver.line, prov)
             builder.edge(
                 EdgeType.ORIGINATED_FROM,
                 signal_id,
@@ -248,8 +282,8 @@ def _ingest_driver_trace(builder: _GraphBuilder, bundle: FailureBundle) -> None:
                 prov,
             )
     for edge in trace.dependency_edges:
-        source = _signal_node(builder, edge.source_signal, {}, prov)
-        target = _signal_node(builder, edge.depends_on, {}, prov)
+        source = _signal_node(builder, bundle, _signal_key(bundle, edge.source_signal), {}, prov)
+        target = _signal_node(builder, bundle, _signal_key(bundle, edge.depends_on), {}, prov)
         builder.edge(
             EdgeType.DEPENDS_ON,
             source,
@@ -275,13 +309,17 @@ def _ingest_divergence(builder: _GraphBuilder, bundle: FailureBundle) -> None:
             attributes["divergence_time"] = str(node.divergence.first_divergence_time)
             attributes["failing_value"] = str(node.divergence.failing_value)
             attributes["xz_difference"] = str(node.divergence.xz_difference)
-        signal_id = _signal_node(builder, node.identifier, attributes, prov)
+        signal_id = _signal_node(
+            builder, bundle, _signal_key(bundle, node.identifier), attributes, prov
+        )
         for declaration in node.declarations:
-            location_id = _location_node(builder, declaration.file_path, declaration.line, prov)
+            location_id = _location_node(
+                builder, bundle, declaration.file_path, declaration.line, prov
+            )
             builder.edge(EdgeType.ORIGINATED_FROM, signal_id, location_id, {}, prov)
     for edge in graph.edges:
-        source = _signal_node(builder, edge.source, {}, prov)
-        target = _signal_node(builder, edge.target, {}, prov)
+        source = _signal_node(builder, bundle, _signal_key(bundle, edge.source), {}, prov)
+        target = _signal_node(builder, bundle, _signal_key(bundle, edge.target), {}, prov)
         builder.edge(
             EdgeType.DRIVES,
             source,
@@ -300,7 +338,7 @@ def _ingest_failure_report(builder: _GraphBuilder, bundle: FailureBundle, failur
         Provenance(artifact_id="failure_report", schema_version=report.schema_version),
     )
     for signal in report.earliest_divergence_signals:
-        signal_id = _signal_node(builder, signal, {}, prov)
+        signal_id = _signal_node(builder, bundle, _signal_key(bundle, signal), {}, prov)
         builder.edge(
             EdgeType.REFERENCES, failure_id, signal_id, {"role": "earliest_divergent"}, prov
         )
@@ -312,7 +350,9 @@ def _ingest_interventions(builder: _GraphBuilder, bundle: FailureBundle, failure
         return
     prov = bundle.interventions_prov
     for candidate in report.candidates:
-        intervention_id = _nid(NodeType.INTERVENTION, candidate.candidate_id)
+        intervention_id = scoped_node_id(
+            NodeType.INTERVENTION, prov.source_id, candidate.semantic_digest
+        )
         builder.node(
             intervention_id,
             NodeType.INTERVENTION,
@@ -322,13 +362,19 @@ def _ingest_interventions(builder: _GraphBuilder, bundle: FailureBundle, failure
                 "confidence": str(candidate.confidence),
                 "affected_signal": candidate.affected_signal,
                 "file": candidate.file,
+                "semantic_digest": candidate.semantic_digest,
+                "candidate_id": candidate.candidate_id,
             },
             prov,
         )
         builder.edge(EdgeType.GENERATED, failure_id, intervention_id, {}, prov)
-        location_id = _location_node(builder, candidate.source_file, candidate.source_line, prov)
+        location_id = _location_node(
+            builder, bundle, candidate.source_file, candidate.source_line, prov
+        )
         builder.edge(EdgeType.REFERENCES, intervention_id, location_id, {"role": "edit_site"}, prov)
-        signal_id = _signal_node(builder, candidate.affected_signal, {}, prov)
+        signal_id = _signal_node(
+            builder, bundle, _signal_key(bundle, candidate.affected_signal), {}, prov
+        )
         builder.edge(
             EdgeType.REFERENCES, intervention_id, signal_id, {"role": "affected_signal"}, prov
         )
@@ -340,7 +386,7 @@ def _ingest_matrix(builder: _GraphBuilder, bundle: FailureBundle) -> None:
         return
     prov = bundle.matrix_prov
     for row in matrix.rows:
-        experiment_id = _nid(NodeType.EXPERIMENT, row.intervention_id)
+        experiment_id = scoped_node_id(NodeType.EXPERIMENT, prov.source_id, row.experiment_digest)
         builder.node(
             experiment_id,
             NodeType.EXPERIMENT,
@@ -349,19 +395,25 @@ def _ingest_matrix(builder: _GraphBuilder, bundle: FailureBundle) -> None:
                 "execution_status": row.execution_status,
                 "observed_effect": row.observed_effect,
                 "command_status": str(row.command_status),
+                "experiment_digest": row.experiment_digest,
+                "intervention_digest": row.intervention_digest,
+                "minimized_stimulus_digest": matrix.minimized_stimulus_digest,
+                "artifact_dir": row.artifact_dir or "",
             },
             prov,
         )
-        intervention_id = _nid(NodeType.INTERVENTION, row.intervention_id)
+        intervention_id = _intervention_id(bundle, row.intervention_id, row.intervention_digest)
         if intervention_id in builder.nodes:
             builder.edge(
                 EdgeType.REFERENCES, experiment_id, intervention_id, {"role": "tested"}, prov
             )
-        effect_id = _nid(NodeType.OBSERVED_EFFECT, row.observed_effect)
+        effect_id = semantic_node_id(NodeType.OBSERVED_EFFECT, row.observed_effect)
         builder.node(effect_id, NodeType.OBSERVED_EFFECT, row.observed_effect, {}, prov)
         builder.edge(EdgeType.PRODUCED, experiment_id, effect_id, {}, prov)
         if row.result_canonical_digest:
-            canonical_id = _nid(NodeType.CANONICAL_FINGERPRINT, row.result_canonical_digest)
+            canonical_id = semantic_node_id(
+                NodeType.CANONICAL_FINGERPRINT, row.result_canonical_digest
+            )
             builder.node(
                 canonical_id,
                 NodeType.CANONICAL_FINGERPRINT,
@@ -377,7 +429,7 @@ def _ingest_experiment_comparisons(builder: _GraphBuilder, bundle: FailureBundle
         return
     prov = bundle.experiment_comparisons_prov
     for comparison in sorted(bundle.experiment_comparisons, key=lambda c: c.intervention_id):
-        experiment_id = _nid(NodeType.EXPERIMENT, comparison.intervention_id)
+        experiment_id = _experiment_id(bundle, comparison.intervention_id)
         if experiment_id not in builder.nodes:
             builder.node(
                 experiment_id,
@@ -401,11 +453,13 @@ def _ingest_experiment_comparisons(builder: _GraphBuilder, bundle: FailureBundle
             prov,
         )
         if comparison.observed_effect:
-            effect_id = _nid(NodeType.OBSERVED_EFFECT, comparison.observed_effect)
+            effect_id = semantic_node_id(NodeType.OBSERVED_EFFECT, comparison.observed_effect)
             builder.node(effect_id, NodeType.OBSERVED_EFFECT, comparison.observed_effect, {}, prov)
             builder.edge(EdgeType.PRODUCED, experiment_id, effect_id, {}, prov)
         if comparison.result_canonical_digest:
-            canonical_id = _nid(NodeType.CANONICAL_FINGERPRINT, comparison.result_canonical_digest)
+            canonical_id = semantic_node_id(
+                NodeType.CANONICAL_FINGERPRINT, comparison.result_canonical_digest
+            )
             builder.node(
                 canonical_id,
                 NodeType.CANONICAL_FINGERPRINT,
@@ -421,7 +475,7 @@ def _ingest_intervention_rankings(builder: _GraphBuilder, bundle: FailureBundle)
         return
     prov = bundle.intervention_rankings_prov
     for ranking in sorted(bundle.intervention_rankings, key=lambda r: r.intervention_id):
-        intervention_id = _nid(NodeType.INTERVENTION, ranking.intervention_id)
+        intervention_id = _intervention_id(bundle, ranking.intervention_id)
         if intervention_id not in builder.nodes:
             builder.node(
                 intervention_id,
@@ -430,26 +484,24 @@ def _ingest_intervention_rankings(builder: _GraphBuilder, bundle: FailureBundle)
                 {},
                 prov,
             )
-        builder.node(
-            intervention_id,
-            NodeType.INTERVENTION,
-            ranking.intervention_id,
-            {
-                "ranking_rank": "" if ranking.rank is None else str(ranking.rank),
-                "ranking_score": str(ranking.score),
-                "ranking_ranked": str(ranking.ranked),
-                "ranking_observed_effect": ranking.observed_effect,
-                "ranking_result_cluster_id": ranking.result_cluster_id or "",
-            },
-            prov,
-        )
-        experiment_id = _nid(NodeType.EXPERIMENT, ranking.intervention_id)
+        experiment_id = _experiment_id(bundle, ranking.intervention_id)
         if experiment_id in builder.nodes:
             builder.edge(
-                EdgeType.REFERENCES, intervention_id, experiment_id, {"role": "ranking"}, prov
+                EdgeType.REFERENCES,
+                intervention_id,
+                experiment_id,
+                {
+                    "role": "ranking",
+                    "ranking_rank": "" if ranking.rank is None else str(ranking.rank),
+                    "ranking_score": str(ranking.score),
+                    "ranking_ranked": str(ranking.ranked),
+                    "ranking_observed_effect": ranking.observed_effect,
+                    "ranking_result_cluster_id": ranking.result_cluster_id or "",
+                },
+                prov,
             )
         if ranking.result_cluster_id:
-            cluster_id = _nid(NodeType.FAILURE_CLUSTER, ranking.result_cluster_id)
+            cluster_id = semantic_node_id(NodeType.FAILURE_CLUSTER, ranking.result_cluster_id)
             if cluster_id in builder.nodes:
                 builder.edge(
                     EdgeType.REFERENCES,
@@ -464,7 +516,7 @@ def _ingest_clusters(
     builder: _GraphBuilder, report: FailureClusterReport, prov: Provenance
 ) -> None:
     for cluster in report.clusters:
-        cluster_id = _nid(NodeType.FAILURE_CLUSTER, cluster.cluster_id)
+        cluster_id = semantic_node_id(NodeType.FAILURE_CLUSTER, cluster.cluster_id)
         builder.node(
             cluster_id,
             NodeType.FAILURE_CLUSTER,
@@ -477,11 +529,17 @@ def _ingest_clusters(
             prov,
         )
         for member_id in cluster.members:
-            failure_id = _nid(NodeType.FAILURE, member_id)
-            if failure_id in builder.nodes:
+            failure_nodes = [
+                node.node_id
+                for node in builder.nodes.values()
+                if str(node.type) == str(NodeType.FAILURE) and node.label == member_id
+            ]
+            for failure_id in sorted(failure_nodes):
                 builder.edge(EdgeType.BELONGS_TO_CLUSTER, failure_id, cluster_id, {}, prov)
         if cluster.canonical_digest:
-            canonical_id = _nid(NodeType.CANONICAL_FINGERPRINT, cluster.canonical_digest)
+            canonical_id = semantic_node_id(
+                NodeType.CANONICAL_FINGERPRINT, cluster.canonical_digest
+            )
             if canonical_id in builder.nodes:
                 builder.edge(EdgeType.BELONGS_TO_CLUSTER, canonical_id, cluster_id, {}, prov)
 
@@ -508,8 +566,16 @@ class _GraphBuilder:
         if existing is None:
             existing = HkgNode(node_id=node_id, type=node_type, label=label, attributes={})
             self.nodes[node_id] = existing
+        elif str(existing.type) != str(node_type) or existing.label != label:
+            raise HkgBuildError(f"incompatible node collision: {node_id}")
         for key, value in attributes.items():
-            existing.attributes.setdefault(key, value)
+            prior = existing.attributes.get(key)
+            if prior is not None and prior != value:
+                raise HkgBuildError(
+                    f"incompatible node attribute collision: {node_id}.{key} "
+                    f"({prior!r} != {value!r})"
+                )
+            existing.attributes[key] = value
         _merge_provenance(existing.provenance, provenance)
         return node_id
 
@@ -521,18 +587,33 @@ class _GraphBuilder:
         attributes: dict[str, str],
         provenance: Provenance,
     ) -> None:
-        edge_id = f"{edge_type}|{source}|{target}"
-        existing = self.edges.get(edge_id)
+        role = attributes.get("role", "")
+        identity = edge_id(edge_type, source, target, role)
+        existing = self.edges.get(identity)
         if existing is None:
             existing = HkgEdge(
-                edge_id=edge_id, type=edge_type, source=source, target=target, attributes={}
+                edge_id=identity, type=edge_type, source=source, target=target, attributes={}
             )
-            self.edges[edge_id] = existing
+            self.edges[identity] = existing
+        elif (
+            str(existing.type) != str(edge_type)
+            or existing.source != source
+            or existing.target != target
+        ):
+            raise HkgBuildError(f"incompatible edge collision: {identity}")
         for key, value in attributes.items():
-            existing.attributes.setdefault(key, value)
+            prior = existing.attributes.get(key)
+            if prior is not None and prior != value:
+                raise HkgBuildError(
+                    f"incompatible edge attribute collision: {identity}.{key} "
+                    f"({prior!r} != {value!r})"
+                )
+            existing.attributes[key] = value
         _merge_provenance(existing.provenance, provenance)
 
-    def finalize(self, *, graph_id: str, warnings: list[str]) -> HkgGraph:
+    def finalize(
+        self, *, graph_id: str, warnings: list[str], sources: list[HkgSourceRecord]
+    ) -> HkgGraph:
         nodes = sorted(self.nodes.values(), key=lambda n: n.node_id)
         edges = sorted(self.edges.values(), key=lambda e: e.edge_id)
         for node in nodes:
@@ -550,6 +631,7 @@ class _GraphBuilder:
             edge_count=len(edges),
             node_type_counts=node_type_counts,
             edge_type_counts=edge_type_counts,
+            sources=sorted(sources, key=lambda source: source.source_id),
             nodes=nodes,
             edges=edges,
             warnings=warnings,
@@ -558,15 +640,33 @@ class _GraphBuilder:
 
 
 def _signal_node(
-    builder: _GraphBuilder, leaf: str, attributes: dict[str, str], prov: Provenance
+    builder: _GraphBuilder,
+    bundle: FailureBundle,
+    identifier: str,
+    attributes: dict[str, str],
+    prov: Provenance,
+    *,
+    label: str | None = None,
 ) -> str:
-    return builder.node(_nid(NodeType.SIGNAL, leaf), NodeType.SIGNAL, leaf, attributes, prov)
+    return builder.node(
+        scoped_node_id(NodeType.SIGNAL, bundle.source_id, identifier),
+        NodeType.SIGNAL,
+        label or identifier.rsplit(".", 1)[-1],
+        attributes,
+        prov,
+    )
 
 
-def _location_node(builder: _GraphBuilder, file_path: str, line: int, prov: Provenance) -> str:
+def _location_node(
+    builder: _GraphBuilder,
+    bundle: FailureBundle,
+    file_path: str,
+    line: int,
+    prov: Provenance,
+) -> str:
     location = f"{file_path}:{line}"
     return builder.node(
-        _nid(NodeType.SOURCE_LOCATION, location),
+        scoped_node_id(NodeType.SOURCE_LOCATION, bundle.source_id, location),
         NodeType.SOURCE_LOCATION,
         location,
         {"file": file_path, "line": str(line)},
@@ -574,8 +674,49 @@ def _location_node(builder: _GraphBuilder, file_path: str, line: int, prov: Prov
     )
 
 
-def _nid(node_type: NodeType, key: str) -> str:
-    return f"{node_type}:{key}"
+def _signal_key(bundle: FailureBundle, identifier: str) -> str:
+    matches: set[str] = set()
+    if bundle.source_map is not None:
+        matches.update(
+            mapping.signal
+            for mapping in bundle.source_map.mappings
+            if identifier in {mapping.signal, mapping.leaf}
+        )
+    if bundle.driver_trace is not None:
+        matches.update(
+            traced.signal
+            for traced in bundle.driver_trace.traced_signals
+            if identifier in {traced.signal, traced.leaf}
+        )
+    return sorted(matches)[0] if len(matches) == 1 else identifier
+
+
+def _intervention_id(
+    bundle: FailureBundle, intervention_id: str, intervention_digest: str | None = None
+) -> str:
+    source_id = (
+        bundle.interventions_prov.source_id
+        if bundle.interventions_prov is not None
+        else bundle.matrix_prov.source_id
+        if bundle.matrix_prov is not None
+        else bundle.source_id
+    )
+    if bundle.interventions is not None:
+        candidate = next(
+            (c for c in bundle.interventions.candidates if c.candidate_id == intervention_id), None
+        )
+        if candidate is not None:
+            return scoped_node_id(NodeType.INTERVENTION, source_id, candidate.semantic_digest)
+    return scoped_node_id(NodeType.INTERVENTION, source_id, intervention_digest or intervention_id)
+
+
+def _experiment_id(bundle: FailureBundle, intervention_id: str) -> str:
+    source_id = bundle.matrix_prov.source_id if bundle.matrix_prov is not None else bundle.source_id
+    if bundle.matrix is not None:
+        row = next((r for r in bundle.matrix.rows if r.intervention_id == intervention_id), None)
+        if row is not None:
+            return scoped_node_id(NodeType.EXPERIMENT, source_id, row.experiment_digest)
+    return scoped_node_id(NodeType.EXPERIMENT, source_id, intervention_id)
 
 
 def _merge_provenance(existing: list[Provenance], provenance: Provenance) -> None:
@@ -586,7 +727,13 @@ def _merge_provenance(existing: list[Provenance], provenance: Provenance) -> Non
 def _sorted_provenance(provenance: list[Provenance]) -> list[Provenance]:
     return sorted(
         provenance,
-        key=lambda p: (p.artifact_id, p.path or "", p.content_sha256 or "", p.schema_version or 0),
+        key=lambda p: (
+            p.source_id,
+            p.artifact_id,
+            p.path or "",
+            p.content_sha256 or "",
+            p.schema_version or 0,
+        ),
     )
 
 
@@ -597,13 +744,16 @@ def _counts(values: object) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
-def _provenance_by_kind(manifest: FailureIntelligenceRunManifest) -> dict[str, Provenance]:
+def _provenance_by_kind(
+    manifest: FailureIntelligenceRunManifest, source_id: str
+) -> dict[str, Provenance]:
     provenance: dict[str, Provenance] = {}
     for artifact in manifest.artifacts:
         provenance.setdefault(
             artifact.kind,
             Provenance(
-                artifact_id=artifact.kind,
+                source_id=source_id,
+                artifact_id=artifact.artifact_id,
                 schema_version=artifact.schema_version,
                 content_sha256=artifact.sha256,
                 path=artifact.relative_path,
@@ -622,11 +772,12 @@ def _artifact_paths(manifest: FailureIntelligenceRunManifest, run_dir: Path) -> 
     return paths
 
 
-def _file_provenance(artifact_id: str, path: Path, model: BaseModel) -> Provenance:
+def _file_provenance(artifact_id: str, path: Path, model: BaseModel, source_id: str) -> Provenance:
     from hashlib import sha256
 
     content = path.read_bytes()
     return Provenance(
+        source_id=source_id,
         artifact_id=artifact_id,
         schema_version=getattr(model, "schema_version", None),
         content_sha256=sha256(content).hexdigest(),

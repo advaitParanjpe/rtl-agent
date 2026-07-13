@@ -1654,3 +1654,63 @@ Required completion validation:
 The audit recommends one coherent next milestone rather than splitting persistence from the integrations that make it safe and useful. Exact implementation scope, acceptance criteria, expected files, and a ready-to-use implementation prompt are in sections 17-20 of the audit.
 
 Next active milestone recorded in `project/current.md`: Persistent HKG Lifecycle and Historical MVP Integration v1.
+
+## 2026-07-12 - Persistent HKG Lifecycle and Historical MVP Integration v1
+
+Implemented the bounded vertical slice from `docs/architecture/persistent-hkg-lifecycle-audit.md`: an explicit, deterministic, local persistent HKG lifecycle over validated real failure-intelligence, relocated failure-package, and MVP counterfactual evidence.
+
+Persistence and lifecycle:
+
+- Advanced the HKG persistent representation to schema 2 and added a manifest schema 1 store at `.rtl-agent/hkg/hkg.json` plus `.rtl-agent/hkg/hkg-manifest.json`.
+- Added typed source/artifact records, lifecycle summaries, and inspection results. Canonical sorted JSON excludes volatile timestamps from semantic output; the manifest records the graph's exact-byte SHA-256, deterministic counts, schema, and source index.
+- Added explicit `build_hkg_store`, `update_hkg_store`, `load_hkg_store`, `inspect_hkg_store`, graph validation, and strict graph merging in `rtl_agent.hkg.lifecycle`.
+- Writes use same-directory temporary files, replace the graph first, and commit the manifest last. Handled write failure restores the prior graph/manifest bytes; failed validation or merge leaves the prior store unchanged.
+- Loading validates JSON, canonical encoding, graph and manifest schemas, graph SHA-256, counts, source indexes/digests, safe source-relative paths, provenance agreement, IDs, and edge endpoints. Persisted HKG schema 1 is rejected with explicit rebuild guidance rather than migrated.
+
+Validated source ingestion and graph construction:
+
+- Added production adapters for an inspected failure-intelligence run, a validated relocated failure package, and a recognizable real MVP output. The adapters verify required typed artifacts, package/run manifests, exact-byte hashes, safe paths, and semantic joins before constructing graph evidence.
+- Original failure runs and equivalent relocated packages normalize to the same logical source record, so relocation is idempotent without retaining original absolute paths.
+- MVP ingestion builds a deterministic source-relative artifact index from the existing summary, reduction, minimized stimulus, intervention manifest/template, experiment matrix, failure package, and result-run artifacts without adding a parallel MVP manifest or changing those producer schemas.
+- Real counterfactual evidence now maps canonical failures, source-scoped failure occurrences/modules/signals/source locations/interventions/experiments, globally semantic observed effects, comparisons, ranking evidence, and deterministic relationships. Repair suggestions remain derived outputs and are never persisted as HKG nodes.
+
+Identity, merge, and conflict behavior:
+
+- Central identity helpers distinguish semantic canonical fingerprints, artifact IDs, source IDs, graph IDs, and file-content SHA-256 values. Persistent occurrence identities are source-scoped and independent of absolute paths, temporary roots, insertion order, and Python object identity.
+- Identical source/content ingestion is a no-op; equivalent relocated evidence is a no-op; new sources add compatible records; shared canonical fingerprints reuse one semantic node while preserving distinct failure occurrences and recomputed cluster membership.
+- Duplicate compatible nodes/edges deduplicate deterministically. Changed content under an existing source identity, or incompatible node/edge payloads under an existing ID, reject rather than silently overwrite or retain a first writer.
+- Canonical build input order and equivalent update order produce byte-identical graph and manifest content.
+
+CLI and historical MVP integration:
+
+- Added only `rtl-agent hkg-build`, `rtl-agent hkg-update`, and `rtl-agent hkg-inspect`, with explicit source arguments, graph-root overrides, JSON operation output, human/JSON inspection, overwrite control for complete rebuilds, and non-zero integrity/conflict failures.
+- Added optional `run-mvp-demo --hkg-store`. When supplied, the MVP loads and validates the persistent graph, derives the current canonical fingerprint, excludes current-source evidence, performs the existing historical lookup, and passes only verified prior evidence to `generate_repair_suggestions(...)`.
+- The default no-HKG MVP flow remains valid and unchanged in behavior. An explicitly supplied corrupt, incompatible, or missing HKG fails clearly instead of silently influencing or bypassing requested memory.
+- Added an additive `historical_memory` disclosure to MVP JSON and a matching Markdown section: request/load status, graph SHA-256, match status, prior failure/intervention/effect counts, current-source exclusions, and an explicit statement that historical evidence is observational and not proof of root cause or repair.
+
+Validation and documentation:
+
+- Added `tests/test_hkg_lifecycle.py` plus focused HKG, MVP, memory, CLI, and packaging coverage. The focused HKG/MVP/CLI set passes 48 tests.
+- Added and registered `scripts/persistent_hkg_lifecycle_check.py`. Its real hermetic flow produced 3 sources, 60 nodes, and 86 edges; equivalent relocated update was a no-op; a later MVP found prior history while excluding one current source; same-identity content conflict and graph tampering were rejected; failed mutation preserved the valid store.
+- Updated the HKG corpus check for source-scoped identities; the three-example corpus now produces 88 nodes, 168 edges, and 3 canonical clusters.
+- Updated README usage for store location, accepted inputs, build/update/inspect, idempotence/conflicts, integrity, legacy rebuild, optional MVP memory, non-causality, and the no-concurrent-writer limitation.
+
+Audit assumptions revised during implementation:
+
+- The audit proposed unavailable-memory fallback for an invalid explicitly supplied graph, while the implementation prompt required explicit corruption to fail clearly. The implementation follows the prompt: no graph remains a safe default; an explicitly requested invalid graph is an error.
+- Existing MVP fields could not provide the required bounded machine-readable memory disclosure. One additive summary field was therefore added without changing the MVP schema version or any failure, package, matrix, fingerprint, clustering, ranking, or repair-suggestion source artifact schema.
+- Importing lifecycle services from `rtl_agent.hkg.__init__` created a cycle through MVP and repair-suggestion models. The explicit Python lifecycle API remains at `rtl_agent.hkg.lifecycle`; the package root exports only dependency-safe HKG models and existing query/build APIs.
+
+Validation:
+
+- Focused `.venv/bin/python -m pytest tests/test_hkg.py tests/test_hkg_lifecycle.py tests/test_mvp_demo.py tests/test_repair_suggestions.py tests/test_cli.py -q` - passed (48 tests).
+- `python3 scripts/persistent_hkg_lifecycle_check.py` - passed (`sources=3`, `nodes=60`, `edges=86`, `idempotent_update=True`, `history_match=True`, `self_excluded=1`, source conflict rejected, graph tamper rejected).
+- `python3 scripts/evidence_artifact_provenance_check.py` - passed.
+- `python3 scripts/hkg_failure_corpus_check.py` - passed (88 nodes, 168 edges, 3 clusters).
+- `python3 scripts/check.py` - passed: Ruff format and lint over 225 files, strict mypy over 225 source files, 468 pytest tests, agent portability, every registered example/pilot/provenance/lifecycle/corpus check, all simulator-gated checks in this environment, the 88-node/168-edge/three-cluster HKG corpus check, and clean wheel-install packaging exposing all three HKG commands. No checks were skipped and no warnings required action.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Known v1 limitations remain explicit: no source deletion/replacement, no concurrent-writer locking or compare-and-swap protection, no schema-1 migration, no database/server/UI, no broad query language, no graph federation, no repair-suggestion nodes, and no causal/root-cause claim. The current MVP source identity combines target commit and output-directory name because existing MVP artifacts have no immutable run identifier.
+
+Next active milestone recorded in `project/current.md`: Persistent HKG Source Lifecycle and Recovery Audit.

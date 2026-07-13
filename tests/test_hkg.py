@@ -166,7 +166,7 @@ def _candidate(candidate_id: str, signal: str) -> InterventionCandidate:
         proposed_replacement="hold <= hold;",
         affected_signal=signal,
         evidence=EvidenceAnchor(signal=f"core.{signal}", leaf=signal, mapping_status="exact"),
-        semantic_digest="sd",
+        semantic_digest=f"sd-{candidate_id}",
         experiment_note="experiment proposal only",
     )
 
@@ -278,18 +278,20 @@ def _bundle(tmp_path: Path, *, with_counterfactual: bool = True) -> FailureBundl
     bundle = load_failure_bundle("failure-core", run_dir)
     if with_counterfactual:
         bundle.matrix = _matrix()
-        bundle.matrix_prov = Provenance(artifact_id="experiment_matrix", schema_version=1)
+        bundle.matrix_prov = Provenance(
+            source_id="mvp:test", artifact_id="experiment-matrix", schema_version=1
+        )
         bundle.interventions = _interventions()
         bundle.interventions_prov = Provenance(
-            artifact_id="intervention_templates", schema_version=1
+            source_id="mvp:test", artifact_id="intervention-templates", schema_version=1
         )
         bundle.experiment_comparisons = _comparisons()
         bundle.experiment_comparisons_prov = Provenance(
-            artifact_id="experiment_comparisons", schema_version=1
+            source_id="mvp:test", artifact_id="mvp-summary", schema_version=1
         )
         bundle.intervention_rankings = _rankings()
         bundle.intervention_rankings_prov = Provenance(
-            artifact_id="intervention_rankings", schema_version=1
+            source_id="mvp:test", artifact_id="mvp-summary", schema_version=1
         )
     return bundle
 
@@ -345,13 +347,12 @@ def test_all_node_and_edge_types_present(tmp_path: Path) -> None:
 
 def test_provenance_is_retained(tmp_path: Path) -> None:
     graph = build_hkg([_bundle(tmp_path)], graph_id="g")
-    by_id = {n.node_id: n for n in graph.nodes}
-    failure = by_id["failure:failure-core"]
-    assert failure.provenance and failure.provenance[0].artifact_id == "run_manifest"
+    failure = next(node for node in graph.nodes if node.type == "failure")
+    assert failure.provenance and failure.provenance[0].artifact_id == "run-manifest"
     # The signal-source map provenance carries a schema version and a content hash.
     module = next(n for n in graph.nodes if n.type == "module")
     prov = module.provenance[0]
-    assert prov.artifact_id == "signal_source_map_report"
+    assert prov.artifact_id == "signal-source-map"
     assert prov.schema_version is not None
     assert prov.content_sha256 and prov.path
     # Every node and edge has at least one provenance record.
@@ -374,16 +375,34 @@ def test_repeated_ingestion_is_byte_identical(tmp_path: Path) -> None:
 
 def test_counterfactual_edges(tmp_path: Path) -> None:
     graph = build_hkg([_bundle(tmp_path)], graph_id="g")
+    failure = next(node for node in graph.nodes if node.type == "failure")
+    cand_a = next(
+        node for node in graph.nodes if node.type == "intervention" and node.label == "cand-a"
+    )
+    cand_b_experiment = next(
+        node for node in graph.nodes if node.type == "experiment" and node.label == "cand-b"
+    )
+    cand_a_experiment = next(
+        node for node in graph.nodes if node.type == "experiment" and node.label == "cand-a"
+    )
+    removed = next(
+        node
+        for node in graph.nodes
+        if node.type == "observed_effect" and node.label == "failure_removed"
+    )
     edges = {(e.type, e.source, e.target) for e in graph.edges}
-    assert ("generated", "failure:failure-core", "intervention:cand-a") in edges
-    assert ("produced", "experiment:cand-a", "observed_effect:failure_removed") in edges
-    assert ("references", "experiment:cand-a", "intervention:cand-a") in edges
+    assert ("generated", failure.node_id, cand_a.node_id) in edges
+    assert ("produced", cand_a_experiment.node_id, removed.node_id) in edges
+    assert ("references", cand_a_experiment.node_id, cand_a.node_id) in edges
     # The changed experiment references its result canonical fingerprint.
-    assert ("references", "experiment:cand-b", "canonical_fingerprint:rc-b") in edges
-    interventions = {n.node_id: n for n in graph.nodes if n.type == "intervention"}
-    assert interventions["intervention:cand-a"].attributes["ranking_rank"] == "1"
-    experiments = {n.node_id: n for n in graph.nodes if n.type == "experiment"}
-    assert experiments["experiment:cand-b"].attributes["canonical_changed"] == "True"
+    assert ("references", cand_b_experiment.node_id, "canonical_fingerprint:rc-b") in edges
+    ranking = next(
+        edge
+        for edge in graph.edges
+        if edge.source == cand_a.node_id and edge.attributes.get("role") == "ranking"
+    )
+    assert ranking.attributes["ranking_rank"] == "1"
+    assert cand_b_experiment.attributes["canonical_changed"] == "True"
 
 
 def test_belongs_to_cluster_edges(tmp_path: Path) -> None:
@@ -392,8 +411,9 @@ def test_belongs_to_cluster_edges(tmp_path: Path) -> None:
         graph_id="g",
         cluster_report=_cluster("failure-core", "canon-x"),
     )
+    failure = next(node for node in graph.nodes if node.type == "failure")
     edges = {(e.type, e.source, e.target) for e in graph.edges}
-    assert ("belongs_to_cluster", "failure:failure-core", "failure_cluster:cluster-abc") in edges
+    assert ("belongs_to_cluster", failure.node_id, "failure_cluster:cluster-abc") in edges
 
 
 def test_missing_canonical_fingerprint_warns(tmp_path: Path) -> None:
@@ -408,7 +428,8 @@ def test_query_get_node_and_list_nodes_by_type(tmp_path: Path) -> None:
     graph = build_hkg([_bundle(tmp_path)], graph_id="g")
     query = query_graph(graph)
 
-    failure = query.get_node("failure:failure-core")
+    failure_id = next(node.node_id for node in graph.nodes if node.type == "failure")
+    failure = query.get_node(failure_id)
     assert failure is not None
     assert failure.type == "failure"
     assert query.get_node("failure:missing") is None
@@ -423,11 +444,17 @@ def test_query_incoming_and_outgoing_edges(tmp_path: Path) -> None:
     graph = build_hkg([_bundle(tmp_path)], graph_id="g")
     query = query_graph(graph)
 
-    outgoing = query.outgoing_edges("failure:failure-core")
+    failure_id = next(node.node_id for node in graph.nodes if node.type == "failure")
+    intervention_id = next(
+        node.node_id
+        for node in graph.nodes
+        if node.type == "intervention" and node.label == "cand-a"
+    )
+    outgoing = query.outgoing_edges(failure_id)
     assert outgoing
     assert [edge.edge_id for edge in outgoing] == sorted(edge.edge_id for edge in outgoing)
-    assert query.outgoing_edges("failure:failure-core", EdgeType.GENERATED)
-    assert query.incoming_edges("intervention:cand-a", EdgeType.REFERENCES)
+    assert query.outgoing_edges(failure_id, EdgeType.GENERATED)
+    assert query.incoming_edges(intervention_id, EdgeType.REFERENCES)
     assert query.outgoing_edges("missing") == []
     assert query.incoming_edges("missing") == []
 
@@ -437,9 +464,9 @@ def test_query_find_signals_by_module_and_name(tmp_path: Path) -> None:
     query = query_graph(graph)
 
     module_signals = query.find_signals(module="core")
-    assert "signal:hold" in {node.node_id for node in module_signals}
-    assert query.find_signals(module="core", name="hold")[0].node_id == "signal:hold"
-    assert query.find_signals(name="core.hold")[0].node_id == "signal:hold"
+    assert "hold" in {node.label for node in module_signals}
+    assert query.find_signals(module="core", name="hold")[0].label == "hold"
+    assert query.find_signals(name="core.hold")[0].label == "hold"
     assert query.find_signals(module="missing") == []
     assert query.find_signals(module="core", name="missing") == []
 
@@ -450,7 +477,7 @@ def test_query_find_failures_by_canonical_fingerprint(tmp_path: Path) -> None:
     query = query_graph(graph)
 
     failures = query.find_failures_by_canonical_fingerprint(bundle.fingerprint.canonical_digest)
-    assert [node.node_id for node in failures] == ["failure:failure-core"]
+    assert [node.label for node in failures] == ["failure-core"]
     assert query.find_failures_by_canonical_fingerprint("missing") == []
 
 
@@ -462,11 +489,9 @@ def test_query_find_cluster_members(tmp_path: Path) -> None:
     )
     query = query_graph(graph)
 
-    assert [node.node_id for node in query.find_cluster_members("cluster-abc")] == [
-        "failure:failure-core"
-    ]
-    assert [node.node_id for node in query.find_cluster_members("failure_cluster:cluster-abc")] == [
-        "failure:failure-core"
+    assert [node.label for node in query.find_cluster_members("cluster-abc")] == ["failure-core"]
+    assert [node.label for node in query.find_cluster_members("failure_cluster:cluster-abc")] == [
+        "failure-core"
     ]
     assert query.find_cluster_members("missing") == []
 
@@ -476,16 +501,13 @@ def test_query_interventions_and_experiment_outcomes(tmp_path: Path) -> None:
     query = query_graph(graph)
 
     interventions = query.find_interventions_for_failure("failure-core")
-    assert [node.node_id for node in interventions] == [
-        "intervention:cand-a",
-        "intervention:cand-b",
-    ]
+    assert [node.label for node in interventions] == ["cand-a", "cand-b"]
     assert query.find_interventions_for_failure("missing") == []
 
     results = query.find_experiments_for_intervention("cand-a")
     assert len(results) == 1
-    assert results[0].experiment.node_id == "experiment:cand-a"
-    assert [node.node_id for node in results[0].outcomes] == ["observed_effect:failure_removed"]
+    assert results[0].experiment.label == "cand-a"
+    assert [node.label for node in results[0].outcomes] == ["failure_removed"]
     assert query.find_experiments_for_intervention("missing") == []
 
 
@@ -493,11 +515,12 @@ def test_query_get_provenance_for_node_and_edge(tmp_path: Path) -> None:
     graph = build_hkg([_bundle(tmp_path)], graph_id="g")
     query = query_graph(graph)
 
-    node_prov = query.get_provenance("failure:failure-core")
-    assert node_prov and node_prov[0].artifact_id == "run_manifest"
-    edge = query.outgoing_edges("failure:failure-core", EdgeType.GENERATED)[0]
+    failure_id = next(node.node_id for node in graph.nodes if node.type == "failure")
+    node_prov = query.get_provenance(failure_id)
+    assert node_prov and node_prov[0].artifact_id == "run-manifest"
+    edge = query.outgoing_edges(failure_id, EdgeType.GENERATED)[0]
     edge_prov = query.get_provenance(edge.edge_id)
-    assert edge_prov and edge_prov[0].artifact_id == "intervention_templates"
+    assert edge_prov and edge_prov[0].artifact_id == "intervention-templates"
     assert query.get_provenance("missing") == []
 
 
@@ -507,10 +530,7 @@ def test_query_graph_file_loads_serialized_graph(tmp_path: Path) -> None:
     write_graph(graph, output)
 
     query = query_graph_file(output)
-    assert query.get_node("failure:failure-core") is not None
-    assert [node.node_id for node in query.list_nodes_by_type(NodeType.FAILURE)] == [
-        "failure:failure-core"
-    ]
+    assert [node.label for node in query.list_nodes_by_type(NodeType.FAILURE)] == ["failure-core"]
 
 
 def test_historical_memory_seen_before_match(tmp_path: Path) -> None:

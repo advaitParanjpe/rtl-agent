@@ -124,7 +124,7 @@ def main() -> int:
         assert memory.prior_interventions == ()
         assert memory.prior_observed_effects == ()
         assert memory.provenance
-        first_failure = query.get_node(f"failure:{first_member}")
+        first_failure = matching_failures[0] if matching_failures else None
         assert first_failure is not None
         assert query.get_provenance(first_failure.node_id)
         assert query.find_interventions_for_failure(first_member) == []

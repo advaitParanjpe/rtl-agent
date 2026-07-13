@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Persistent HKG Lifecycle and Counterfactual Evidence Integration Audit
+Persistent HKG Lifecycle and Historical MVP Integration v1
 
 ## Completed Work
 
@@ -36,4 +36,4 @@ Persistent HKG Lifecycle and Counterfactual Evidence Integration Audit
 
 ## Resume Instructions
 
-- Read `AGENTS.md`, `project/current.md`, and `docs/architecture/persistent-hkg-lifecycle-audit.md`; the next active milestone is `Persistent HKG Lifecycle and Historical MVP Integration v1`.
+- Read `AGENTS.md`, `project/current.md`, and `docs/architecture/persistent-hkg-lifecycle-audit.md`; the next active milestone is `Persistent HKG Source Lifecycle and Recovery Audit`.

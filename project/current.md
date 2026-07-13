@@ -1,26 +1,24 @@
-# Persistent HKG Lifecycle and Historical MVP Integration v1
+# Persistent HKG Source Lifecycle and Recovery Audit
 
 ## Objective
 
-Implement one deterministic local vertical slice that persists and updates a provenance-validated HKG from real failure-intelligence runs, relocated failure packages, and MVP counterfactual outputs; exposes minimal build/update/inspect CLI operations; and optionally supplies prior, self-excluded HKG memory to later MVP repair suggestions with explicit JSON/Markdown disclosure and safe no-memory fallback.
+Perform a bounded, read-only architecture and implementation audit of the concrete operational limitations left by persistent HKG v1: MVP source identity stability, explicit source replacement/removal, interrupted-write recovery, and concurrent-writer detection. Define the smallest coherent deterministic local follow-up without implementing it.
 
 ## Scope
 
-- Implement the canonical `.rtl-agent/hkg/` graph plus integrity-manifest store specified in `docs/architecture/persistent-hkg-lifecycle-audit.md`.
-- Add validated lifecycle adapters for original failure runs, relocated failure packages, and real MVP demo outputs.
-- Implement deterministic build, update, idempotence, conflict rejection, provenance validation, and minimal `hkg-build`, `hkg-update`, and `hkg-inspect` commands.
-- Correct HKG-only persistent identities/provenance and ingest real minimized-stimulus, intervention, experiment, outcome, comparison, and ranking evidence.
-- Add optional self-excluded historical-memory lookup to later MVP repair suggestions with structured/Markdown disclosure and safe fallback.
-- Add focused tests and one deterministic hermetic registered lifecycle check.
+- Inspect the implemented schema-2 graph/manifest lifecycle, source adapters, atomic-write behavior, CLI, tests, and registered lifecycle check.
+- Evaluate whether an additive immutable MVP source identifier is justified by the current `target_commit` plus output-directory-name key and identify every affected producer/consumer if so.
+- Define explicit, provenance-safe semantics for replacing or removing one source without silently retaining stale source-scoped graph evidence.
+- Define bounded crash-recovery and concurrent-writer detection requirements consistent with the two-file local store; do not assume a database or locking framework is required.
+- Recommend one smallest coherent implementation milestone, with exact files, compatibility rules, failure behavior, tests, and acceptance criteria.
 
 ## Acceptance Criteria
 
-- Rebuilding or reingesting identical relocated sources is byte-deterministic and idempotent.
-- Changed same-identity, tampered, unsafe, malformed, corrupt, or incompatible evidence is rejected without partial writes.
-- Real failure/package/MVP artifacts are ingested with source-relative, hash-cited provenance; same-canonical failures remain distinct occurrences.
-- The three bounded lifecycle commands validate and report the persistent store deterministically.
-- MVP remains valid with absent/unavailable memory and discloses verified historical evidence when used without causal overclaiming.
-- Focused, hermetic lifecycle, full canonical, whitespace, and Git-state validation pass.
+- The audit distinguishes confirmed behavior, proposed behavior, and unresolved issues with concrete file paths, symbols, identities, and runtime evidence.
+- Replacement/removal rules account for source-scoped nodes, shared canonical entities, derived clusters, provenance, idempotence, and rollback on failure.
+- Recovery and writer-safety recommendations preserve deterministic local operation and identify whether a lightweight generation/compare-and-swap mechanism is sufficient.
+- Any source-schema addition is justified narrowly and remains additive/backward-compatible; unnecessary migrations are rejected.
+- The next implementation milestone is bounded, testable, and does not include unrelated HKG query, inference, server, UI, or database work.
 
 ## Required Validation Commands
 
@@ -30,7 +28,7 @@ Implement one deterministic local vertical slice that persists and updates a pro
 
 ## Exclusions
 
-- No external model-provider integration, supervisor enforcement, automatic patch generation, database/server/UI, source deletion/replacement, broad migration framework, graph federation, advanced graph algorithms, broad query language, or causal/root-cause claims.
+- Read-only audit only. No production code, tests, schemas, CLI behavior, graph/source artifacts, source replacement/removal, writer locking, database/server/UI, broad migration framework, graph federation, advanced graph algorithms, external model-provider integration, supervisor enforcement, automatic patch generation, or causal/root-cause claims.
 
 ## Completion State
 
