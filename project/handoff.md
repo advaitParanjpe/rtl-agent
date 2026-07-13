@@ -8,7 +8,7 @@ None
 
 ## Last Completed Checkpoint
 
-Evidence-Guided Repair Suggestions v0
+Prohibited-Shortcut Review Finding Example Check
 
 ## Completed Work
 
@@ -36,4 +36,4 @@ Evidence-Guided Repair Suggestions v0
 
 ## Resume Instructions
 
-- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Prohibited-Shortcut Review Finding Example Check`.
+- Read `AGENTS.md` and `project/current.md`; the next active milestone is `Evidence Artifact Provenance Integrity Check`.

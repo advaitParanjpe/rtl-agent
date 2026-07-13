@@ -1,20 +1,20 @@
-# Prohibited-Shortcut Review Finding Example Check
+# Evidence Artifact Provenance Integrity Check
 
 ## Objective
 
-Add a compact, deterministic local example check that exercises the existing but currently untested `det-prohibited-shortcut-N` review finding, using a deliberate diff that textually conflicts with a task-contract prohibited shortcut. This closes the last remaining coverage gap for the review service's prohibited-shortcut detection. It is read-only and reuses the existing review and task-contract representations with no new analysis behavior.
+Add a deterministic local check that validates existing MVP/failure-intelligence artifact references and hashes remain internally consistent across generated summaries, evidence bundles, and exported packages. This should tighten confidence in artifact provenance without adding analysis behavior.
 
 ## Scope
 
-- Add a small example check (a `scripts/*_check.py` registered in `scripts/check.py`, consistent with the existing example checks) that constructs a minimal task contract containing at least one explicit prohibited shortcut, plus a candidate implementation diff whose text deliberately conflicts with that prohibited shortcut, runs the existing review service, and asserts the `det-prohibited-shortcut-N` finding is produced with the expected deterministic finding id and evidence.
-- Reuse the existing review service, task-contract parsing/representation, and review-report models verbatim; do not add new analysis behavior, new finding types, or schema changes.
-- Keep the check hermetic (no simulator dependency) and deterministic; if any real dependency is required, gate it cleanly, but prefer a fully hermetic fixture.
-- If a genuine defect in the existing prohibited-shortcut detection is discovered while writing the check, fix only that narrow defect; otherwise leave the review service unchanged.
+- Add a compact `scripts/*_check.py` registered in `scripts/check.py` that reuses existing example fixtures and typed models.
+- Verify that artifact references in generated reports resolve to the expected local files and that recorded SHA-256 values match file contents where the existing schemas record hashes.
+- Keep the check deterministic and local; gate any simulator-backed path cleanly if needed, but prefer existing hermetic artifacts.
+- Do not add schemas, new analysis behavior, graph features, provider integration, automatic patching, or broad refactors.
 
 ## Acceptance Criteria
 
-- One registered example check deterministically exercises the `det-prohibited-shortcut-N` review finding via the existing review service and asserts the finding is emitted for a diff that conflicts with a task-contract prohibited shortcut, and absent for a clean diff.
-- No new analysis behavior, finding types, or schema changes; the check is read-only and hermetic.
+- One registered deterministic local check validates provenance/path/hash consistency across existing generated artifacts.
+- The implementation reuses existing models and artifact conventions only.
 - All existing tests, example checks, packaging smoke, and canonical validation continue to pass.
 
 ## Required Validation Commands
@@ -25,8 +25,7 @@ Add a compact, deterministic local example check that exercises the existing but
 
 ## Exclusions
 
-- No new review analysis behavior, no new finding types, no schema changes, no automatic patching, and no causal claims.
-- No new model providers, databases, remote execution, CI, or UI.
+- No new analysis behavior, schema changes, graph features, model providers, databases, remote execution, CI, UI, automatic patching, or causal claims.
 
 ## Completion State
 

@@ -1544,3 +1544,25 @@ Suggestion rules are deterministic and auditable. Ranked interventions with alte
 MVP demo summaries now include additive `repair_suggestions` in JSON and render a "Repair-direction suggestions" Markdown section. The existing failure-corpus integration check asserts every corpus demo emits evidence-backed, non-causal suggestions. Focused unit tests cover ranked suggestions, fallback suggestions, insufficient-evidence/no-suggestion cases, determinism, and Markdown surfacing.
 
 Deferred capabilities remain explicit: no automatic patching, no generated code edits, no new intervention templates, no new fingerprint algorithms, no LLM/API-key requirement, no global repair ranking, and no causal/root-cause claims.
+
+## 2026-07-13 - Prohibited-Shortcut Review Finding Example Check
+
+Added a compact deterministic example check, `scripts/prohibited_shortcut_review_check.py`, and registered it in `scripts/check.py`. The check constructs minimal local artifacts using the existing typed models: a task contract with `Do not delete rtl/top.sv`, a repository map containing `rtl/top.sv`, a proposed-diff implementation report with passing validation evidence, and explicit diff files.
+
+The positive case calls the existing `review_implementation(...)` path and verifies that a diff containing the existing matched token `delete rtl/top.sv` emits exactly `det-prohibited-shortcut-1`, with error severity, matched-token evidence, task-contract evidence citation, and an unacceptable review outcome. The negative control uses a clean diff over the same modeled inputs and verifies that no prohibited-shortcut finding is emitted and the review remains acceptable.
+
+No review behavior, prohibited-shortcut matching logic, finding types, schemas, provider integration, or unrelated roadmap items changed.
+
+Focused validation while implementing:
+
+- `python3 scripts/prohibited_shortcut_review_check.py` - passed.
+- `.venv/bin/python -m ruff format --check scripts/prohibited_shortcut_review_check.py scripts/check.py` - passed after formatting the new script.
+- `.venv/bin/python -m ruff check scripts/prohibited_shortcut_review_check.py scripts/check.py` - passed.
+
+Required completion validation:
+
+- `python3 scripts/check.py` - passed.
+- `git diff --check` - passed.
+- `git status --short` - reviewed before commit.
+
+Next active milestone recorded in `project/current.md`: Evidence Artifact Provenance Integrity Check.
